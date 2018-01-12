@@ -21,7 +21,7 @@ Other documents that are in progress:
 
 # Some Applications
 
-Some deadlock-free programs verified in [VeriFast]() according to the presented proof rules can be found at 
+Some deadlock-free programs verified in [VeriFast](https://people.cs.kuleuven.be/~bart.jacobs/verifast/) according to the presented proof rules can be found at [VeriFast GitHub repository](https://github.com/verifast/verifast)
 
 # The Approach in details
 
