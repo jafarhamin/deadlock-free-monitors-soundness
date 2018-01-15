@@ -1,7 +1,7 @@
 #include "stdlib.h"
 #include "monitors.h"
 #include "queues.h"
-#include "ghost_resources.h"
+#include "auth_monoid.h"
 
 struct buffer {
    struct queue *q;
@@ -12,29 +12,29 @@ struct buffer {
 
 /*@
 predicate_ctor buffer(struct buffer *b)(fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot) =
-  b->q |-> ?q &*& [_]b->v |-> ?v &*& queue(q,?s) &*& s >= 0 &*& [_]b->m |-> ?m &*& [_]b->gid |-> ?i &*& Trn(v) == vtrn(i) &*&
+  b->q |-> ?q &*& [_]b->v |-> ?v &*& queue(q,?s) &*& s >= 0 &*& [_]b->m |-> ?m &*& [_]b->gid |-> ?gid &*& Trn(v) == vtrn(gid) &*&
   mutex_of(v)==m &*&
   P(v)==false &*&
-  Resources(i,?Ct) &*&
-  Wt(v) + int_of_nat(Ct) <= Ot(v) + s &*&
+  authfull(gid,?Ct) &*&
+  Wt(v) + Ct <= Ot(v) + s &*&
   Wt(v) <= Ot(v);
 @*/
 
 /*@
 predicate_family_instance thread_run_data(consumer_thread)(list<void*> tobs, struct buffer *b) =
-   [_]b->m |-> ?m &*& [_]b->v |-> ?v &*& [_]mutex(m) &*& inv(m) == buffer(b) &*& [_]b->gid |-> ?i
-   &*& resource(i) &*& tobs == nil;
+   [_]b->m |-> ?m &*& [_]b->v |-> ?v &*& [_]b->gid |-> ?gid &*& [_]mutex(m) &*& inv(m) == buffer(b)
+   &*& authfrag(gid,1) &*& tobs == nil;
 
 predicate_family_instance thread_run_data(producer_thread)(list<void*> tobs, struct buffer *b) =
-   [_]b->m |-> ?m &*& [_]b->v |-> ?v &*& [_]mutex(m) &*& inv(m) == buffer(b)
-   &*& no_cycle(m,cons(v,nil))== true  &*& tobs == cons(v,nil);
+   [_]b->m |-> ?m &*& [_]b->v |-> ?v &*& [_]b->gid |-> ?gid &*& [_]mutex(m) &*& inv(m) == buffer(b)
+   &*& no_cycle(m,cons(v,nil))== true &*& authfrag(gid,0) &*& tobs == cons(v,nil);
 
-predicate_ctor vtrn(int i)() = resource(i);
+predicate_ctor vtrn(int gid)() = authfrag(gid,1);
 @*/
 
 void consumer(struct buffer *b)
-    /*@ requires [_]b->m |-> ?m &*& [_]b->v |-> ?v &*& [_]mutex(m) &*& inv(m) == buffer(b) &*& [_]b->gid |-> ?i
-          &*& obs(?O) &*& resource(i)
+    /*@ requires [_]b->m |-> ?m &*& [_]b->v |-> ?v &*& [_]mutex(m) &*& inv(m) == buffer(b) &*& [_]b->gid |-> ?gid
+          &*& obs(?O) &*& authfrag(gid,1)
           &*& no_cycle(v,O) == true
           &*& no_cycle(m,O) == true;
     @*/
@@ -46,32 +46,35 @@ void consumer(struct buffer *b)
   //@ leak [_]b->v |-> v;
   
   while (size_of(b->q)==0)
-  /*@ invariant [_]b->m |-> m &*& [_]b->v |-> v &*&  b->q |-> ?q &*& queue(q,?s) &*& s>=0 &*& mutex_held(m, _, ?Wt, ?Ot) &*& [_]b->gid |-> i
-                &*& Resources(i,?Ct)
-                &*& Wt(v) + int_of_nat(Ct) <= Ot(v) + s
+  /*@ invariant [_]b->m |-> m &*& [_]b->v |-> v &*&  b->q |-> ?q &*& [_]b->gid |-> gid &*& queue(q,?s) &*& s>=0 &*& mutex_held(m, _, ?Wt, ?Ot)
+                &*& authfull(gid,?Ct)
+                &*& Wt(v) + Ct <= Ot(v) + s
                 &*& Wt(v) <= Ot(v)
-                &*& obs(cons(m,O)) &*& resource(i);
+                &*& obs(cons(m,O)) &*& authfrag(gid,1);
   @*/
   {
-    //@ lose_g_resource(i);
+    //@ upd_ghost(gid,-1);
     //@ close buffer(b)(finc(Wt,v),Ot);
     //@ close mutex_inv(m,buffer(b));
-    //@ close cond_trn(v,vtrn(i));
+    //@ close cond_trn(v,vtrn(gid));
     mutex_cond_wait(b->v, b->m);
     //@ open buffer(b)(_,_);
-    //@ open vtrn(i)();
+    //@ open vtrn(gid)();
+    
+    //@ leak authfrag(gid,0);
   }
   dequeue(b->q);
-  //@ lose_g_resource(i);
+  //@ upd_ghost(gid,-1);
   //@ close buffer(b)(Wt, Ot);
   //@ close mutex_inv(m,buffer(b));
   mutex_release(b->m);
   //@ leak [_]mutex(m);
+  //@ leak authfrag(gid,0);
 }
 
 void producer(struct buffer *b)
-    /*@ requires [_]b->m |-> ?m &*& [_]b->v |-> ?v &*& [_]mutex(m) &*& inv(m) == buffer(b)
-          &*& obs(cons(v,?O))
+    /*@ requires [_]b->m |-> ?m &*& [_]b->v |-> ?v &*& [_]b->gid |-> ?gid &*& [_]mutex(m) &*& inv(m) == buffer(b)
+          &*& obs(cons(v,?O)) &*& authfrag(gid,0)
           &*& no_cycle(m,cons(v,O))== true;
     @*/
     //@ ensures [_]b->m |-> m &*& [_]b->v |-> v &*& [_]mutex(m) &*& obs(O);
@@ -79,12 +82,13 @@ void producer(struct buffer *b)
   //@ close mutex_inv(m,buffer(b));
   mutex_acquire(b->m);
   //@ open buffer(b)(?Wt,_);
-  //@ assert [_]b->gid |-> ?i;
-  //@ close cond_trn(v,vtrn(i));
+  //@ close cond_trn(v,vtrn(gid));
   /*@ if (Wt(v)>0){
-        gain_g_resource(i);
-        close vtrn(i)();
+        upd_ghost(gid,1);
+        close vtrn(gid)();
       }
+      else
+        leak authfrag(gid,0);
   @*/
 
   mutex_cond_signal(b->v);
@@ -121,13 +125,13 @@ void main()
     //@ close create_mutex_ghost_args(0,nil);
     struct mutex *m = create_mutex();
     
-    //@ int gid = create_g_id();
+    //@ int gid = ghost_create2(0,1);
     //@ close create_mutex_cond_ghost_args(m,1,false,vtrn(gid));
     struct mutex_cond *v = create_mutex_cond();
-    
+
     struct buffer *b = malloc(sizeof(struct buffer));
     if (b==0)
-      abort();
+      abort();    
     b->q = q;
     b->m = m;
     b->v = v;
@@ -135,10 +139,9 @@ void main()
     
     //@ leak [_]b->v |-> _;
     //@ leak [_]b->m |-> _;
-    //@ leak [_]b->gid |-> _;    
+    //@ leak [_]b->gid |-> _;
     //@ leak [_]malloc_block_buffer(_);
-    
-    //@ gain_g_resource(b->gid);
+
     //@ g_chrgu(v);
     //@ close init_mutex_ghost_args(buffer(b));
     //@ close buffer(b)(empb,finc(empb,v));

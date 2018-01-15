@@ -1,5 +1,5 @@
 /*
-  This module provieds two synchronization constructs, including mutexes and condition variables, in order to verifiy deadlock freedom of programs using these synchronizers.
+  This module provieds two synchronization constructs, including mutexes and condition variables, in order to verifiy deadlock-freedom of programs using these synchronizers.
 */
 
 
