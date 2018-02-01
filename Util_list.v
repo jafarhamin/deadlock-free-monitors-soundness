@@ -1,3 +1,5 @@
+Add LoadPath "/Users/jafarhamin/Desktop/deadlock-free-monitors-soundness".
+
 Require Import List.
 Require Import ZArith.
 Require Import Coq.Init.Nat.
@@ -1769,6 +1771,47 @@ Proof.
   assumption.
 Qed.
 
+Lemma eq_map A B (m: (A * Z) -> B) (m': (A * Z) -> (A * Z)):
+  forall (l: list (A * Z)) id x
+         (M': forall x, m x = m (m' x) /\ snd (m' x) = snd x),
+    map m (updl (map m' l) id x) = map m (updl l id x).
+Proof.
+  induction l.
+  simpl.
+  reflexivity.
+  simpl.
+  intros.
+  destruct (m' a) eqn:m'a.
+  destruct a.
+  simpl.
+  destruct (Z.eq_dec z id).
+  destruct (Z.eq_dec z0 id).
+  rewrite IHl.
+  reflexivity.
+  assumption.
+  assert (M2:=M').
+  specialize M2 with (a,z0).
+  destruct M2 as (M2,M3).
+  rewrite m'a in M3.
+  simpl in *.
+  omega.
+  destruct (Z.eq_dec z0 id).
+  assert (M2:=M').
+  specialize M2 with (a,z0).
+  destruct M2 as (M2,M3).
+  rewrite m'a in M3.
+  simpl in *.
+  omega.
+  assert (M2:=M').
+  specialize M2 with (a,z0).
+  destruct M2 as (M2,M3).
+  rewrite m'a in M2.
+  rewrite M2.
+  rewrite IHl.
+  reflexivity.
+  assumption.
+Qed.
+
 Lemma filter_updl_eq A B (f: B -> bool) (m: (A * Z) -> B):
   forall (l: list (A * Z)) x z
          (F1: f (m x) = false)
@@ -1899,6 +1942,131 @@ Proof.
   destruct IN1 as (IN1,EQ1).
   apply Z.eqb_eq in EQ1.
   auto.
+Qed.
+
+Lemma map_updl A B (m: A * Z -> B):
+  forall (l: list (A * Z)) x 
+          (NODUP: NoDup (map snd l)) 
+         (IN: In (m x,snd x) (map (fun x => (m x, snd x)) l)),
+    map (fun x => (m x, snd x)) (updl l (snd x) x) = map (fun x => (m x, snd x)) l.
+Proof.
+  induction l.
+  simpl.
+  reflexivity.
+  simpl.
+  intros.
+  destruct x.
+  destruct a.
+  simpl in *.
+  destruct IN as [EQ|IN].
+  inversion EQ.
+  rewrite eqz.
+  rewrite <- H0.
+  rewrite H1.
+  simpl.
+  rewrite updl_eq_l.
+  reflexivity.
+  rewrite <- H1.
+  assumption.
+  destruct (Z.eq_dec z0 z).
+  exfalso.
+  apply in_map_iff in IN.
+  destruct IN as (x,(EQ,IN)).
+  eapply NoDup_elem.
+  apply NODUP.
+  unfold elem.
+  apply filter_In.
+  split.
+  apply IN.
+  inversion EQ.
+  rewrite H1.
+  rewrite e.
+  apply Z.eqb_eq.
+  reflexivity.
+  simpl.
+  erewrite <- IHl with (a0,z).
+  reflexivity.
+  inversion NODUP.
+  assumption.
+  assumption.
+Qed.
+
+Lemma map_updl2 A B (m: A * Z -> B):
+  forall (l: list (A * Z)) x 
+         (NODUP: NoDup (map snd l)) 
+         (IN: In (m x,snd x) (map (fun x => (m x, snd x)) l)),
+    map m (updl l (snd x) x) = map m l.
+Proof.
+  induction l.
+  simpl.
+  reflexivity.
+  simpl.
+  intros.
+  destruct x.
+  destruct a.
+  simpl in *.
+  destruct IN as [EQ|IN].
+  inversion EQ.
+  rewrite eqz.
+  rewrite <- H0.
+  rewrite H1.
+  simpl.
+  rewrite updl_eq_l.
+  reflexivity.
+  rewrite <- H1.
+  assumption.
+  destruct (Z.eq_dec z0 z).
+  exfalso.
+  apply in_map_iff in IN.
+  destruct IN as (x,(EQ,IN)).
+  eapply NoDup_elem.
+  apply NODUP.
+  unfold elem.
+  apply filter_In.
+  split.
+  apply IN.
+  inversion EQ.
+  rewrite H1.
+  rewrite e.
+  apply Z.eqb_eq.
+  reflexivity.
+  simpl.
+  erewrite <- IHl with (a0,z).
+  reflexivity.
+  inversion NODUP.
+  assumption.
+  assumption.
+Qed.
+
+Lemma in_map_updl A B (m: A * Z -> B):
+  forall (l: list (A * Z)) p i i' x'
+         (NEQ: i <> i')
+         (IN: In (p,i) (map (fun x => (m x, snd x)) l)),
+    In (p,i) (map (fun x => (m x, snd x)) (updl l i' x')).
+Proof.
+  induction l.
+  simpl.
+  intros.
+  assumption.
+  simpl.
+  intros.
+  destruct IN as [EQ|IN].
+  inversion EQ.
+  rewrite H1.
+  destruct (Z.eq_dec i i').
+  contradiction.
+  left.
+  rewrite H1.
+  reflexivity.
+  destruct (Z.eq_dec (snd a) i').
+  right.
+  apply IHl.
+  assumption.
+  assumption.
+  right.
+  apply IHl.
+  assumption.
+  assumption.
 Qed.
 
 Lemma updl_updl_neq A:
@@ -2374,6 +2542,7 @@ Lemma defl_bagdef:
 Proof.
   unfold bagdef.
   unfold defl.
+  intros.
   trivial.
 Qed.
 
@@ -3297,6 +3466,7 @@ Proof.
   trivial.
 Qed.
 
+
 (** # <font size="5"><b> concat </b></font> # *)
 
 Lemma concat_map_filter A (f1: A -> list Z) (f2: A -> bool):
@@ -3510,4 +3680,44 @@ Proof.
   contradiction.
   assumption.
   assumption.
+Qed.
+
+(** # <font size="5"><b> Domain-Lift </b></font> # *)
+
+Definition dom_f A (f: Z -> option A) D :=
+  forall z, In z D -> f z <> None.
+
+Definition lift_f A default (f: Z -> option A) : (Z -> A) :=
+  fun x => match (f x) with
+            | Some z => z
+            | None => default
+           end.
+
+Lemma lift_f_in A:
+  forall (f1 f2: Z -> option A) d z l
+        (DOM: f1 z <> None)
+        (REF: refines f1 f2)
+        (IN: In (lift_f d f1 z) l),
+    In (lift_f d f2 z) l.
+Proof.
+  induction l.
+  simpl.
+  tauto.
+  simpl.
+  intros.
+  destruct IN as [EQ|IN].
+  rewrite EQ.
+  left.
+  unfold lift_f.
+  unfold refines in REF.
+  specialize REF with (z:=z).
+  destruct (f1 z) eqn:f1z.
+  rewrite REF with a0.
+  reflexivity.
+  reflexivity.
+  destruct DOM.
+  reflexivity.
+  right.
+  apply IHl;
+  try tauto.
 Qed.

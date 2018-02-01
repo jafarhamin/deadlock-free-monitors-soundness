@@ -102,17 +102,16 @@ Definition filterb (L: Z -> Z) (l: Z) (b: Z -> nat) :=
 
 (** # <font size="5"><b> COMM_ASSOC_NEUTRAL </b></font> # *)
 
+Definition neutral A (f: A -> A -> A) (n: A) :=
+  forall x, f x n = x /\ f n x = x.
+
 Definition can A (def: A -> A -> Prop) (f: A -> A -> A) :=
   (forall x y (DEF: def x y), f x y = f y x) /\
   (forall x y z (DEF1: def x y)(DEF2: def x z)(DEF3: def y z), f (f x y) z = f x (f y z)) /\
   (forall x y z (DEF1: def x y)(DEF2: def x z)(DEF3: def y z), def x (f y z)) /\
   (forall x y z (DEF1: def (f x y) z)(DEF2: def x y), def x z /\ def y z) /\
   (forall x y (DEF1: def x y), def y x) /\
-  exists n, forall x, f x n = x.
-
-
-Definition neutral A (f: A -> A -> A) (n: A) :=
-  forall x, f x n = x /\ f n x = x.
+  exists n, neutral f n.
 
 (** # <font size="5"><b> bag </b></font> # *)
 
@@ -197,6 +196,12 @@ Proof.
   intros.
   unfold bagplus.
   unfold empb.
+  unfold neutral.
+  intros.
+  split. 
+  apply functional_extensionality.
+  intros.
+  omega.
   apply functional_extensionality.
   intros.
   omega.
@@ -327,4 +332,120 @@ Proof.
   assumption.
   inversion Cont.
 Qed.
+
+Lemma Qc_Lt_plus:
+  forall (q1 q2: Qc)
+         (LT1: 0 < q1)
+         (LT2: 0 < q2),
+    0 < q1 + q2.
+Proof.
+  intros.
+  apply Qclt_trans with q2.
+  tauto.
+  rewrite Qclt_minus_iff.
+  rewrite <- Qcplus_assoc.
+  rewrite Qcplus_opp_r.
+  rewrite Qcplus_0_r.
+  tauto.
+Qed.
+
+Lemma Qc_Le_mon1:
+  forall (q1 q2: Qc)
+         (LE: q1 + q2 <= 1)
+         (LT: 0 < q2),
+    q1 <= 1.
+Proof.
+  intros.
+  apply Qcle_trans with (q2 + q1).
+  rewrite Qcle_minus_iff.
+  rewrite <- Qcplus_assoc.
+  rewrite Qcplus_opp_r.
+  rewrite Qcplus_0_r.
+  apply Qclt_le_weak.
+  tauto.
+  rewrite Qcplus_comm.
+  tauto.
+Qed.
+
+Lemma Qc_Le_mon2:
+  forall (q1 q2: Qc)
+         (LE: q1 + q2 <= 1)
+         (LT: 0 < q1),
+    q2 <= 1.
+Proof.
+  intros.
+  apply Qcle_trans with (q1 + q2).
+  rewrite Qcle_minus_iff.
+  rewrite <- Qcplus_assoc.
+  rewrite Qcplus_opp_r.
+  rewrite Qcplus_0_r.
+  apply Qclt_le_weak.
+  tauto.
+  tauto.
+Qed.
+
+Lemma Qc_Le_mon13:
+  forall (q1 q2 q3: Qc)
+         (LE: q1 + q2 + q3 <= 1)
+         (LT: 0 < q2),
+    q1 + q3 <= 1.
+Proof.
+  intros.
+  apply Qcle_trans with (q2 + (q1 + q3)).
+  rewrite Qcle_minus_iff.
+  rewrite <- Qcplus_assoc.
+  rewrite Qcplus_opp_r.
+  rewrite Qcplus_0_r.
+  apply Qclt_le_weak.
+  tauto.
+  rewrite Qcplus_assoc.
+  replace (q2 + q1) with (q1 + q2).
+  tauto.
+  apply Qcplus_comm.
+Qed.
+
+Lemma Qc_Le_mon23:
+  forall (q1 q2 q3: Qc)
+         (LE: q1 + q2 + q3 <= 1)
+         (LT: 0 < q1),
+    q2 + q3 <= 1.
+Proof.
+  intros.
+  apply Qcle_trans with (q1 + (q2 + q3)).
+  rewrite Qcle_minus_iff.
+  rewrite <- Qcplus_assoc.
+  rewrite Qcplus_opp_r.
+  rewrite Qcplus_0_r.
+  apply Qclt_le_weak.
+  tauto.
+  rewrite Qcplus_assoc.
+  replace (q2 + q1) with (q1 + q2).
+  tauto.
+  apply Qcplus_comm.
+Qed.
+
+Lemma Qc_Le_mon12:
+  forall (q1 q2 q3: Qc)
+         (LE: q1 + (q2 + q3) <= 1)
+         (LT: 0 < q3),
+    q1 + q2 <= 1.
+Proof.
+  intros.
+  apply Qcle_trans with (q3 + (q1 + q2)).
+  rewrite Qcle_minus_iff.
+  rewrite <- Qcplus_assoc.
+  rewrite Qcplus_opp_r.
+  rewrite Qcplus_0_r.
+  apply Qclt_le_weak.
+  tauto.
+  rewrite Qcplus_comm.
+  rewrite <- Qcplus_assoc.
+  tauto.
+Qed.
+
+(** # <font size="5"><b> Refine </b></font> # *)
+
+Definition refines A (f1 f2: Z -> option A) :=
+  forall z z', f1 z = Some z' -> f2 z = Some z'.
+
 
