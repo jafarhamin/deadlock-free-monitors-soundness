@@ -115,7 +115,7 @@ void writer(struct read_write *b)
   mutex_acquire(b->m);
   //@ open read_write(b)(?Wt2,?Ot2);
 
-  if (b->aw != 1 || b->ar > 0)
+  if (b->aw != 1)
     abort(); 
   b->aw = b->aw - 1;
    

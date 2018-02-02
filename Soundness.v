@@ -15,10 +15,10 @@ Require Import Wait4Graph.
 Theorem initial_configuration_is_valid:
   forall I L M P X c id
          (WELLFORMED: wellformed_cmd c)
-         (VERIFIED: exists R, proof_rule (Aobs nil) c (fun _ => Aobs nil) R I L M P X),
+         (VERIFIED: exists R, correct (Aobs nil) c (fun _ => Aobs nil) R I L M P X),
     validk (upd (emp (cmd * context)) id (Some (c,done))) (emp Z).
 Proof.
-  unfold proof_rule.
+  unfold correct.
   unfold validk.
   intros.
   destruct VERIFIED as (R,VERIFIED).
@@ -817,47 +817,3 @@ Proof.
   inversion GOAL.
   }
 Qed.
-
-
-(*
-Hint Resolve Let_preserves_validity.
-Hint Resolve Val_preserves_validity.
-Hint Resolve Val_done_preserves_validity.
-Hint Resolve Fork_preserves_validity.
-Hint Resolve Cons_preserves_validity.
-Hint Resolve Cons_preserves_validity.
-Hint Resolve Lookup_preserves_validity.
-Hint Resolve Mutate_preserves_validity.
-Hint Resolve Newlock_preserves_validity.
-Hint Resolve Acquire_preserves_validity.
-Hint Resolve Acquire0_preserves_validity.
-Hint Resolve Waiting4lock_preserves_validity.
-Hint Resolve Release_preserves_validity.
-Hint Resolve Newcond_preserves_validity.
-Hint Resolve Wait_preserves_validity.
-Hint Resolve Notify_preserves_validity.
-Hint Resolve Notify0_preserves_validity.
-Hint Resolve NotifyAll_preserves_validity.
-Hint Resolve g_dupl_preserves_validity.
-Hint Resolve g_initl_preserves_validity.
-Hint Resolve g_chrg_preserves_validity.
-Hint Resolve g_chrgu_preserves_validity.
-Hint Resolve g_disch_preserves_validity.
-Hint Resolve g_dischu_preserves_validity.
-Hint Resolve g_gain_preserves_validity.
-Hint Resolve g_gainu_preserves_validity.
-Hint Resolve g_lose_preserves_validity.
-Hint Resolve g_loseu_preserves_validity.
-Hint Resolve g_info_preserves_validity.
-Hint Resolve g_infou_preserves_validity.
-
-Theorem steps_preserve_validity:
-  forall t h t' h' 
-         (VALIDK: validk t h) (STEP: red t h t' h'),
-    validk t' h'.
-Proof.
-  intros.
-  induction STEP;
-  eauto.
-Qed.
-*)

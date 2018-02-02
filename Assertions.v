@@ -1,4 +1,3 @@
-Add LoadPath "/Users/jafarhamin/Desktop/deadlock-free-monitors-soundness".
 Require Import ZArith.
 Require Import Qcanon.
 Require Import List.

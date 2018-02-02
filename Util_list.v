@@ -1,5 +1,3 @@
-Add LoadPath "/Users/jafarhamin/Desktop/deadlock-free-monitors-soundness".
-
 Require Import List.
 Require Import ZArith.
 Require Import Coq.Init.Nat.
