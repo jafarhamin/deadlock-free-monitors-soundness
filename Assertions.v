@@ -27,6 +27,33 @@ Inductive lassn :=
   | Laex A (pp: A -> lassn)
   | Lafa A (pp: A -> lassn).
 
+Definition inv := bag -> bag -> bag -> lassn.
+
+(*
+Definition location := (Z * Z * inv * Z * bool * bool * list Z)%type.
+
+Definition Aof (l: location) : Z :=
+  fst (fst (fst (fst (fst (fst l))))).
+
+Definition Rof (l: location) : Z :=
+  snd (fst (fst (fst (fst (fst l))))).
+
+Definition Iof (l: location) : inv :=
+  snd (fst (fst (fst (fst l)))).
+
+Definition Lof (l: location) : Z :=
+  snd (fst (fst (fst l))).
+
+Definition Mof (l: location) : bool :=
+  snd (fst (fst l)).
+
+Definition Pof (l: location) : bool :=
+  snd (fst l).
+
+Definition Xof (l: location) : list Z :=
+  snd l.
+*)
+
 Inductive assn :=
   | Abool (b: bool)
   | Aprop (p: Prop)
@@ -34,7 +61,7 @@ Inductive assn :=
   | Adisj (P: assn) (Q: assn)
   | Astar (P: assn) (Q: assn)
   | Asepimp (P: assn) (Q: assn)
-  | Apointsto (fr:Qc) (a z: Z)
+  | Apointsto (fr:Qc) (a: Z) (z: Z)
   | Aulock (l: Z) (Wt Ot Ct: bag)
   | Alock (l: Z)
   | Alocked (l: Z) (Wt Ot Ct: bag)
@@ -43,7 +70,7 @@ Inductive assn :=
   | Acredit (cvar: Z)
   | Aex A (pp: A -> assn)
   | Afa A (pp: A -> assn)
-  | Aexi (pp: (bag -> bag -> bag -> lassn) -> assn)
+  | Aexi (pp: inv -> assn)
   | Alasn (la: lassn).
 
 
@@ -109,7 +136,7 @@ Definition phplus (p1 p2: pheap) : pheap :=
 Definition boundph (p: pheap) :=
   forall x f z, p x = Some (Cell f z) -> 0 < f /\ f <= 1.
 
-Definition emp A : (Z -> option A) :=
+Definition emp A B : (A -> option B) :=
   fun _ => None.
 
 Definition phtoh (p: pheap) : heap := 
@@ -174,6 +201,7 @@ Fixpoint sat (p:pheap) (O: option (list Z)) (C: bag) (a:assn) :=
     | Aexi pp => exists v, sat p O C (pp v)
     | Alasn la => lsat p C la
   end.
+
 
 Notation "P '|=' Q" := 
   (forall p o C (bp: boundph p)

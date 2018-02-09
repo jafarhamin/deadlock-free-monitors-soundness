@@ -13,15 +13,14 @@ Require Import ValidityOfConfigurations.
 Require Import Wait4Graph.
 
 Theorem initial_configuration_is_valid:
-  forall I L M P X c id
+  forall R I L M P X c id
          (WELLFORMED: wellformed_cmd c)
-         (VERIFIED: exists R, correct (Aobs nil) c (fun _ => Aobs nil) R I L M P X),
+         (VERIFIED: correct (Aobs nil) c (fun _ => Aobs nil) R I L M P X),
     validk (upd (emp (cmd * context)) id (Some (c,done))) (emp Z).
 Proof.
   unfold correct.
   unfold validk.
   intros.
-  destruct VERIFIED as (R,VERIFIED).
   assert (SAT: sat (emp knowledge) (Some nil) (fun _ => O) (weakest_pre c (fun _ : Z => Aobs nil) Datatypes.id R I L M P X)). 
   apply VERIFIED.
   apply boundph_emp.
@@ -46,6 +45,7 @@ Proof.
   {
   unfold defl.
   intros.
+
   simpl in IN1.
   destruct IN1 as [EQ|CO].
   unfold pof in EQ.
@@ -145,24 +145,6 @@ Proof.
   inversion NOTHELD.
   exists.
   intros.
-  contradiction.
-  exists.
-  intros.
-  unfold phplus in LKCN.
-  unfold pof in LKCN.
-  simpl in LKCN.
-  destruct LKCN as [LK|LK];
-  inversion LK.
-  destruct LK as [LK|LK];
-  inversion LK.
-  inversion H.
-  destruct LK as [LK|LK];
-  inversion LK.
-  destruct LK as (wt,(ot,(ct,LK))).
-  destruct LK as [LK|LK];
-  inversion LK.
-  exists.
-  intros.
   destruct ING as [EQ|FAL].
   Focus 2.
   contradiction.
@@ -172,18 +154,60 @@ Proof.
   unfold wellformed.
   simpl.
   auto.
+
   exists.
+  unfold weakest_pre_ct.
+  simpl.
   assumption.
   exists.
   intros.
   rewrite W4COND in SAT.
-  rewrite W4COND in WELLFORMED.
-  simpl in *.
   apply sat_wait4cond with (tx:=done) (p:=emp knowledge) (L:=L) in SAT.
   destruct SAT as (CO,rest).
   inversion CO.
   trivial.
   trivial.
+Qed.
+
+Hint Resolve Let_preserves_validity.
+Hint Resolve Val_preserves_validity.
+Hint Resolve Val_done_preserves_validity.
+Hint Resolve Fork_preserves_validity.
+Hint Resolve Cons_preserves_validity.
+Hint Resolve Cons_preserves_validity.
+Hint Resolve Lookup_preserves_validity.
+Hint Resolve Mutate_preserves_validity.
+Hint Resolve Newlock_preserves_validity.
+Hint Resolve Acquire_preserves_validity.
+Hint Resolve Acquire0_preserves_validity.
+Hint Resolve Waiting4lock_preserves_validity.
+Hint Resolve Release_preserves_validity.
+Hint Resolve Newcond_preserves_validity.
+Hint Resolve Wait_preserves_validity.
+Hint Resolve Notify_preserves_validity.
+Hint Resolve Notify0_preserves_validity.
+Hint Resolve NotifyAll_preserves_validity.
+Hint Resolve g_dupl_preserves_validity.
+Hint Resolve g_initl_preserves_validity.
+Hint Resolve g_chrg_preserves_validity.
+Hint Resolve g_chrgu_preserves_validity.
+Hint Resolve g_disch_preserves_validity.
+Hint Resolve g_dischu_preserves_validity.
+Hint Resolve g_gain_preserves_validity.
+Hint Resolve g_gainu_preserves_validity.
+Hint Resolve g_lose_preserves_validity.
+Hint Resolve g_loseu_preserves_validity.
+Hint Resolve g_info_preserves_validity.
+Hint Resolve g_infou_preserves_validity.
+
+Theorem steps_preserve_validity:
+  forall t h t' h' 
+         (VALIDK: validk t h) (STEP: red t h t' h'),
+    validk t' h'.
+Proof.
+  intros.
+  destruct STEP;
+  eauto.
 Qed.
 
 Theorem valid_configuration_is_not_deadlock:
@@ -192,7 +216,7 @@ Theorem valid_configuration_is_not_deadlock:
 Proof.
   unfold validk.
   intros.
-  destruct VALIDK as (T,(R,(I,(L,(M,(P,(X,(Pinv,(Ainv,(Cinv,(NODUPA,(Ainvl,(PHPDL,(PHPD,(BPE,(BPA,(BPT,(SATA,(PH2H,(AUT,(UNQ,(VLOCK,(VULOCK,(WOT,(LINV,(OLC,(LCN,(VALIDT,TR)))))))))))))))))))))))))))).
+  destruct VALIDK as (T,(R,(I,(L,(M,(P,(X,(Pinv,(Ainv,(Cinv,(NODUPA,(Ainvl,(PHPDL,(PHPD,(BPE,(BPA,(BPT,(SATA,(PH2H,(AUT,(UNQ,(VLOCK,(VULOCK,(WOT,(LINV,(VALIDT,TR)))))))))))))))))))))))))).
   destruct (In_dec opZ_eq_dec None (map (wof h) T)) as [IN|NIN].
   apply in_map_iff in IN.
   destruct IN as (x,(w4,INT)).
@@ -206,7 +230,7 @@ Proof.
   assumption.
   assert (GOAL: (map (fun x => (lift 0%Z (wof h x), oof x, idof x)) T) = nil).
 
-  apply valid_graph_is_deadlock_free with (length T) (lift_f 0%Z R) L P X.
+  apply valid_graph_is_deadlock_free with (length T) R L P X.
   rewrite map_map.
   simpl.
   assumption.
@@ -241,13 +265,13 @@ Proof.
   apply count_occ_In.
   assert (tmp: L ([[l]]) = ([[l]]) /\
         P ([[l]]) = false /\
-        nexc ([[l]]) R X L /\
+        ~ In (R ([[l]])) (X (L ([[l]]))) /\
         (h ([[l]]) <> Some 1%Z -> In ([[l]]) (concat (map oof T)))).
   {
   apply VLOCK.
-  apply sat_wait4lock0 in WP.
-  destruct WP as (WP,PRC).
-  destruct WP as [pl|pl].
+  apply sat_wait4lock in WP.
+  destruct WP as (Pl,tmp).
+  destruct Pl as [pl|pl].
   apply phplus_fold_lock.
   apply pofs.
   assumption.
@@ -286,39 +310,16 @@ Proof.
   apply tm4.
   assumption.
   }
-
-  assert (SOB': R ([[v]]) <> None).
   {
-  apply LCN.
-  left.
-  assert (tmp:=INT).
-  apply VALIDT in tmp.
-  destruct tmp as (WF1,(SAT1,rest1)).
-  apply sat_wait4cond in SAT1.
-  destruct SAT1 as (pv,rest).
-  apply fold_cond;
-  try tauto.
-  apply pofs.
-  right.
-  exists p.
-  exists.
-  apply in_map_iff.
-  exists (Waiting4cond v l, ct, p, O1, C, z1).
-  tauto.
-  assumption.
-  }
-
-  {
-  assert (SOB: safe_obs0 ([[v]]) (length (filter (fun c : cmd =>
+  assert (SOB: safe_obs ([[v]]) (length (filter (fun c : cmd =>
                 ifb (opZ_eq_dec (waiting_for h c) (Some ([[v]]))))
                (map cmdof T)))
-         (count_occ Z.eq_dec (concat (map oof T)) ([[v]])) R L P X).
+         (count_occ Z.eq_dec (concat (map oof T)) ([[v]])) R L P X = true).
   apply VOBS with l.
   reflexivity.
-  unfold safe_obs0 in SOB.
-  apply SOB in SOB'.
-  apply Coq.Bool.Bool.andb_true_iff in SOB'.
-  destruct SOB' as (SOB1,SOB2).
+  unfold safe_obs in SOB.
+  apply Coq.Bool.Bool.andb_true_iff in SOB.
+  destruct SOB as (SOB1,SOB2).
 
   unfold one_ob in SOB1.
   apply Coq.Bool.Bool.orb_true_iff in SOB1.
@@ -368,13 +369,13 @@ Proof.
   destruct c;
   inversion WFC.
   {
-  apply sat_wait4lock0 in WP.
-  destruct WP as (WP,PRC).
-  assert (tmp: L ([[l]]) = ([[l]]) /\ P ([[l]]) = false /\ nexc ([[l]]) R X L /\
+  apply sat_wait4lock in WP.
+  destruct WP as (Pl,PRC).
+  assert (tmp: L ([[l]]) = ([[l]]) /\ P ([[l]]) = false /\ ~ In (R ([[l]])) (X (L ([[l]]))) /\
         (h ([[l]]) <> Some 1%Z -> In ([[l]]) (concat (map oof T)))).
   {
   apply VLOCK.
-  destruct WP as [pl|pl].
+  destruct Pl as [pl|pl].
   apply phplus_fold_lock.
   apply pofs.
   assumption.
@@ -414,9 +415,9 @@ Proof.
   inversion Plf.
   }
   {
-  assert (SOB: safe_obs0 ([[v]])
+  assert (SOB: safe_obs ([[v]])
          (length (filter (fun c : cmd => ifb (opZ_eq_dec (waiting_for h c) (Some ([[v]])))) (map cmdof T)))
-         (count_occ Z.eq_dec (concat (map oof T)) ([[v]])) R L P X).
+         (count_occ Z.eq_dec (concat (map oof T)) ([[v]])) R L P X = true).
   apply VOBS with l.
   reflexivity.
   unfold safe_obs in SOB.
@@ -481,27 +482,6 @@ Proof.
   destruct a as (((((xx1,xx2),xx3),xx4),xx5),xx6).
   exists (xx1,xx2,xx3,xx4,xx5,xx6).
   auto.
-  assert (SOB': R ([[v]]) <> None).
-  {
-  apply LCN.
-  left.
-  assert (tmp:=INT).
-  apply VALIDT in tmp.
-  destruct tmp as (WF1,(SAT1,rest1)).
-  apply sat_wait4cond in SAT1.
-  destruct SAT1 as (pv,rest).
-  apply fold_cond;
-  try tauto.
-  apply pofs.
-  right.
-  exists p.
-  exists.
-  apply in_map_iff.
-  exists (Waiting4cond v l, ct, p, O1, C, z1).
-  tauto.
-  assumption.
-  }
-  assumption.
   }
   }
   {
@@ -533,14 +513,13 @@ Proof.
   destruct (opZ_eq_dec (h ([[l]])) (Some 1%Z)).
   inversion WFC.
   {
-  apply sat_wait4lock0 in WP.
-  destruct WP as (WP,PRC).
-
-  assert (tmp: L ([[l]]) = ([[l]]) /\ P ([[l]]) = false /\ nexc ([[l]]) R X L /\
+  apply sat_wait4lock in WP.
+  destruct WP as (Pl,PRC).
+  assert (tmp: L ([[l]]) = ([[l]]) /\ P ([[l]]) = false /\ ~ In (R ([[l]])) (X (L ([[l]]))) /\
         (h ([[l]]) <> Some 1%Z -> In ([[l]]) (concat (map oof T)))).
   {
   apply VLOCK.
-  destruct WP as [pl|pl].
+  destruct Pl as [pl|pl].
   apply phplus_fold_lock.
   apply pofs.
   assumption.
@@ -570,53 +549,15 @@ Proof.
   assumption.
   }
 
-  assert (LK: fold_left phplus (map pof T) Pinv ([[l]]) = Some Lock \/
-    exists wt ot ct, fold_left phplus (map pof T) Pinv ([[l]]) = Some (Locked wt ot ct)).
-  {
-  apply fold_lock_ed.
-  apply pofs.
-  assumption.
-  assumption.
-  assumption.
-  right.
-  right.
-  exists p.
-  exists.
-  apply in_map_iff.
-  exists (Waiting4lock l, ct, p, O1, C, z1).
-  tauto.
-  assumption.
-  }
-
-  assert (RlN: R ([[l]]) <> None).
-  {
-  apply LCN.
-  assert (tmp1:=INT).
-  apply VALIDT in tmp1.
-  destruct tmp1 as (WF1,(SAT1,rest1)).
-  apply sat_wait4lock0 in SAT1.
-  destruct SAT1 as (pv,rest).
-  right.
-  destruct LK.
-  left.
-  assumption.
-  right.
-  destruct H as (wt1,(ot1,(ct1,LKD))).
-  exists wt1, ot1, ct1.
-  left.
-  assumption.
-  }
   destruct tmp as (Lll,(Plf,(NINX,LOBS))).
   simpl in H0.
   rewrite <- H0 in INX.
-  unfold nexc in NINX.
-  apply NINX in RlN.
   contradiction.
   }
   {
-  assert (SOB: safe_obs0 ([[v]])
+  assert (SOB: safe_obs ([[v]])
          (length (filter (fun c : cmd => ifb (opZ_eq_dec (waiting_for h c) (Some ([[v]])))) (map cmdof T)))
-         (count_occ Z.eq_dec (concat (map oof T)) ([[v]])) R L P X).
+         (count_occ Z.eq_dec (concat (map oof T)) ([[v]])) R L P X = true).
   apply VOBS with l.
   reflexivity.
   unfold safe_obs in SOB.
@@ -629,7 +570,7 @@ Proof.
   destruct SOB3 as [SOB3|SOB3].
   simpl in H0.
   rewrite H0 in SOB3.
-  destruct (in_dec Z.eq_dec (lift_f 0%Z R o) (X (L o))).
+  destruct (in_dec Z.eq_dec (R o) (X (L o))).
   inversion SOB3.
   contradiction.
   unfold own_ob in SOB3.
@@ -667,27 +608,6 @@ Proof.
   destruct a as (((((xx1,xx2),xx3),xx4),xx5),xx6).
   exists (xx1,xx2,xx3,xx4,xx5,xx6).
   auto.
-  assert (SOB': R ([[v]]) <> None).
-  {
-  apply LCN.
-  left.
-  assert (tmp:=INT).
-  apply VALIDT in tmp.
-  destruct tmp as (WF1,(SAT1,rest1)).
-  apply sat_wait4cond in SAT1.
-  destruct SAT1 as (pv,rest).
-  apply fold_cond;
-  try tauto.
-  apply pofs.
-  right.
-  exists p.
-  exists.
-  apply in_map_iff.
-  exists (Waiting4cond v l, ct, p, O1, C, z1).
-  tauto.
-  assumption.
-  }
-  assumption.
   }
   }
   {
@@ -718,88 +638,15 @@ Proof.
   destruct (opZ_eq_dec (h ([[l]])) (Some 1%Z));
   inversion WFC.
   {
-  apply sat_wait4lock0 in WP.
-  destruct WP as (WP,PRC).
+  apply sat_wait4lock in WP.
+  destruct WP as (Pl,PRC).
   rewrite <- H1.
-  unfold prc0 in PRC.
-  apply PRC.
-
-  assert (LK: fold_left phplus (map pof T) Pinv ([[l]]) = Some Lock \/
-    exists wt ot ct, fold_left phplus (map pof T) Pinv ([[l]]) = Some (Locked wt ot ct)).
-  {
-  apply fold_lock_ed.
-  apply pofs.
-  assumption.
-  assumption.
-  assumption.
-  right.
-  right.
-  exists p.
-  exists.
-  apply in_map_iff.
-  exists (Waiting4lock l, ct, p, O1, C, z1).
-  tauto.
-  assumption.
-  }
-
-  assert (DOM: dom_f R (([[l]]) :: O1)).
-  {
-  unfold dom_f.
-  simpl.
-  intros.
-  destruct H as [EQ|IN].
-  rewrite <- EQ.
-  apply LCN.
-  right.
-  destruct LK.
-  left.
-  assumption.
-  right.
-  destruct H as (wt1,(ot1,(ct1,LKD))).
-  exists wt1, ot1, ct1.
-  left.
-  assumption.
-  apply LCN.
-  apply OLC.
-  rewrite <- flat_map_concat_map.
-  apply in_flat_map.
-  exists (Waiting4lock l, ct, p, O1, C, z1).
-  tauto.
-  }
   assumption.
   }
   {
   apply sat_wait4cond in WP.
   rewrite <- H1.
   destruct WP as (pv,(pl,(lv,(prc1,(prc2,rest))))).
-  unfold prc0 in prc2.
-  apply prc2.
-  assert (DOM: dom_f R (([[v]]) :: O1)).
-  {
-  unfold dom_f.
-  simpl.
-  intros.
-  destruct H as [EQ|IN].
-  rewrite <- EQ.
-  apply LCN.
-  left.
-  apply fold_cond;
-  try tauto.
-  apply pofs.
-  right.
-  exists p.
-  exists.
-  apply in_map_iff.
-  exists (Waiting4cond v l, ct, p, O1, C, z1).
-  tauto.
-  assumption.
-  apply LCN.
-  apply OLC.
-  rewrite <- flat_map_concat_map.
-  apply in_flat_map.
-  exists (Waiting4cond v l, ct, p, O1, C, z1).
-  tauto.
-  }
   assumption.
   }
   }
