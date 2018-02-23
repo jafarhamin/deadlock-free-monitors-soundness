@@ -15,19 +15,18 @@ struct read_write {
    struct mutex *m;   
    struct mutex_cond *vr;
    struct mutex_cond *vw;
-   //@ int gr;
    //@ int gw;  
 };
 
 /*@
 predicate_ctor read_write(struct read_write *b)(fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot) = 
-  b->aw |-> ?aw &*& b->ar |-> ?ar &*& b->ww |-> ?ww &*& [_]b->m |-> ?m &*& [_]b->gr |-> ?gr &*& [_]b->gw |-> ?gw
+  b->aw |-> ?aw &*& b->ar |-> ?ar &*& b->ww |-> ?ww &*& [_]b->m |-> ?m &*& [_]b->gw |-> ?gw
   &*& aw >= 0 &*& ar >= 0 &*& ww >= 0     
   &*& [_]b->vr |-> ?vr &*& [_]b->vw |-> ?vw &*& vr != vw &*& mutex_of(vr)==m &*& mutex_of(vw)==m 
   &*& vr != vw &*& P(vr)==false &*& Trn(vw) == vwtrn(gw) &*& Trn(vr) == vrtrn &*&
-  authfull(gr,?Cr) &*& authfull(gw,?Cw) &*&
-  (Wt(vr) <= 0 || 0 < aw + ww + Cr) &*&
-  aw + ww + Cr <= Ot(vr) &*&
+  authfull(gw,?Cw) &*&
+  (Wt(vr) <= 0 || 0 < aw + ww) &*&
+  aw + ww <= Ot(vr) &*&
   Wt(vw) + Cw + aw + ar  <= Ot(vw) &*&
   Wt(vw) < 1 || Wt(vw) < Ot(vw)
   ;
@@ -36,7 +35,7 @@ predicate_ctor read_write(struct read_write *b)(fixpoint(void*, unsigned int) Wt
 /*@
 predicate_family_instance thread_run_data(reader_thread)(list<void*> tobs, struct read_write *b) =
    [_]b->m |-> ?m &*& [_]b->vr |-> ?vr &*& [_]b->vw |-> ?vw &*& [_]mutex(m) &*& inv(m) ==  read_write(b) 
-   &*& [_]b->gr |-> ?gr &*& [_]b->gw |-> ?gw &*& authfrag(gr,0) &*& authfrag(gw,0) &*& authfrag(gw,0)
+   &*& [_]b->gw |-> ?gw &*& authfrag(gw,0) &*& authfrag(gw,0)
    &*& P(vr)==false &*& !eXc(vr)
    &*& tobs == nil
    &*& no_cycle(vr,nil) == true 
@@ -44,7 +43,7 @@ predicate_family_instance thread_run_data(reader_thread)(list<void*> tobs, struc
 
 predicate_family_instance thread_run_data(writer_thread)(list<void*> tobs, struct read_write *b) =
    [_]b->m |-> ?m &*& [_]b->vr |-> ?vr &*& [_]b->vw |-> ?vw &*& [_]mutex(m) &*& inv(m) == read_write(b)
-   &*& [_]b->gr |-> ?gr &*& [_]b->gw |-> ?gw &*& authfrag(gr,0) &*& authfrag(gw,0) &*& authfrag(gw,0)
+   &*& [_]b->gw |-> ?gw &*& authfrag(gw,0) &*& authfrag(gw,0)
    &*& tobs == nil &*& !eXc(vr)
    &*& no_cycle(vw,cons(vw,cons(vr,nil))) == true 
    &*& no_cycle(m,cons(vw,cons(vr,nil))) == true;
@@ -59,7 +58,7 @@ lemma void vperms(int n,struct mutex_cond *cond);
 
 void writer(struct read_write *b)
     /*@ requires [_]b->m |-> ?m &*& [_]b->vr |-> ?vr &*& [_]b->vw |-> ?vw &*& [_]mutex(m) &*& inv(m) == read_write(b)
-          &*& [_]b->gr |-> ?gr &*& [_]b->gw |-> ?gw &*& authfrag(gr,0) &*& authfrag(gw,0) &*& authfrag(gw,0)
+          &*& [_]b->gw |-> ?gw &*& authfrag(gw,0) &*& authfrag(gw,0)
 	  &*& !eXc(vr)    
           &*& obs(?O)
           &*& no_cycle(vw,cons(vw,cons(vr,O))) == true 
@@ -71,24 +70,22 @@ void writer(struct read_write *b)
   mutex_acquire(b->m);
   //@ open read_write(b)(?Wt1,?Ot1);
   //@ g_chrgl(vr);  
-  //@ upd_ghost(gr,1);  
   //@ g_chrgl(vw);
   //@ upd_ghost(gw,1);
   while (b->aw + b->ar > 0)
   /*@ invariant b->aw |-> ?aw &*& b->ar |-> ?ar &*& b->ww |-> ?ww &*& [_]b->m |-> m
         &*& aw >= 0 &*& ar >= 0 &*& ww >= 0    
         &*& [_]b->vr |-> vr &*& [_]b->vw |-> vw &*& mutex_held(m, _, ?Wt, ?Ot)
-        &*& [_]b->gr |-> gr &*& [_]b->gw |-> gw
-        &*& authfull(gr,?Cr) &*& authfull(gw,?Cw)
-        &*& Wt(vr) <= 0 || 0 < aw + ww + Cr
-        &*& aw + ww + Cr <= Ot(vr)
+        &*& [_]b->gw |-> gw
+        &*& authfull(gw,?Cw)
+        &*& Wt(vr) <= 0 || 0 < aw + ww + 1
+        &*& aw + ww + 1 <= Ot(vr)
         &*& Wt(vw) + Cw + aw + ar  <= Ot(vw) 
         &*& Wt(vw) < 1 || Wt(vw) < Ot(vw)
-        &*& obs(cons((void*)vw,cons((void*)vr,cons(m,O)))) &*& authfrag(gr,1) &*& authfrag(gw,1);
+        &*& obs(cons((void*)vw,cons((void*)vr,cons(m,O)))) &*& authfrag(gw,1);
   @*/
   {
     b->ww = b->ww + 1;
-    //@ upd_ghost(gr,-1);
     //@ upd_ghost(gw,-1);
     //@ close read_write(b)(finc(Wt,vw),Ot);
     //@ close mutex_inv(m,read_write(b));
@@ -98,12 +95,11 @@ void writer(struct read_write *b)
     if (b->ww<=0)
       abort();
     b->ww = b->ww - 1;
-    //@ upd_ghost(gr,1);
     //@ open vwtrn(gw)();
     //@ leak authfrag(gw,0);
    }
+   
   b->aw = b->aw + 1;
-  //@ upd_ghost(gr,-1);
   //@ upd_ghost(gw,-1);
   //@ close read_write(b)(Wt,Ot);  
   //@ close mutex_inv(m,read_write(b));  
@@ -136,20 +132,19 @@ void writer(struct read_write *b)
     //@ vperms(Wt2(vr),vr);
     mutex_cond_broadcast(b->vr);
   }
-  //@ upd_ghost(gr,0);
   //@ g_dischl(vr);
   //@ assert mutex_held(m,_,?Wte,?Ote);  
   //@ close read_write(b)(Wte,Ote);       
   //@ close mutex_inv(m,read_write(b));  
   //@ leak authfrag(gw,0);
-  //@ leak authfrag(gr,0);
   mutex_release(b->m);     
   //@ leak [_]mutex(m);
 }
 
+
 void reader(struct read_write *b)
     /*@ requires [_]b->m |-> ?m &*& [_]b->vr |-> ?vr &*& [_]b->vw |-> ?vw &*& [_]mutex(m) &*& inv(m) == read_write(b) 
-          &*& [_]b->gr |-> ?gr &*& [_]b->gw |-> ?gw &*& authfrag(gr,0) &*& authfrag(gw,0) &*& authfrag(gw,0)
+          &*& [_]b->gw |-> ?gw &*& authfrag(gw,0) &*& authfrag(gw,0)
           &*& !eXc(vr)
           &*& obs(?O)
           &*& no_cycle(vr,O) == true 
@@ -166,16 +161,15 @@ void reader(struct read_write *b)
   /*@ invariant b->aw |-> ?aw &*& b->ar |-> ?ar &*& b->ww |-> ?ww &*& [_]b->m |-> m
         &*& aw >= 0 &*& ar >= 0 &*& ww >= 0    
         &*& [_]b->vr |-> vr &*& [_]b->vw |-> vw &*& mutex_held(m, _, ?Wt, ?Ot)
-        &*& [_]b->gr |-> gr &*& [_]b->gw |-> gw
-        &*& authfull(gr,?Cr) &*& authfull(gw,?Cw)
-        &*& Wt(vr) <= 0 || 0 < aw + ww + Cr
-        &*& aw + ww + Cr <= Ot(vr)
+        &*& [_]b->gw |-> gw
+        &*& authfull(gw,?Cw)
+        &*& Wt(vr) <= 0 || 0 < aw + ww
+        &*& aw + ww <= Ot(vr)
         &*& Wt(vw) + Cw + aw + ar  <= Ot(vw) 
         &*& Wt(vw) < 1 || Wt(vw) < Ot(vw)
-        &*& obs(cons(m,O)) &*& authfrag(gr,0);
+        &*& obs(cons(m,O));
   @*/
   {
-    //@ upd_ghost(gr,0);
     //@ close read_write(b)(finc(Wt,vr),Ot);
     //@ close mutex_inv(m,read_write(b));
     //@ close cond_trn(vr,vrtrn);
@@ -211,7 +205,6 @@ void reader(struct read_write *b)
   //@ assert mutex_held(m,_,?Wte,?Ote); 
   //@ close read_write(b)(Wte,Ote);
   //@ close mutex_inv(m,read_write(b));  
-  //@ leak authfrag(gr,0);
   //@ leak authfrag(gw,0);
   mutex_release(b->m);     
   //@ leak [_]mutex(m);
@@ -244,7 +237,6 @@ void main()
     //@ close create_mutex_cond_ghost_args(m,1,true,vwtrn(gw));    
     struct mutex_cond *vw = create_mutex_cond();
 
-    //@ int gr = ghost_create1(0);
     //@ close create_mutex_cond_ghost_args(m,2,false,vrtrn);    
     struct mutex_cond *vr = create_mutex_cond();
    
@@ -257,12 +249,10 @@ void main()
     b->m = m;
     b->vw = vw;
     b->vr = vr;
-    //@ b->gr = gr;
     //@ b->gw = gw;
     //@ leak [_]b->vw |-> _;
     //@ leak [_]b->vr |-> _;
     //@ leak [_]b->m |-> _;    
-    //@ leak [_]b->gr |-> _;   
     //@ leak [_]b->gw |-> _;    
     //@ leak [_]malloc_block_read_write(_);
     //@ close init_mutex_ghost_args(read_write(b));
@@ -270,9 +260,6 @@ void main()
     //@ init_mutex(m);
     //@ leak [_]mutex(m);
 
-    //@ ghost_split(gr,0,0);
-    //@ ghost_split(gr,0,0);
-    //@ ghost_split(gr,0,0);
     //@ ghost_split(gw,0,0);
     //@ ghost_split(gw,0,0);
     //@ ghost_split(gw,0,0);
@@ -290,11 +277,10 @@ void main()
     //@ close thread_run_data(writer_thread)(nil,b);    
     while (true)
     /*@ invariant obs(nil) &*& thread_run_data(writer_thread)(nil,b) &*& [_]b->m |-> m &*& [_]b->vr |-> vr &*& [_]b->vw |-> vw 
-                  &*& [_]b->gr |-> gr &*& [_]b->gw |-> gw &*& [_]mutex(m)
-                  &*& authfrag(gr,0) &*& authfrag(gw,0) &*& authfrag(gw,0);
+                  &*& [_]b->gw |-> gw &*& [_]mutex(m)
+                  &*& authfrag(gw,0) &*& authfrag(gw,0);
     @*/
     {
-      //@ ghost_split(gr,0,0);
       //@ ghost_split(gw,0,0);
       //@ ghost_split(gw,0,0);
       thread_start(writer_thread, b);
