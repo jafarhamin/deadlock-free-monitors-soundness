@@ -7,8 +7,29 @@ Require Import Util_Z.
 
 Set Implicit Arguments.
 
+Ltac inm_ := 
+  repeat match goal with 
+          | _: In ?x ?l |- In (?f1 ?x, ?f2 ?x) (map (fun x1 => (?f1 x1, ?f2 x1)) ?l) => 
+                 apply in_map_iff; exists x; tauto
+          | _: In ?x ?l |- In ?x' (map (fun x1 => (?f1 x1, ?f2 x1)) ?l) => 
+                 apply in_map_iff; exists x; tauto
+          | _: _ |- In (?f ?x) (map ?f ?l) => apply in_map
+         end; trivial.
+
 Definition lift_list A (opA_eqb: option A -> option A -> bool) (default: A) (l: list (option A)) : list A :=
   map (lift default) (filter (fun x => negb (opA_eqb x None)) l).
+
+Lemma map_app A B (f: A -> B):
+  forall (l1 l2: list A),
+    map f (l1 ++ l2) = map f l1 ++ map f l2.
+Proof.
+  induction l1.
+  - reflexivity.
+  - intros.
+    simpl.
+    rewrite IHl1.
+    reflexivity.
+Qed.
 
 Lemma map_list A B C (f: A -> C) (f1: B -> C) (f2: A -> B):
   forall (l: list A)
@@ -16,14 +37,8 @@ Lemma map_list A B C (f: A -> C) (f1: B -> C) (f2: A -> B):
     map f l = map f1 (map f2 l).
 Proof.
   induction l.
-  simpl.
-  reflexivity.
-  simpl.
-  intros.
-  rewrite MAP.
-  rewrite IHl.
-  reflexivity.
-  assumption.
+  - reflexivity.
+  - simpl; intros; rewrite MAP; rewrite IHl; [reflexivity | assumption].
 Qed.
 
 Lemma length_map A B (f: A -> B):
@@ -31,11 +46,8 @@ Lemma length_map A B (f: A -> B):
     length (map f l) = length l.
 Proof.
   induction l.
-  simpl.
-  reflexivity.
-  simpl.
-  rewrite IHl.
-  reflexivity.
+  - reflexivity.
+  - simpl; rewrite IHl; reflexivity.
 Qed.
 
 Lemma in_in_count A B dec (f: A -> B):
@@ -46,96 +58,71 @@ Lemma in_in_count A B dec (f: A -> B):
          (IN2: In a2 l),
     2 <= count_occ dec (map f l) (f a1).
 Proof.
-  induction l.
-  simpl.
-  intros.
-  contradiction.
-  simpl.
-  intros.
-  destruct IN1 as [IN1|IN1].
-  destruct IN2 as [IN2|IN2].
-  rewrite <- IN1 in NEQ.
-  rewrite <- IN2 in NEQ.
-  contradiction.
-  rewrite IN1.
-  destruct (dec (f a1) (f a1)).
-  Focus 2.
-  contradiction.
-  assert (tmp: 0 <count_occ dec (map f l) (f a1)).
-  rewrite EQ.
-  apply count_occ_In.
-  apply in_map_iff.
-  exists a2.
-  auto.
-  omega.
-  destruct IN2 as [IN2|IN2].
-  rewrite IN2.
-  rewrite EQ.
-  destruct (dec (f a2) (f a2)).
-  Focus 2.
-  contradiction.
-  assert (tmp: 0 <count_occ dec (map f l) (f a2)).
-  rewrite <- EQ.
-  apply count_occ_In.
-  apply in_map_iff.
-  exists a1.
-  auto.
-  omega.
-  destruct (dec (f a) (f a1)).
-  apply le_trans with (count_occ dec (map f l) (f a1)).
-  apply IHl with a2.
-  assumption.
-  assumption.
-  assumption.
-  assumption.
-  omega.
-  apply IHl with a2.
-  assumption.
-  assumption.
-  assumption.
-  assumption.
+  induction l; simpl; intros.
+  - contradiction.
+  - destruct IN1 as [IN1|IN1].
+    + destruct IN2 as [IN2|IN2].
+      * rewrite <- IN1 in NEQ.
+        rewrite <- IN2 in NEQ.
+        contradiction.
+      * rewrite IN1.
+        destruct (dec (f a1) (f a1)); try contradiction.
+        assert (tmp: 0 <count_occ dec (map f l) (f a1)).
+        -- rewrite EQ.
+           apply count_occ_In.
+           apply in_map_iff.
+           eexists.
+           tauto.
+        -- omega.
+   + destruct IN2 as [IN2|IN2].
+     rewrite IN2.
+     rewrite EQ.
+     destruct (dec (f a2) (f a2)); try contradiction.
+     assert (tmp: 0 <count_occ dec (map f l) (f a2)).
+     * rewrite <- EQ.
+       apply count_occ_In.
+       apply in_map_iff.
+       eexists.
+       tauto.
+     * omega.
+     * destruct (dec (f a) (f a1)).
+       apply le_trans with (count_occ dec (map f l) (f a1)).
+       apply IHl with a2; try assumption.
+       omega.
+       apply IHl with a2; try assumption.
 Qed.
 
 Lemma remove_remove A dec:
   forall (l: list A) a b,
     remove dec a (remove dec b l) = remove dec b (remove dec a l).
 Proof.
-  induction l.
-  simpl.
-  reflexivity.
-  simpl.
-  intros.
-  destruct (dec b a).
-  destruct (dec a0 a).
-  apply IHl.
-  simpl.
-  rewrite e.
-  destruct (dec a a).
-  Focus 2.
-  contradiction.
-  apply IHl.
-  simpl.
-  destruct (dec a0 a).
-  apply IHl.
-  simpl.
-  destruct (dec b a).
-  rewrite e in n.
-  contradiction.
-  rewrite IHl.
-  reflexivity.
+  induction l; simpl; intros.
+  - reflexivity.
+  - destruct (dec b a).
+    + destruct (dec a0 a).
+      apply IHl.
+      simpl.
+      rewrite e.
+      destruct (dec a a); try contradiction.
+      apply IHl.
+    + simpl.
+      destruct (dec a0 a).
+       * apply IHl.
+       * simpl.
+         destruct (dec b a).
+         rewrite e in n.
+         contradiction.
+         rewrite IHl.
+         reflexivity.
 Qed.
 
 Lemma length_app A:
   forall (l1 l2: list A),
     length (l1 ++ l2) = length l1 + length l2.
 Proof.
-  induction l1.
-  simpl.
-  reflexivity.
-  simpl.
-  intros.
-  rewrite IHl1.
-  reflexivity.
+  induction l1; simpl; intros.
+  - reflexivity.
+  - rewrite IHl1; reflexivity.
 Qed.
 
 Lemma filter_filter_eq A f1 f2:
@@ -806,6 +793,56 @@ Proof.
   assumption.
 Qed.
 
+Lemma list_has_max:
+  forall (l: list Z) (HAS_ELEMENT: lt 0 (length l)),
+    exists max (INl: In max l), forall x (INl: In x l), Z.le x max.
+Proof.
+  induction l.
+  simpl.
+  intros.
+  inversion HAS_ELEMENT.
+  simpl.
+  intros.
+  destruct (length l) eqn:LENL.
+  exists a.
+  exists.
+  left.
+  reflexivity.
+  intros.
+  destruct INl.
+  rewrite H.
+  omega.
+  destruct l.
+  inversion H.
+  inversion LENL.
+  assert (tmp: exists max (INM : In max l),
+        forall x, In x l -> Z.le x max).
+  apply IHl.
+  omega.
+  destruct tmp as (max,(INmax,MAX)).
+  destruct (Z_le_dec a max).
+  exists max.
+  exists.
+  right.
+  assumption.
+  intros.
+  destruct INl.
+  rewrite <- H.
+  assumption.
+  apply MAX.
+  assumption.
+  exists a.
+  exists.
+  left.
+  reflexivity.
+  intros.
+  destruct INl.
+  rewrite <- H.
+  omega.
+  apply MAX in H.
+  omega.
+Qed.
+
 Lemma map_filter A B (f1: A -> B) (f2: A -> bool) (f3: B -> bool):
   forall (l: list A) (FIL: forall x (IN: In x l), f2 x = f3 (f1 x)),
     map f1 (filter f2 l) = filter f3 (map f1 l).
@@ -1054,6 +1091,39 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma length_filter_map_eq A B C (m1: A -> B) (m2: A -> C) f1 f2:
+  forall (l: list A)
+         (EQF: forall a (IN: In a l), f1 (m1 a) = f2 (m2 a)),
+    length (filter f1 (map m1 l)) = length (filter f2 (map m2 l)).
+Proof.
+  induction l.
+  simpl.
+  reflexivity.
+  simpl.
+  intros.
+  destruct (f1 (m1 a)) eqn:f1m1a.
+  rewrite EQF in f1m1a.
+  rewrite f1m1a.
+  simpl.
+  rewrite IHl.
+  reflexivity.
+  intros.
+  apply EQF.
+  right.
+  assumption.
+  left.
+  reflexivity.
+  rewrite EQF in f1m1a.
+  rewrite f1m1a.
+  apply IHl.
+  intros.
+  apply EQF.
+  right.
+  assumption.
+  left.
+  reflexivity.
+Qed.
+
 Lemma prem_length_eq A f:
   forall (l l': list A)
          (PERM: Permutation l l'),
@@ -1075,6 +1145,27 @@ Proof.
   reflexivity.
   omega.
 Qed.
+
+Lemma count_map_perm A B dec (m: A -> B):
+  forall (l1 l2: list A)
+         (PERM: Permutation l1 l2) x,
+    count_occ dec (map m l1) x = count_occ dec (map m l2) x.
+Proof.
+  intros.
+  induction PERM.
+  reflexivity.
+  simpl.
+  rewrite IHPERM.
+  reflexivity.
+  simpl.
+  destruct (dec (m y) x).
+  destruct (dec (m x0) x).
+  reflexivity.
+  reflexivity.
+  reflexivity.
+  omega.
+Qed.
+
 
 (** # <font size="5"><b> key-value lists </b></font> # *)
 
@@ -1350,6 +1441,7 @@ Proof.
   assumption.
 Qed.
 
+(*
 Lemma filterb_filterb_eq A B (m: (A * Z) -> B) (f1 f2: Z -> B -> bool):
   forall (l: keyval A) L lk
     (EQF: forall x v (IN: L v = lk)(NEQ: v <> lk) (IN: In x l), (f1 v) (m x) = (f2 v) (m x)),
@@ -1377,6 +1469,7 @@ Proof.
   assumption.
   assumption.
 Qed.
+*)
 
 Lemma in_perm A:
   forall (l l': list A)
@@ -1453,7 +1546,7 @@ Proof.
   assumption.
 Qed.
 
-Lemma perm_filter A f:
+Lemma perm_filter' A f:
   forall (l: keyval A) x z
          (NODUP: NoDup (map snd l))
          (IN: In (x,z) l)
@@ -1518,6 +1611,70 @@ Proof.
   auto.
 Qed.
 
+Lemma perm_filter A B f:
+  forall (l: list (A * B)) x z
+         (NODUP: NoDup (map snd l))
+         (IN: In (x,z) l)
+         (Fx: f (x,z) = false)
+         (Fx': forall x' z' (IN: In (x',z') l) (NEQ: z' <> z), f (x',z') = true),
+    Permutation l ((x,z) :: filter f l).
+Proof.
+  induction l.
+  simpl.
+  intros.
+  contradiction.
+  simpl.
+  intros.
+  destruct IN as [EQ|IN].
+  rewrite EQ.
+  rewrite Fx.
+  apply perm_skip.
+  rewrite filter_list.
+  apply Permutation_refl.
+  intros.
+  destruct x0.
+  apply Fx'.
+  right.
+  assumption.
+  unfold not.
+  intros.
+  rewrite EQ in NODUP.
+  simpl in NODUP.
+  rewrite H in INx.
+  inversion NODUP.
+  apply H2.
+  apply in_map_iff.
+  exists (a0,z).
+  auto.
+  destruct (f a) eqn:fa.
+  apply Permutation_trans with (a :: (x,z) :: filter f l).
+  apply perm_skip.
+  apply IHl.
+  inversion NODUP.
+  assumption.
+  assumption.
+  assumption.
+  intros.
+  apply Fx'.
+  right.
+  assumption.
+  assumption.
+  apply perm_swap.
+  destruct a.
+  rewrite Fx' in fa.
+  inversion fa.
+  left.
+  reflexivity.
+  unfold not.
+  intros.
+  rewrite H in NODUP.
+  simpl in NODUP.
+  inversion NODUP.
+  apply H2.
+  apply in_map_iff.
+  exists (x,z).
+  auto.
+Qed.
 
 (** # <font size="5"><b> updl-elem </b></font> # *)
 
@@ -1958,15 +2115,11 @@ Proof.
   simpl in *.
   destruct IN as [EQ|IN].
   inversion EQ.
-  rewrite eqz.
-  rewrite <- H0.
-  rewrite H1.
-  simpl.
+  repeat dstr_.
   rewrite updl_eq_l.
   reflexivity.
-  rewrite <- H1.
   assumption.
-  destruct (Z.eq_dec z0 z).
+  repeat dstr_.
   exfalso.
   apply in_map_iff in IN.
   destruct IN as (x,(EQ,IN)).
@@ -1977,8 +2130,6 @@ Proof.
   split.
   apply IN.
   inversion EQ.
-  rewrite H1.
-  rewrite e.
   apply Z.eqb_eq.
   reflexivity.
   simpl.
@@ -2005,15 +2156,11 @@ Proof.
   simpl in *.
   destruct IN as [EQ|IN].
   inversion EQ.
-  rewrite eqz.
-  rewrite <- H0.
-  rewrite H1.
-  simpl.
+  repeat dstr_.
   rewrite updl_eq_l.
   reflexivity.
-  rewrite <- H1.
   assumption.
-  destruct (Z.eq_dec z0 z).
+  repeat dstr_.
   exfalso.
   apply in_map_iff in IN.
   destruct IN as (x,(EQ,IN)).
@@ -2024,8 +2171,6 @@ Proof.
   split.
   apply IN.
   inversion EQ.
-  rewrite H1.
-  rewrite e.
   apply Z.eqb_eq.
   reflexivity.
   simpl.
@@ -2231,7 +2376,8 @@ Proof.
   assumption.
 Qed.
 
-Lemma filterb_updl_eq A B (m: (A * Z) -> B) (f: Z -> B -> bool):
+(*
+Lemma filterb_updl_eq222 A B (m: (A * Z) -> B) (f: Z -> B -> bool):
   forall (l: list (A * Z)) L lk x z
          (F: forall v (IN: L v = lk) (NEQ: v <> lk), (f v) (m x) = false /\ (forall x' (IN: In x' (elem z l)), (f v) (m x') = false)),
     filterb L lk (fun v => length (filter (f v) (map m l))) = filterb L lk (fun v => length (filter (f v) (map m (updl l z x)))).
@@ -2255,6 +2401,7 @@ Proof.
   apply F2.
   assumption.
 Qed.
+*)
 
 Lemma filter_updl_dec A B (f: B -> bool) (m: (A * Z) -> B):
   forall (l: list (A * Z)) x z
@@ -2273,7 +2420,7 @@ Proof.
   destruct F2 as (x',(IN',EQ')).
   destruct (Z.eq_dec (snd a) z).
   rewrite e in IN'.
-  rewrite zeqb in IN'.
+  destruct ((z =? z)%Z) eqn:zz.
   destruct IN' as [EQ|IN].
   rewrite EQ.
   rewrite EQ'.
@@ -2299,6 +2446,8 @@ Proof.
   reflexivity.
   rewrite <- e.
   assumption.
+  apply neqb_neq in zz.
+  contradiction.
   destruct (snd a =? z)%Z eqn:az.
   rewrite Z.eqb_eq in az.
   contradiction.
@@ -2331,8 +2480,10 @@ Proof.
   reflexivity.
   simpl.
   intros.
-  destruct (Z.eq_dec (snd a) z).
-  rewrite e in F.
+  destruct (snd a =? z)%Z eqn:az.
+  apply Z.eqb_eq in az.
+  rewrite az.
+  repeat dstr_.
   rewrite <- count_app.
   rewrite <- count_app.
   rewrite F.
@@ -2353,36 +2504,62 @@ Proof.
   rewrite <- count_app.
   rewrite <- count_app.
   rewrite IHl with (x:=x)(z:=z).
+  apply neqb_neq in az.
+  destruct (Z.eq_dec (snd a) z).
+  contradiction.
   reflexivity.
   intros.
   apply F.
-  destruct (snd a =? z)%Z eqn:az.
-  apply Z.eqb_eq in az.
-  contradiction.
   assumption.
 Qed.
 
 Lemma filterb_updl_obs_eq A (m: (A*Z) -> list Z):
-  forall (l: list (A * Z)) L lk x z
-         (F: forall v (IN: L v = lk) (NEQ: v <> lk) x' (IN: In x' (elem z l)), count_occ Z.eq_dec (m x') v = count_occ Z.eq_dec (m x) v),
+  forall (l: list (A * Z)) (lk: Z) x z L
+         (F: forall v (IN: L v = Some lk) (NEQ: v <> lk) x' (IN: In x' (elem z l)), 
+               count_occ Z.eq_dec (m x') v = count_occ Z.eq_dec (m x) v),
      filterb L lk (count_occ Z.eq_dec (concat (map m l))) = filterb L lk (count_occ Z.eq_dec (concat (map m (updl l z x)))).
 Proof.
   unfold filterb.
   intros.
   apply functional_extensionality.
   intros.
+  destruct (L x0) eqn:Lx0.
   destruct (Z.eq_dec x0 lk).
   reflexivity.
-  destruct (Z.eq_dec (L x0) lk).
-  Focus 2.
-  reflexivity.
+  destruct (Z.eq_dec z0 lk) eqn:EQ.
   apply count_updl_eq.
   intros.
-  apply F.
+  apply F;
+  try tauto.
+  rewrite <- e.
   assumption.
-  assumption.
-  assumption.
+  reflexivity.
+  reflexivity.
 Qed.
+
+Lemma filterb_updl_eq A B (m: (A * Z) -> B) (f: Z -> B -> bool):
+  forall (l: list (A * Z)) (lk: Z) x z L
+         (F: forall v (IN: L v = Some lk) (NEQ: v <> lk), (f v) (m x) = false /\ (forall x' (IN: In x' (elem z l)), (f v) (m x') = false)),
+    filterb L lk (fun v => length (filter (f v) (map m l))) = filterb L lk (fun v => length (filter (f v) (map m (updl l z x)))).
+Proof.
+  unfold filterb.
+  intros.
+  apply functional_extensionality.
+  intros.
+  destruct (L x0) eqn:Lx0.
+  destruct (Z.eq_dec x0 lk).
+  reflexivity.
+  destruct (Z.eq_dec z0 lk) eqn:EQ.
+  destruct F with (v:=x0) as [F1 F2].
+  rewrite <- e.
+  assumption.
+  assumption.
+  rewrite <- filter_updl_eq;
+  try tauto.
+  reflexivity.
+  reflexivity.
+Qed.
+
 
 Lemma filterbv_updl_eq A B (m: (A * Z) -> B) (f: Z -> B -> bool):
   forall (l: list (A * Z)) L lk x z v
@@ -2391,9 +2568,10 @@ Lemma filterbv_updl_eq A B (m: (A * Z) -> B) (f: Z -> B -> bool):
 Proof.
   unfold filterb.
   intros.
+  destruct (L v) eqn:LV.
   destruct (Z.eq_dec v lk).
   reflexivity.
-  destruct (Z.eq_dec (L v) lk).
+  destruct (Z.eq_dec z0 lk).
   Focus 2.
   reflexivity.
   destruct F as [F1 F2].
@@ -2403,6 +2581,7 @@ Proof.
   intros.
   apply F2.
   assumption.
+  reflexivity.
 Qed.
 
 Lemma count_updl_decr A m:
@@ -2421,19 +2600,11 @@ Proof.
   intros.
   destruct IN as [EQ|IN].
   inversion EQ.
-  rewrite eqz.
-  rewrite H1.
-  rewrite X.
+  repeat dstr_.
   rewrite updl_eq_l.
-  rewrite H0.
-  simpl.
-  rewrite eqz.
-  simpl.
   omega.
-  rewrite <- H1.
   assumption.
-  destruct (Z.eq_dec (snd a) id).
-  rewrite e in NODUP.
+  repeat dstr_.
   inversion NODUP.
   exfalso.
   apply H1.
@@ -2467,6 +2638,242 @@ Proof.
   apply IN.
   assumption.
 Qed.
+
+Lemma count_perm1 A dec:
+  forall (l1 l2: list A)
+         (PERM: Permutation l1 l2) x,
+    count_occ dec l1 x = count_occ dec l2 x.
+Proof.
+  intros.
+  induction PERM.
+  reflexivity.
+  simpl.
+  rewrite IHPERM.
+  reflexivity.
+  simpl.
+  destruct (dec y x).
+  destruct (dec x0 x).
+  reflexivity.
+  reflexivity.
+  reflexivity.
+  omega.
+Qed.
+
+Lemma count_perm A dec:
+  forall (l l': list A)
+         (PERM: Permutation l' l) l1 l2 x
+         (EQ: l' = l1 ++ l2),
+    count_occ dec l1 x + count_occ dec l2 x = count_occ dec l x.
+Proof.
+  intros l l' PERM.
+  induction PERM.
+  simpl.
+  intros.
+  {
+  destruct l1.
+  destruct l2.
+  simpl.
+  omega.
+  inversion EQ.
+  inversion EQ.
+  }
+  {
+  simpl.
+  intros.
+  destruct (dec x x0).
+  {
+  destruct l1.
+  destruct l2.
+  inversion EQ.
+  simpl in EQ.
+  inversion EQ.
+  rewrite <- H0.
+  rewrite e.
+  simpl.
+  destruct (dec x0 x0).
+  Focus 2.
+  contradiction.
+  specialize IHPERM with (l1:=nil).
+  simpl in IHPERM.
+  rewrite IHPERM.
+  reflexivity.
+  assumption.
+  inversion EQ.
+  rewrite <- e.
+  rewrite H0.
+  simpl.
+  destruct (dec a a).
+  Focus 2.
+  contradiction.
+  simpl.
+  rewrite IHPERM.
+  reflexivity.
+  assumption.
+  }
+  destruct l1.
+  destruct l2.
+  inversion EQ.
+  simpl in EQ.
+  inversion EQ.
+  rewrite <- H0.
+  simpl.
+  destruct (dec x x0).
+  contradiction.
+  specialize IHPERM with (l1:=nil).
+  simpl in IHPERM.
+  rewrite IHPERM.
+  reflexivity.
+  assumption.
+  inversion EQ.
+  rewrite <- H0.
+  simpl.
+  destruct (dec x x0).
+  contradiction.
+  rewrite IHPERM.
+  reflexivity.
+  assumption.
+  }
+  simpl.
+  intros.
+  rewrite count_app.
+  rewrite <- EQ.
+  simpl.
+  destruct (dec y x0).
+  destruct (dec x x0).
+  reflexivity.
+  reflexivity.
+  reflexivity.
+  simpl.
+  intros.
+  apply IHPERM1 with (x:=x) in EQ.
+  rewrite EQ.
+  apply count_perm1.
+  assumption.
+Qed.
+
+Lemma count_updl_decr' A m:
+  forall (l: keyval A) O O' x z id
+         (NODUP: NoDup (map snd l))
+         (PERM: Permutation O' (z::O))
+         (IN: In (O',id) (map (fun x => (m x, snd x)) l))
+         (X: m (x,id) = O),
+    count_occ Z.eq_dec (concat (map m l)) z - 1 =
+    count_occ Z.eq_dec (concat (map m (updl l id (x,id)))) z.
+Proof.
+  induction l.
+  simpl.
+  intros.
+  reflexivity.
+  simpl.
+  intros.
+  destruct IN as [EQ|IN].
+  inversion EQ.
+  rewrite eqz.
+  rewrite H1.
+  rewrite X.
+  rewrite H0.
+  rewrite updl_eq_l.
+  rewrite <- count_app.
+  rewrite <- count_app.
+  rewrite count_perm1 with (l2:=z::O).
+  simpl.
+  rewrite eqz.
+  omega.
+  assumption.
+  repeat dstr_.
+  inversion NODUP.
+  rewrite <- count_app.
+  rewrite <- count_app.
+  erewrite <- IHl.
+  assert (tmp: count_occ Z.eq_dec (concat (map m l)) z > 0).
+  {
+  apply count_occ_In.
+  rewrite <- flat_map_concat_map.
+  apply in_flat_map.
+  apply in_map_iff in IN.
+  destruct IN as (x1,(EQ,IN)).
+  inversion EQ.
+  exists x1.
+  split.
+  assumption.
+  rewrite H4.
+  apply Permutation_in with (z :: O).
+  apply Permutation_sym.
+  assumption.
+  left.
+  reflexivity.
+  }
+  destruct (Z.eq_dec (snd a) id).
+  {
+  inversion NODUP.
+  exfalso.
+  apply H5.
+  apply in_map_iff in IN.
+  destruct IN as (x2,(EQx,INx)).
+  apply in_map_iff.
+  exists x2.
+  inversion EQx.
+  rewrite e.
+  auto.
+  }
+  omega.
+  inversion NODUP.
+  assumption.
+  apply PERM.
+  apply IN.
+  assumption.
+Qed.
+
+Lemma count_updl_incr' A m:
+  forall (l: keyval A) O x z id
+         (NODUP: NoDup (map snd l))
+         (IN: In (O,id) (map (fun x => (m x, snd x)) l))
+         (X: m (x,id) = z::O),
+    count_occ Z.eq_dec (concat (map m l)) z + 1 =
+    count_occ Z.eq_dec (concat (map m (updl l id (x,id)))) z.
+Proof.
+  induction l.
+  simpl.
+  intros.
+  contradiction.
+  simpl.
+  intros.
+  destruct IN as [EQ|IN].
+  inversion EQ.
+  rewrite eqz.
+  rewrite H1.
+  rewrite X.
+  rewrite H0.
+  simpl.
+  rewrite eqz.
+  rewrite updl_eq_l.
+  omega.
+  rewrite <- H1.
+  assumption.
+  rewrite <- count_app.
+  rewrite <- count_app.
+  destruct (Z.eq_dec (snd a) id).
+  {
+  inversion NODUP.
+  exfalso.
+  apply H1.
+  apply in_map_iff in IN.
+  destruct IN as (x2,(EQx,INx)).
+  apply in_map_iff.
+  exists x2.
+  inversion EQx.
+  rewrite e.
+  auto.
+  }
+  rewrite <- plus_assoc.
+  erewrite IHl.
+  reflexivity.
+  inversion NODUP.
+  assumption.
+  apply IN.
+  assumption.
+Qed.
+
 
 (** # <font size="5"><b> fold_left </b></font> # *)
 
@@ -2535,17 +2942,11 @@ Definition defl A (def: A -> A -> Prop) (P: list (A * Z)) :=
          (IN2: In (p2,id2) P),
     def p1 p2. 
 
-Lemma defl_bagdef:
-  forall l, defl bagdef l.
-Proof.
-  unfold bagdef.
-  unfold defl.
-  intros.
-  trivial.
-Qed.
-
-Lemma fold_left_f A f def (CAN: can def f) (DEF: forall a b, def a b):
-  forall (l: list A) a b,
+(*
+Lemma fold_left_f A f def (CAN: can def f):
+  forall (l: list A) a b 
+         (DEFab: def a b)
+         (DEFLab: forall x (IN: In x l), def x a /\ def x b),
     fold_left f l (f a b) = f a (fold_left f l b).
 Proof.
   induction l.
@@ -2556,15 +2957,39 @@ Proof.
   intros.
   assert (CAN1:=CAN).
   unfold can in CAN1.
-  destruct CAN1 as (COMM,(ASSOC,(DASSOC,(DCOMM,(DREF,NUT))))).
+  destruct CAN1 as (COMM,(ASSOC,(DASSOC,(DDIST,(DCOMM,NUT))))).
   replace (f (f a0 b) a) with (f a0 (f b a)).
   apply IHl.
+  assert (G: def a a0 /\ def a b).
+  {
+  apply DEFLab.
+  left.
+  reflexivity.
+  }
+  apply DASSOC;
+  try tauto.
+  apply DCOMM.
+  tauto.
+  apply DCOMM.
+  tauto.
+  intros.
+  split.
+  apply DEFLab.
+  right.
+  assumption.
+  apply DASSOC.
+  apply DEFLab.
+  right.
+  assumption.
+  apply DEFLab.
+  assumpt
   rewrite ASSOC.
   reflexivity.
   apply DEF.
   apply DEF.
   apply DEF.
 Qed.
+*)
 
 Lemma fold_left_f_def A f def (CAN: can def f):
   forall (l: list (A * Z)) a b
@@ -3182,12 +3607,8 @@ Proof.
 
   destruct ELM as [EQ|IN].
   inversion EQ.
-  rewrite eqz.
-  simpl.
+  repeat dstr_.
   rewrite updl_eq_l.
-  rewrite H0.
-  rewrite H1.
-  rewrite X.
   replace (f b (f x1 x2)) with (f x2 (f b x1)).
   {
   symmetry.
@@ -3209,15 +3630,13 @@ Proof.
   assumption.
   apply DCOMM.
   apply DEFLb.
-  left.
-  assumption.
+  tauto.
   intros.
   apply in_map_iff in IN.
   destruct IN as (y0,(EQ0,IN)).
   destruct y0 as (x0',x1').
   simpl in EQ0.
   rewrite <- EQ0.
-  rewrite EQ in DEFL.
   split.
   apply DEFLx2.
   right.
@@ -3232,9 +3651,8 @@ Proof.
   unfold not.
   intros.
   rewrite H in IN.
-  rewrite H1 in NODUP.
   inversion NODUP.
-  apply H4.
+  apply H2.
   apply in_map_iff.
   exists (x0', id).
   auto.
@@ -3246,15 +3664,13 @@ Proof.
   reflexivity.
   apply DCOMM.
   apply DEFLb.
-  left.
-  assumption.
+  tauto.
   }
   rewrite COMM.
   apply ASSOC.
   apply DCOMM.
   apply DEFLb.
-  left.
-  assumption.
+  tauto.
   apply DCOMM. 
   assumption.
   assumption.
@@ -3262,12 +3678,10 @@ Proof.
   assumption.
   apply DCOMM.
   apply DEFLx2.
-  left.
-  assumption.
+  tauto.
   apply DCOMM.
   apply DEFLb.
-  left.
-  assumption.
+  tauto.
   assumption.
   apply in_map_iff in IN.
   destruct IN as (y0,(EQ0,IN)).
@@ -3342,6 +3756,7 @@ Proof.
   assumption.
 Qed.
 
+(*
 Lemma fold_left_g A B def (f: A -> A -> A) (g: A -> B) (CAN: can def f) (DEF: forall a b, def a b):
   forall (l: list A) a b,
     g (fold_left f l (f a b)) = g (f b (fold_left f l a)).
@@ -3379,6 +3794,7 @@ Proof.
   apply COMM.
   apply DEF.
 Qed.
+*)
 
 (*Class cang A B (f: A -> A -> A) (g: A -> B) :=
 {
@@ -3467,7 +3883,7 @@ Qed.
 
 (** # <font size="5"><b> concat </b></font> # *)
 
-Lemma concat_map_filter A (f1: A -> list Z) (f2: A -> bool):
+Lemma concat_map_filter A B (f1: A -> list B) (f2: A -> bool):
   forall (l: list A)
          (FIL: forall x (IN: In x l), f2 x = false -> f1 x = nil),
     concat (map f1 (filter f2 l)) = concat (map f1 l).
@@ -3499,118 +3915,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma count_perm1 A dec:
-  forall (l1 l2: list A)
-         (PERM: Permutation l1 l2) x,
-    count_occ dec l1 x = count_occ dec l2 x.
-Proof.
-  intros.
-  induction PERM.
-  reflexivity.
-  simpl.
-  rewrite IHPERM.
-  reflexivity.
-  simpl.
-  destruct (dec y x).
-  destruct (dec x0 x).
-  reflexivity.
-  reflexivity.
-  reflexivity.
-  omega.
-Qed.
-
-Lemma count_perm A dec:
-  forall (l l': list A)
-         (PERM: Permutation l' l) l1 l2 x
-         (EQ: l' = l1 ++ l2),
-    count_occ dec l1 x + count_occ dec l2 x = count_occ dec l x.
-Proof.
-  intros l l' PERM.
-  induction PERM.
-  simpl.
-  intros.
-  {
-  destruct l1.
-  destruct l2.
-  simpl.
-  omega.
-  inversion EQ.
-  inversion EQ.
-  }
-  {
-  simpl.
-  intros.
-  destruct (dec x x0).
-  {
-  destruct l1.
-  destruct l2.
-  inversion EQ.
-  simpl in EQ.
-  inversion EQ.
-  rewrite <- H0.
-  rewrite e.
-  simpl.
-  destruct (dec x0 x0).
-  Focus 2.
-  contradiction.
-  specialize IHPERM with (l1:=nil).
-  simpl in IHPERM.
-  rewrite IHPERM.
-  reflexivity.
-  assumption.
-  inversion EQ.
-  rewrite <- e.
-  rewrite H0.
-  simpl.
-  destruct (dec a a).
-  Focus 2.
-  contradiction.
-  simpl.
-  rewrite IHPERM.
-  reflexivity.
-  assumption.
-  }
-  destruct l1.
-  destruct l2.
-  inversion EQ.
-  simpl in EQ.
-  inversion EQ.
-  rewrite <- H0.
-  simpl.
-  destruct (dec x x0).
-  contradiction.
-  specialize IHPERM with (l1:=nil).
-  simpl in IHPERM.
-  rewrite IHPERM.
-  reflexivity.
-  assumption.
-  inversion EQ.
-  rewrite <- H0.
-  simpl.
-  destruct (dec x x0).
-  contradiction.
-  rewrite IHPERM.
-  reflexivity.
-  assumption.
-  }
-  simpl.
-  intros.
-  rewrite count_app.
-  rewrite <- EQ.
-  simpl.
-  destruct (dec y x0).
-  destruct (dec x x0).
-  reflexivity.
-  reflexivity.
-  reflexivity.
-  simpl.
-  intros.
-  apply IHPERM1 with (x:=x) in EQ.
-  rewrite EQ.
-  apply count_perm1.
-  assumption.
-Qed.
-
 Lemma concat_move_eq A (m: (A * Z) -> list Z) :
   forall (l: list (A * Z)) x O O1 O2 id
          (UNQ: NoDup (map snd l))
@@ -3627,7 +3931,7 @@ Proof.
   intros.
   destruct (Z.eq_dec (snd a) id).
   rewrite e in ELM.
-  rewrite zeqb in ELM.
+  destruct (id =? id)%Z eqn:idid.
   simpl in ELM.
   destruct ELM as [EQ|IN].
   rewrite EQ.
@@ -3661,6 +3965,8 @@ Proof.
   apply in_map_iff.
   exists y.
   auto.
+  apply neqb_neq in idid.
+  contradiction.
   apply functional_extensionality.
   intros.
   rewrite <- count_app.
@@ -3678,44 +3984,4 @@ Proof.
   contradiction.
   assumption.
   assumption.
-Qed.
-
-(** # <font size="5"><b> Domain-Lift </b></font> # *)
-
-Definition dom_f A (f: Z -> option A) D :=
-  forall z, In z D -> f z <> None.
-
-Definition lift_f A default (f: Z -> option A) : (Z -> A) :=
-  fun x => match (f x) with
-            | Some z => z
-            | None => default
-           end.
-
-Lemma lift_f_in A:
-  forall (f1 f2: Z -> option A) d z l
-        (DOM: f1 z <> None)
-        (REF: refines f1 f2)
-        (IN: In (lift_f d f1 z) l),
-    In (lift_f d f2 z) l.
-Proof.
-  induction l.
-  simpl.
-  tauto.
-  simpl.
-  intros.
-  destruct IN as [EQ|IN].
-  rewrite EQ.
-  left.
-  unfold lift_f.
-  unfold refines in REF.
-  specialize REF with (z:=z).
-  destruct (f1 z) eqn:f1z.
-  rewrite REF with a0.
-  reflexivity.
-  reflexivity.
-  destruct DOM.
-  reflexivity.
-  right.
-  apply IHl;
-  try tauto.
 Qed.

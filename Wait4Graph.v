@@ -1,9 +1,15 @@
+Add LoadPath "/Users/jafarhamin/Desktop/deadlock-free-monitors-soundness".
+
 Require Import List.
 Require Import ZArith.
 Require Import Coq.Init.Nat.
+Require Import Coq.Sorting.Permutation.
 Require Import Util_Z.
 Require Import Util_list.
+
+(*
 Require Import PrecedenceRelation.
+*)
 
 Set Implicit Arguments.
 
@@ -33,6 +39,85 @@ Proof.
   apply list_eq_dec.
   apply Z_eq_dec.
 Qed.
+
+Definition prc (o:Z) (O: list Z) (R: Z -> Z) (L: Z -> Z) (P: Z -> bool) (X: Z -> list Z): bool :=
+  andb (orb (negb (ifb (In_dec Z.eq_dec (R o) (X (L o)))))
+            (andb (leb (length (filter (fun x => ifb (In_dec Z.eq_dec (R x) (X (L o)))) O)) 1)
+                  (forallb (fun x => orb (negb (ifb (In_dec Z.eq_dec (R x) (X (L o)))))
+                                         (Z.eqb (L x) (L o))) O)))
+       (orb (forallb (fun x => Z.ltb (R o) (R x)) O)
+            (andb (P o)
+                  (andb (ifb (In_dec Z.eq_dec (R o) (X (L o))))
+                        (forallb (fun x => orb (Z.ltb (R o) (R x)) 
+                                               (andb (ifb (In_dec Z.eq_dec (R x) (X (L o))))
+                                                     (andb (Z.eqb (L x) (L o))
+                                                           (Z.leb (R o) (R x + 1))))) O)))).
+
+Lemma prc_perm:
+  forall O O' o R L P X
+         (PRC: prc o O R L P X = true)
+         (PERM: Permutation O' O),
+    prc o O' R L P X = true.
+Proof.
+  unfold prc.
+  intros.
+  apply Coq.Bool.Bool.andb_true_iff in PRC.
+  destruct PRC as (PRC1,PRC2).
+  apply Coq.Bool.Bool.orb_true_iff in PRC1.
+  apply Coq.Bool.Bool.orb_true_iff in PRC2.
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct PRC1 as [PRC1|PRC1].
+  left.
+  assumption.
+  right.
+  apply Coq.Bool.Bool.andb_true_iff in PRC1.
+  destruct PRC1 as (PRC1,PRC1').
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Nat.leb_le.
+  apply Nat.leb_le in PRC1.
+  rewrite prem_length_eq with (l':=O).
+  assumption.
+  assumption. 
+  apply forallb_forall.
+  intros.
+  apply forallb_forall with (x:=x) in PRC1'.
+  apply PRC1'.
+  apply Permutation_in with O'.
+  assumption.
+  assumption.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct PRC2 as [PRC2|PRC2].
+  left.
+  apply forallb_forall.
+  intros.
+  apply forallb_forall with (x:=x) in PRC2.
+  apply PRC2.
+  apply Permutation_in with O'.
+  assumption.
+  assumption.
+  right.
+  apply Coq.Bool.Bool.andb_true_iff in PRC2.
+  destruct PRC2 as (PRC2, PRC2').
+  apply Coq.Bool.Bool.andb_true_iff in PRC2'.
+  destruct PRC2' as (PRC2', PRC2'').
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  assumption.
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  assumption.
+  apply forallb_forall.
+  intros.
+  apply forallb_forall with (x:=x) in PRC2''.
+  apply PRC2''.
+  apply Permutation_in with O'.
+  assumption.
+  assumption.
+Qed.
+
 
 Lemma count_remove_list_Z:
   forall (G:list (list Z * Z)) r R t
@@ -205,7 +290,6 @@ Proof.
   destruct PRC as (tmp1,tmp2).
   apply Coq.Bool.Bool.orb_true_iff in tmp2.
   destruct tmp2 as [tmp2|tmp2].
-  unfold prclt in tmp2.
   apply forallb_forall with (x:=o') in tmp2.
   apply Z.ltb_lt in tmp2.
   omega.
@@ -228,7 +312,6 @@ Proof.
   destruct OLE as (tmp1,tmp2).
   apply Coq.Bool.Bool.orb_true_iff in tmp2.
   destruct tmp2 as [tmp2|tmp2].
-  unfold prclt in tmp2.
   apply forallb_forall with (x:=o') in tmp2.
   apply Z.ltb_lt in tmp2.
   omega.
@@ -246,9 +329,6 @@ Proof.
   destruct tmp4 as (tmp4,tmp5).
   apply Coq.Bool.Bool.andb_true_iff in tmp5.
   destruct tmp5 as (tmp5,tmp6).
-  unfold exc in tmp4.
-  apply Z.eqb_eq in tmp5.
-  rewrite <- tmp5.
   assumption.
   assumption.
 Qed.
@@ -266,7 +346,6 @@ Proof.
   destruct OLE as (tmp1,tmp2).
   apply Coq.Bool.Bool.orb_true_iff in tmp2.
   destruct tmp2 as [tmp2|tmp2].
-  unfold prclt in tmp2.
   apply forallb_forall with (x:=r') in tmp2.
   apply Z.ltb_lt in tmp2.
   omega.
@@ -303,7 +382,6 @@ Proof.
   destruct OLE as (tmp1,tmp2).
   apply Coq.Bool.Bool.orb_true_iff in tmp1.
   destruct tmp1 as [tmp1|tmp1].
-  unfold exc in tmp1.
   rewrite Xr in tmp1.
   inversion tmp1.
   apply le_trans with (length (filter (fun x : Z => ifb (In_dec Z.eq_dec (R x) (X (L o)))) O)).
@@ -890,7 +968,6 @@ Proof.
   destruct OLE as (tmp1,tmp2).
   apply Coq.Bool.Bool.orb_true_iff in tmp1.
   destruct tmp1 as [tmp1|tmp1].
-  unfold exc in tmp1.
   rewrite Xr in tmp1.
   inversion tmp1.
   apply Coq.Bool.Bool.andb_true_iff in tmp1.
@@ -914,7 +991,6 @@ Proof.
   destruct OLE as (tmp1,tmp2).
   apply Coq.Bool.Bool.orb_true_iff in tmp2.
   destruct tmp2 as [tmp2|tmp2].
-  unfold prclt in tmp2.
   apply forallb_forall with (x:=r') in tmp2.
   apply Z.ltb_lt in tmp2.
   omega.
@@ -938,7 +1014,6 @@ Proof.
   destruct OLE as (tmp1,tmp2).
   apply Coq.Bool.Bool.orb_true_iff in tmp2.
   destruct tmp2 as [tmp2|tmp2].
-  unfold prclt in tmp2.
   apply forallb_forall with (x:=r') in tmp2.
   apply Z.ltb_lt in tmp2.
   omega.
@@ -1035,10 +1110,6 @@ Proof.
     assumption.
     apply OLER''.
   }
-  unfold exc.
-  unfold prclt.
-  unfold prcle.
-  unfold defo.
 
   rewrite Lr'Lrmin.
   intros.
@@ -1088,7 +1159,6 @@ Proof.
     destruct OLER' as (tmp1,tmp2).
     apply Coq.Bool.Bool.orb_true_iff in tmp1.
     destruct tmp1 as [tmp3|tmp3].
-    unfold exc in tmp3.
     rewrite Xrmin in tmp3.
     inversion tmp3.
     apply Coq.Bool.Bool.andb_true_iff in tmp3.
@@ -1110,7 +1180,6 @@ Proof.
     destruct OLER'' as (tmp1,tmp2).
     apply Coq.Bool.Bool.orb_true_iff in tmp1.
     destruct tmp1 as [tmp3|tmp3].
-    unfold exc in tmp3.
     rewrite Lr'Lrmin in tmp3.
     rewrite Xr' in tmp3.
     inversion tmp3.
@@ -1143,8 +1212,6 @@ Proof.
     {
     apply Coq.Bool.Bool.andb_true_iff.
     split.
-    unfold exc in *.
-    rewrite Lr'Lrmin.
     assumption.
     apply forallb_forall.
     simpl.
@@ -1245,7 +1312,6 @@ Proof.
     apply Coq.Bool.Bool.orb_true_iff in tmp2.
     destruct tmp2 as [tmp2|tmp3].
     left.
-    unfold prclt in tmp2.
     apply forallb_forall with (x:=x) in tmp2.
     assumption.
     apply in_filter_in_l with (fun x : Z => (W rmin <=? W x)%Z).
@@ -1269,7 +1335,6 @@ Proof.
     destruct tmp2 as [tmp2|tmp3].
     apply Coq.Bool.Bool.orb_true_iff.
     left.
-    unfold prclt in tmp2.
     apply forallb_forall with (x:=x) in tmp2.
     assumption.
     apply in_remove_in with Z.eq_dec rmin.
@@ -1301,7 +1366,6 @@ Proof.
   destruct OLE as (tmp1,tmp2).
   apply Coq.Bool.Bool.orb_true_iff in tmp1.
   destruct tmp1 as [tmp1|tmp1].
-  unfold exc in tmp1.
   rewrite Xr in tmp1.
   inversion tmp1.
   apply Coq.Bool.Bool.andb_true_iff in tmp1.
@@ -1743,11 +1807,6 @@ Proof.
       apply OLER'.
     }
 
-  unfold exc in *.
-  unfold defo in *.
-  unfold prclt in *.
-  unfold prcle in *.
-
   rewrite Lr'Lrmin.
   intros.
   apply Coq.Bool.Bool.andb_true_iff.
@@ -1760,14 +1819,12 @@ Proof.
     destruct OLER' as (tmp1,tmp2).
     apply Coq.Bool.Bool.orb_true_iff in tmp1.
     destruct tmp1 as [tmp11|tmp12].
-    unfold exc in tmp11.
     rewrite Lr'Lrmin in tmp11.
     rewrite Xr in tmp11.
     inversion tmp11.
     apply Coq.Bool.Bool.andb_true_iff.
     split.
     apply Nat.leb_le.
-    unfold defo in tmp12.
     rewrite Lr'Lrmin in tmp12.
     apply Coq.Bool.Bool.andb_true_iff in tmp12.
     destruct tmp12 as (tmp12, tmp13).
@@ -1800,7 +1857,6 @@ Proof.
     destruct OLER as (tmp3,tmp4).
     apply Coq.Bool.Bool.orb_true_iff in tmp3.
     destruct tmp3 as [tmp3|tmp3].
-    unfold exc in tmp3.
     rewrite Xrmin in tmp3.
     inversion tmp3.
     apply Coq.Bool.Bool.andb_true_iff in tmp3.
@@ -1843,8 +1899,6 @@ Proof.
     {
     apply Coq.Bool.Bool.andb_true_iff.
     split.
-    unfold exc in *.
-    rewrite Lr'Lrmin.
     assumption.
     apply forallb_forall.
     simpl.
@@ -1873,9 +1927,8 @@ Proof.
     rewrite EQ2.
     rewrite <- EQ1.
     assumption.
-
-    assert (G: ((L x =? L rmin)%Z && (W r <=? W x + 1)%Z)%bool = true).
-    {
+    split.
+    assumption.
     apply Coq.Bool.Bool.andb_true_iff.
     split.
     unfold prc in OLER.
@@ -1883,39 +1936,6 @@ Proof.
     destruct OLER as (tmp1,tmp2).
     apply Coq.Bool.Bool.orb_true_iff in tmp1.
     destruct tmp1 as [tmp1|tmp1].
-    unfold exc in tmp1.
-    rewrite Xrmin in tmp1.
-    inversion tmp1.
-    apply Coq.Bool.Bool.andb_true_iff in tmp1.
-    destruct tmp1 as (tmp3, tmp4).
-    apply forallb_forall with (x:=x) in tmp4.
-    apply Coq.Bool.Bool.orb_true_iff in tmp4.
-    destruct tmp4 as [tmp4|tmp4].
-    rewrite Xx in tmp4.
-    inversion tmp4.
-    assumption.
-    apply in_filter_in_l with (fun x : Z => (W rmin <=? W x)%Z).
-    assumption.
-    apply Z.leb_le.
-    omega.
-    }
-    assert (G2:=G).
-    apply Coq.Bool.Bool.andb_true_iff in G2.
-    destruct G2 as (lxlrmin,WrWx).
-    apply Z.eqb_eq in lxlrmin.
-    split.
-    unfold exc.
-    rewrite lxlrmin.
-    assumption.
-
-    apply Coq.Bool.Bool.andb_true_iff.
-    split.
-    unfold prc in OLER.
-    apply Coq.Bool.Bool.andb_true_iff in OLER.
-    destruct OLER as (tmp1,tmp2).
-    apply Coq.Bool.Bool.orb_true_iff in tmp1.
-    destruct tmp1 as [tmp1|tmp1].
-    unfold exc in tmp1.
     rewrite Xrmin in tmp1.
     inversion tmp1.
     apply Coq.Bool.Bool.andb_true_iff in tmp1.
@@ -1938,9 +1958,8 @@ Proof.
     assert (Xx: ifb (In_dec Z.eq_dec (W x) (X (L rmin))) = true).
     rewrite EQ3.
     assumption.
-
-    assert (G: ((L x =? L rmin)%Z && (W r <=? W x + 1)%Z)%bool = true).
-    {
+    split.
+    assumption.
     apply Coq.Bool.Bool.andb_true_iff.
     split.
     unfold prc in OLER.
@@ -1948,7 +1967,6 @@ Proof.
     destruct OLER as (tmp1,tmp2).
     apply Coq.Bool.Bool.orb_true_iff in tmp1.
     destruct tmp1 as [tmp1|tmp1].
-    unfold exc in tmp1.
     rewrite Xrmin in tmp1.
     inversion tmp1.
     apply Coq.Bool.Bool.andb_true_iff in tmp1.
@@ -1961,25 +1979,14 @@ Proof.
     assumption.
     apply in_filter_in_l with (fun x : Z => (W rmin <=? W x)%Z).
     assumption.
+    rewrite EQ1.
+    rewrite EQ3.
     apply Z.leb_le.
     omega.
-    }
-    assert (G2:=G).
-    apply Coq.Bool.Bool.andb_true_iff in G2.
-    destruct G2 as (lxlrmin,WrWx).
-    apply Z.eqb_eq in lxlrmin.
-
-    split.
-    unfold exc in *.
-    rewrite lxlrmin.
-    assumption.
-    assumption.
-
     apply filter_In in IN1.
     destruct IN1 as [INx Wrmin].
     apply Z.leb_le in Wrmin.
     omega.
-
 
     unfold prc in OLER.
     apply Coq.Bool.Bool.andb_true_iff in OLER.
@@ -1987,7 +1994,6 @@ Proof.
     apply Coq.Bool.Bool.orb_true_iff in tmp2.
     destruct tmp2 as [tmp2|tmp2].
     left.
-    unfold prclt in tmp2.
     apply forallb_forall with (x:=x) in tmp2.
     apply Z.ltb_lt in tmp2.
     apply Z.ltb_lt.
@@ -2005,8 +2011,6 @@ Proof.
     apply Z.ltb_lt in tmp4.
     apply Z.ltb_lt.
     omega.
-
-
     apply Coq.Bool.Bool.andb_true_iff in tmp4.
     destruct tmp4 as (tmp4,tmp5).
     apply Coq.Bool.Bool.andb_true_iff in tmp5.
@@ -2021,7 +2025,6 @@ Proof.
     apply Z.leb_le in tmp6.
     apply Z.leb_le.
     omega.
-
     apply in_filter_in_l with (fun x : Z => (W rmin <=? W x)%Z).
     assumption.
 
@@ -2032,10 +2035,8 @@ Proof.
     apply Coq.Bool.Bool.orb_true_iff in tmp2.
     destruct tmp2 as [tmp2|tmp2].
     left.
-    unfold prclt in tmp2.
     apply forallb_forall with (x:=x) in tmp2.
     assumption.
-
     apply in_remove_in with Z.eq_dec rmin.
     assumption.
     apply Coq.Bool.Bool.andb_true_iff in tmp2.
