@@ -7,8 +7,12 @@ This repository is still in progress and contains soundness proofs for deadlock-
 
 * Util_Z.v : Basic lemma related to Integers
 * Util_list.v : Basic lemma related to lists
+* PrecedenceRelation.v : Definition of precedence relation, used to avoid cycles in the wait-for graph of a program, and some related lemmas
 * Wait4Graph.v : Lemma proving a valid graph is not deadlock
 * Programs.v : Definition of a simpl programming language, its semantics, and the semantics of abort
+
+Other documents that are in progress:
+
 * Assertions.v : Definition of heaps, assertions, satisfaction relation and some related lemmas
 * WeakestPreconditions.v : Definition of the weakest precondition of a command and some related lemmas
 * ValidityOfConfigurations.v : Definition of the validity of configurations and some lemmas proving that the small step preseves it
