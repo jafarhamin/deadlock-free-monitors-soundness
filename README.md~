@@ -5,7 +5,7 @@ This repository is still in progress and contains a soundness proof, carried out
 
 For more details about the approach please look at:
 * [The Deadlock-Free Monitors Paper](https://link.springer.com/chapter/10.1007/978-3-319-89884-1_15), published in [27th European Symposium on Programming, ESOP 2018](https://link.springer.com/book/10.1007/978-3-319-89884-1)
-* [The extended version of this paper](https://lirias2repo.kuleuven.be/bitstream/id/500138/), published as a technical report in [Department of Computer Science, KU Leuven](https://wms.cs.kuleuven.be/cs/english)
+* [The Extended version of this paper](https://lirias2repo.kuleuven.be/bitstream/id/500138/), published as a technical report in [Department of Computer Science, KU Leuven](https://wms.cs.kuleuven.be/cs/english)
 * [Some deadlock-free programs](https://github.com/verifast/verifast/tree/master/examples/monitors), verified in [VeriFast](https://people.cs.kuleuven.be/~bart.jacobs/verifast/), using the proposed proof rules
 
 This project has received funding from [the European Union’s Horizon 2020 research and innovation programme](https://ec.europa.eu/programmes/horizon2020/en) under grant agreement No 731453 ([VESSEDIA](https://vessedia.eu/)).
