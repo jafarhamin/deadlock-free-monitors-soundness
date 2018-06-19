@@ -1,29 +1,26 @@
 # deadlock-free-monitors-soundness
-Deadlock-Free Monitors: Soundness Proof In Coq
+Deadlock-Free Monitors: A Soundness Proof in Coq
+
+This repository is still in progress and contains a soundness proof, carried out by [Coq proof assistant v8.6](https://coq.inria.fr), for deadlock-free monitors, a modular approach to verify deadlock-freedom of programs synchronized by condition variables.
+
+For more details about the approach please look at:
+* [The Deadlock-Free Monitors Paper](https://link.springer.com/chapter/10.1007/978-3-319-89884-1_15), published in [27th European Symposium on Programming, ESOP 2018](https://link.springer.com/book/10.1007/978-3-319-89884-1)
+* [The Extended version of this paper](https://lirias2repo.kuleuven.be/bitstream/id/500138/), published as a technical report in [Department of Computer Science, KU Leuven](https://wms.cs.kuleuven.be/cs/english)
+* [Some deadlock-free programs](https://github.com/verifast/verifast/tree/master/examples/monitors), verified in [VeriFast](https://people.cs.kuleuven.be/~bart.jacobs/verifast/), using the proposed proof rules
+
+This project has received funding from [the European Union’s Horizon 2020 research and innovation programme](https://ec.europa.eu/programmes/horizon2020/en) under grant agreement No 731453 ([VESSEDIA](https://vessedia.eu/)).
 
 # Contents 
 
-This repository is still in progress and contains soundness proofs for deadlock-free monitors, carried out by [Coq proof assistant](https://coq.inria.fr) version 8.6.
-
-* Util_Z.v : Basic lemma related to Integers
-* Util_list.v : Basic lemma related to lists
-* Wait4Graph.v : Lemma proving a valid graph is not deadlock
-* Programs.v : Definition of a simpl programming language, its semantics, and the semantics of abort
-* Assertions.v : Definition of heaps, assertions, satisfaction relation and some related lemmas
-* WeakestPreconditions.v : Definition of the weakest precondition of a command and some related lemmas
-* ValidityOfConfigurations.v : Definition of the validity of configurations and some lemmas proving that the small step preseves it
-* ProofRules.v : Definitions and proofs of the presented proof rules
-* Soundness.v : Soundness proof of the proof rules, i.e. if a program is verified by the proposed proof rules, where the verification starts from an empty bag of obligations and also ends with such bag, this program is deadlock-free
-
-# Some Applications
-
-Some deadlock-free programs verified in [VeriFast](https://people.cs.kuleuven.be/~bart.jacobs/verifast/) using the presented proof rules can be found in this repository (in the Applications folder) or at [VeriFast GitHub repository](https://github.com/verifast/verifast)
-
-# The Approach in details
-
-For more details about the presented approach, please look at the following paper:
-
-* [Deadlock-Free Monitors.](https://)
+* Util_Z.v : Some basic lemmas related to Integers
+* Util_list.v : Some basic lemmas related to lists
+* Wait4Graph.v : A lemma proving that a valid graph is deadlock-free
+* Programs.v : Definitions of a simple programming language, and its semantics
+* Assertions.v : Definitions of heaps, assertions, and satisfaction relation along with some related lemmas
+* WeakestPreconditions.v : The definition of the weakest precondition of a command along with some related lemmas
+* ValidityOfConfigurations.v : The definition of the validity of configurations along with some lemmas proving that the small step preseves it
+* ProofRules.v : The proposed proof rules
+* Soundness.v : The soundness proof of the proposed proof rules, i.e. any program that is verified by the proposed proof rules is deadlock-free
 
 # Contact
 
