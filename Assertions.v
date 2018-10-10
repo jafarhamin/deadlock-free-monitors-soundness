@@ -1,3 +1,4 @@
+Require Import Coq.Bool.Bool.
 Require Import ZArith.
 Require Import Qcanon.
 Require Import List.
@@ -11,43 +12,67 @@ Set Implicit Arguments.
 
 (** # <font size="5"><b> Locations </b></font> # *)
 
-Definition locatione := (exp * Z * (Z * list (Z * Z)) * exp * list Z * (Z * list (Z * Z)) * bool)%type.
+Definition olocation A := (A * Z * A * option Z * bool)%type.
 
-Definition location := (Z * Z * (Z * list (Z * Z)) * Z * list Z * (Z * list (Z * Z)) * bool)%type.
+Definition location A := (olocation A * (Z * list (Z * Z)) * (Z * list (Z * Z)) * list (olocation A))%type.
 
-Definition locatione_eq_dec (l1 l2: locatione) : {l1 = l2} + {l1 <> l2}.
+Definition olocation_eq_dec A (dec: forall (x y:A), {x = y} + {x <> y}) (l1 l2: olocation A) : {l1 = l2} + {l1 <> l2}.
 Proof.
   repeat decide equality.
 Qed.
 
-Definition location_eq_dec (l1 l2: location) : {l1 = l2} + {l1 <> l2}.
+Definition location_eq_dec A (dec: forall (x y:A), {x = y} + {x <> y}) (l1 l2: location A) : {l1 = l2} + {l1 <> l2}.
 Proof.
   repeat decide equality.
 Qed.
 
-Definition Aof A (l: (A * Z * (Z * list (Z * Z)) * A * list Z * (Z * list (Z * Z)) * bool)) : A :=
-  fst (fst (fst (fst (fst (fst l))))).
+Definition Aofo A (l: olocation A) : A :=
+  fst (fst (fst (fst l))).
 
-Definition Rof A (l: (A * Z * (Z * list (Z * Z)) * A * list Z * (Z * list (Z * Z)) * bool)) : Z :=
-  snd (fst (fst (fst (fst (fst l))))).
-
-Definition Iof A (l: (A * Z * (Z * list (Z * Z)) * A * list Z * (Z * list (Z * Z)) * bool)) : (Z * list (Z * Z)) :=
-  snd (fst (fst (fst (fst l)))).
-
-Definition Lof A (l: (A * Z * (Z * list (Z * Z)) * A * list Z * (Z * list (Z * Z)) * bool)) : A :=
+Definition Rofo A (l: olocation A) : Z :=
   snd (fst (fst (fst l))).
 
-Definition Xof A (l: (A * Z * (Z * list (Z * Z)) * A * list Z * (Z * list (Z * Z)) * bool)) : list Z :=
+Definition Lofo A (l: olocation A) : A :=
   snd (fst (fst l)).
 
-Definition Mof A (l: (A * Z * (Z * list (Z * Z)) * A * list Z * (Z * list (Z * Z)) * bool)) : (Z * list (Z * Z)) :=
+Definition Xofo A (l: olocation A) : option Z :=
   snd (fst l).
 
-Definition Pof A (l: (A * Z * (Z * list (Z * Z)) * A * list Z * (Z * list (Z * Z)) * bool)) : bool :=
+Definition Pofo A (l: olocation A) : bool :=
   snd l.
 
-Definition evall (l: locatione) : location :=
-  ([[Aof l]], Rof l, Iof l, [[Lof l]], Xof l, Mof l, Pof l).
+Definition Oof A (l: location A) : olocation A :=
+  fst (fst (fst l)).
+
+Definition Aof A (l: location A) : A :=
+  Aofo (Oof l).
+
+Definition Rof A (l: location A) : Z :=
+  Rofo (Oof l).
+
+Definition Lof A (l: location A) : A :=
+  Lofo (Oof l).
+
+Definition Xof A (l: location A) : option Z :=
+  Xofo (Oof l).
+
+Definition Pof A (l: location A) : bool :=
+  Pofo (Oof l).
+
+Definition Iof A (l: location A) : (Z * list (Z * Z)) :=
+  snd (fst (fst l)).
+
+Definition Mof A (l: location A) : (Z * list (Z * Z)) :=
+  snd (fst l).
+
+Definition M'of A (l: location A) : list (olocation A) :=
+  snd l.
+
+Definition evalol (l: olocation exp) : olocation Z :=
+  ([[Aofo l]], Rofo l, [[Lofo l]], Xofo l, Pofo l).
+
+Definition evall (l: location exp) : location Z :=
+  (evalol (Oof l), Iof l, Mof l, map evalol (M'of l)).
 
 (** # <font size="5"><b> Assertions </b></font> # *)
 
@@ -57,38 +82,38 @@ Definition empb : (Z -> nat) :=
   fun _ => O.
 
 Inductive assn :=
-  | Aemp
   | Aprop (p: Prop)
   | Abool (b: bool)
   | Aconj (P: assn) (Q: assn)
   | Adisj (P: assn) (Q: assn)
   | Astar (P: assn) (Q: assn)
   | Asepimp (P: assn) (Q: assn)
-  | Apointsto (fr:Qc) (a: locatione) (e: exp)
-  | Aulock (l: locatione) (Wt Ot: bag)
-  | Alock (l: locatione)
-  | Alocked (l: locatione) (Wt Ot: bag)
-  | Acond (v: locatione)
-  | Aobs (obs: (list locatione))
+  | Apointsto (fr:Qc) (a: location exp) (e: exp)
+  | Aulock (l: location exp) (Wt Ot: bag)
+  | Alock (l: location exp)
+  | Alocked (l: location exp) (Wt Ot: bag)
+  | Acond (v: location exp)
+  | Aucond (v: location exp)
+  | Aicond (v: location exp)
+  | Aobs (obs: (list (olocation exp)))
   | Atic (e: exp)
   | Actr (e: exp) (n: nat)
   | Aex A (pp: A -> assn)
   | Afa A (pp: A -> assn).
 
-Definition subsl (x:Z) (z:Z) (l:locatione): locatione :=
+
+Definition subsol (x:Z) (z:Z) (l:olocation exp): olocation exp :=
   match l with
-    | (A,R,i,L,X,M,P) => (subse x z A,R,i,subse x z L,X,M,P)
+    | (A,R,L,X,P) => (subse x z A,R,subse x z L,X,P)
   end.
 
-Fixpoint subso (x:Z) (z:Z) (l: list locatione): list locatione :=
+Definition subsl (x:Z) (z:Z) (l:location exp): location exp :=
   match l with
-    | nil => nil
-    | o::os => (subsl x z o)::(subso x z os)
+    | (ol,i,M,M') => (subsol x z ol,i,M, map (subsol x z) M')
   end.
 
 Fixpoint subsa (x:Z) (z:Z) (a:assn): assn :=
   match a with 
-    | Aemp => Aemp
     | Aprop p => Aprop p
     | Abool b => Abool b
     | Aconj P Q => Aconj (subsa x z P) (subsa x z Q)
@@ -100,7 +125,9 @@ Fixpoint subsa (x:Z) (z:Z) (a:assn): assn :=
     | Alock l => Alock (subsl x z l)
     | Alocked l Wt Ot => Alocked (subsl x z l) Wt Ot
     | Acond v => Acond (subsl x z v)
-    | Aobs O1 => Aobs (subso x z O1)
+    | Aucond v => Aucond (subsl x z v)
+    | Aicond v => Aicond (subsl x z v)
+    | Aobs O1 => Aobs (map (subsol x z) O1)
     | Atic v => Atic (subse x z v)
     | Actr v n => Actr (subse x z v) n
     | Aex pp => Aex (fun y => subsa x z (pp y))
@@ -120,9 +147,11 @@ Inductive knowledge :=
   | Ulock (Wt Ot: bag)
   | Lock
   | Locked (Wt Ot: bag)
-  | Cond.
+  | Cond
+  | Ucond
+  | Icond.
 
-Definition pheap := location -> option knowledge.
+Definition pheap := location Z -> option knowledge.
 
 Open Local Scope Qc.
 
@@ -153,6 +182,14 @@ Definition phplusdef (p1 p2 : pheap) :=
       | Some Cond => match p2 x with
                        | None => True
                        | Some Cond => True
+                       | _ => False
+                     end
+      | Some Ucond => match p2 x with
+                       | None => True
+                       | _ => False
+                     end
+      | Some Icond => match p2 x with
+                       | None => True
                        | _ => False
                      end
     end.
@@ -186,7 +223,9 @@ Definition phtoh (p: pheap) (h: heap) :=
       | Some (Ulock _ _) => h (Aof l) = Some 1%Z
       | Some Lock => h (Aof l) = Some 1%Z
       | Some (Locked _ _) => h (Aof l) = Some 0%Z
-      | Some cond => h (Aof l) = Some 0%Z
+      | Some Cond => h (Aof l) <> None
+      | Some Ucond => h (Aof l) <> None
+      | Some Icond => h (Aof l) <> None
     end) /\
  forall z (NONE: forall l (EQ:Aof l = z), p l = None), h z = None.
 
@@ -201,6 +240,18 @@ Proof.
   unfold injph; unfold inj; unfold phplus.
   intros; specialize INJ with x1 x2; apply INJ.
   repeat dstr_. repeat dstr_. assumption.
+Qed.
+
+Lemma injo:
+  forall x1 x2
+         (INJ: inj (fun x : location Z => Aof x) x1 x2),
+    inj (fun x : olocation Z => Aofo x) (Oof x1) (Oof x2).
+Proof.
+  unfold inj.
+  intros.
+  apply INJ in H.
+  rewrite H.
+  reflexivity.
 Qed.
 
 (** # <font size="5"><b> Ghost Heaps </b></font> # *)
@@ -239,9 +290,8 @@ Inductive oplus A: (option (list A)) -> (option (list A)) -> (option (list A)) -
 
 (** # <font size="5"><b> Satisfaction Relation </b></font> # *)
 
-Fixpoint sat (p:pheap) (O: option (list location)) (g: gheap) (a:assn) :=
+Fixpoint sat (p:pheap) (O: option (list (olocation Z))) (g: gheap) (a:assn) :=
   match a with
-    | Aemp => p = emp knowledge /\ O = None /\ g = emp (option nat*nat)
     | Aprop p => p
     | Abool b => b = true
     | Aconj P Q => sat p O g P /\ sat p O g Q
@@ -258,8 +308,10 @@ Fixpoint sat (p:pheap) (O: option (list location)) (g: gheap) (a:assn) :=
     | Alock l => p (evall l) = Some Lock \/ exists Wt Ot, p (evall l) = Some (Locked Wt Ot)
     | Alocked l Wt Ot => p (evall l) = Some (Locked Wt Ot)
     | Acond v => p (evall v) = Some Cond
-    | Aobs O1 => oplus (Some (map evall O1)) None O
-    | Atic v => exists n, g ([[v]]) = Some (None, S n)
+    | Aucond v => p (evall v) = Some Ucond
+    | Aicond v => p (evall v) = Some Icond
+    | Aobs O1 => oplus (Some (map evalol O1)) None O
+    | Atic v => exists n o, g ([[v]]) = Some (o, S n)
     | Actr v m => exists n, g ([[v]]) = Some (Some m, n)
     | Aex pp => exists v, sat p O g (pp v)
     | Afa pp => forall v, sat p O g (pp v)
@@ -292,14 +344,14 @@ Notation "P '**' Q" :=
 Notation "P '|->' Q" := 
   (Apointsto 1 P Q)(at level 90).
 
-(** # <font size="5"><b> Locations </b></font> # *)
+(** # <font size="5"><b> Injectivity of Locations </b></font> # *)
 
 Definition comp A B (l: list A) (f: A -> B) :=
   forall x1 x2 (IN: In x1 l) (IN: In x2 l), inj f x1 x2.
 
 Lemma count_loc_Z:
   forall l x (COMP: comp (x::l) (fun x => Aof x)),
-    count_occ Z.eq_dec (map (fun x => Aof x) l) (Aof x) = count_occ location_eq_dec l x.
+    count_occ Z.eq_dec (map (fun x => Aof x) l) (Aof x) = count_occ (location_eq_dec Z.eq_dec) l x.
 Proof.
   induction l.
   simpl.
@@ -326,7 +378,7 @@ Proof.
   right.
   assumption.
   }
-  destruct (location_eq_dec a x).
+  destruct (location_eq_dec Z.eq_dec a x).
   destruct (Z.eq_dec (Aof a) (Aof x)).
   rewrite IHl.
   reflexivity.
@@ -349,11 +401,63 @@ Proof.
   assumption.
 Qed.
 
-Lemma count_map_eq A (f1: A -> list location):
+Lemma count_loc_Zo:
+  forall l x (COMP: comp (x::l) (fun x => Aofo x)),
+    count_occ Z.eq_dec (map (fun x => Aofo x) l) (Aofo x) = count_occ (olocation_eq_dec Z.eq_dec) l x.
+Proof.
+  induction l.
+  simpl.
+  reflexivity.
+  simpl.
+  intros.
+  assert (COMP1: comp (x :: l) (fun x => Aofo x)).
+  {
+  unfold comp in *.
+  intros.
+  apply COMP.
+  destruct IN as [EQ1|IN1].
+  rewrite EQ1.
+  left.
+  reflexivity.
+  right.
+  right.
+  assumption.
+  destruct IN0 as [EQ1|IN1].
+  rewrite EQ1.
+  left.
+  reflexivity.
+  right.
+  right.
+  assumption.
+  }
+  destruct (olocation_eq_dec Z.eq_dec a x).
+  destruct (Z.eq_dec (Aofo a) (Aofo x)).
+  rewrite IHl.
+  reflexivity.
+  assumption.
+  rewrite e in n.
+  contradiction.
+  destruct (Z.eq_dec (Aofo a) (Aofo x)).
+  assert (CO: a = x).
+  {
+  apply COMP.
+  right.
+  left.
+  reflexivity.
+  left.
+  reflexivity.
+  assumption.
+  }
+  contradiction.
+  apply IHl.
+  assumption.
+Qed.
+
+Lemma count_map_eqo A (f1: A -> list (olocation Z)):
   forall l x
-         (COMP: comp (x::concat (map f1 l)) (fun x => Aof x)),
-     count_occ Z.eq_dec (concat (map (fun t => map (fun x => Aof x) (f1 t)) l)) (Aof x) = 
-     count_occ location_eq_dec (concat (map f1 l)) x.
+         (COMP: comp (x::concat (map f1 l)) (fun x => Aofo x)),
+     count_occ Z.eq_dec (concat (map (fun t => map (fun x => Aofo x) (f1 t)) l)) (Aofo x) = 
+     count_occ (olocation_eq_dec Z.eq_dec) (concat (map f1 l)) x.
 Proof.
   induction l.
   simpl.
@@ -364,8 +468,68 @@ Proof.
   rewrite <- count_app.
   rewrite <- count_app.
   rewrite IHl.
-  assert (G: count_occ Z.eq_dec (map (fun x0 : Z * Z * (Z * list (Z * Z)) * Z * list Z * (Z * list (Z * Z)) *
-    bool => Aof x0) (f1 a)) (Aof x) = count_occ location_eq_dec (f1 a) x).
+  assert (G: count_occ Z.eq_dec (map (fun x0 => Aofo x0) (f1 a)) (Aofo x) = count_occ (olocation_eq_dec Z.eq_dec) (f1 a) x).
+  {
+  apply count_loc_Zo.
+  unfold comp in *.
+  intros.
+  apply COMP.
+  destruct IN as [EQ1|IN1].
+  rewrite EQ1.
+  left.
+  reflexivity.
+  right.
+  apply in_app_iff.
+  left.
+  assumption.
+  destruct IN0 as [EQ1|IN1].
+  rewrite EQ1.
+  left.
+  reflexivity.
+  right.
+  apply in_app_iff.
+  left.
+  assumption.
+  }
+  rewrite G.
+  reflexivity.
+  unfold comp in *.
+  intros.
+  apply COMP.
+  destruct IN as [EQ1|IN1].
+  rewrite EQ1.
+  left.
+  reflexivity.
+  right.
+  apply in_app_iff.
+  right.
+  assumption.
+  destruct IN0 as [EQ1|IN1].
+  rewrite EQ1.
+  left.
+  reflexivity.
+  right.
+  apply in_app_iff.
+  right.
+  assumption.
+Qed.
+
+Lemma count_map_eq A (f1: A -> list (location Z)):
+  forall l x
+         (COMP: comp (x::concat (map f1 l)) (fun x => Aof x)),
+     count_occ Z.eq_dec (concat (map (fun t => map (fun x => Aof x) (f1 t)) l)) (Aof x) = 
+     count_occ (location_eq_dec Z.eq_dec) (concat (map f1 l)) x.
+Proof.
+  induction l.
+  simpl.
+  intros.
+  reflexivity.
+  simpl.
+  intros.
+  rewrite <- count_app.
+  rewrite <- count_app.
+  rewrite IHl.
+  assert (G: count_occ Z.eq_dec (map (fun x0 => Aof x0) (f1 a)) (Aof x) = count_occ (location_eq_dec Z.eq_dec) (f1 a) x).
   {
   apply count_loc_Z.
   unfold comp in *.
@@ -411,7 +575,7 @@ Proof.
   assumption.
 Qed.
 
-Lemma comp_cons A (f: location -> A):
+Lemma comp_cons A (f: location Z -> A):
   forall locs x (IN: In x locs)
          (COMP: comp locs f),
     comp (x::locs) f.
@@ -429,14 +593,32 @@ Proof.
   assumption.
 Qed.
 
-Fixpoint xOf A (f: location -> A) (l: list location) (z: Z) : option A :=
+Lemma comp_conso A (f: olocation Z -> A):
+  forall locs x (IN: In x (map (fun x => Oof x) locs))
+         (COMP: comp (map (fun x => Oof x) locs) f),
+    comp (x::(map (fun x => Oof x) locs)) f.
+Proof.
+  unfold comp.
+  intros.
+  apply COMP.
+  destruct IN0 as [EQ0|IN0].
+  rewrite <- EQ0.
+  assumption.
+  assumption.
+  destruct IN1 as [EQ0|IN2].
+  rewrite <- EQ0.
+  assumption.
+  assumption.
+Qed.
+
+Fixpoint xOf A (f: location Z -> A) (l: list (location Z)) (z: Z) : option A :=
   match l with
     | nil => None
     | h::t => if Z.eq_dec z (Aof h) then (Some (f h)) else (xOf f t z)
   end.
 
-Lemma xOf_same A (f: location -> A):
-  forall (l: list location) x
+Lemma xOf_same A (f: location Z -> A):
+  forall (l: list (location Z)) x
          (IN: In (Aof x) (map (fun x => Aof x) l))
          (COMP: comp (x::l) (fun x => Aof x)),
     xOf f l (Aof x) = Some (f x).
@@ -478,6 +660,75 @@ Proof.
   rewrite G.
   reflexivity.
   apply IHl.
+  assumption.
+  unfold comp in *.
+  intros.
+  apply COMP.
+  unfold comp in *.
+  destruct IN0 as [EQ0|IN0].
+  rewrite <- EQ0.
+  left.
+  reflexivity.
+  right.
+  right.
+  assumption.
+  destruct IN1 as [EQ0|IN1].
+  rewrite <- EQ0.
+  left.
+  reflexivity.
+  right.
+  right.
+  assumption.
+Qed.
+
+Lemma xOf_sameo A (f: location Z -> A) (f': olocation Z -> A):
+  forall (l: list (location Z)) (x: olocation Z)
+         (FF': forall l, f l = f' (Oof l))
+         (IN: In x (map (fun x => Oof x) l))
+         (COMP: comp (x::(map (fun x : location Z => Oof x) l)) (fun x => Aofo x)),
+    xOf f l (Aofo x) = Some (f' x).
+Proof.
+  induction l.
+  simpl.
+  intros.
+  contradiction.
+  simpl.
+  intros.
+  destruct IN as [EQ|IN].
+  rewrite <- EQ in *.
+  rewrite eqz.
+  assert (EQ1: Oof a = x).
+  {
+  apply COMP.
+  right.
+  left.
+  reflexivity.
+  left.
+  assumption.
+  rewrite EQ.
+  reflexivity.
+  }
+  rewrite EQ.
+  rewrite <- EQ1.
+  rewrite FF'.
+  reflexivity.
+  destruct (Z.eq_dec (Aofo x) (Aof a)).
+  assert (G: Oof a = x).
+  {
+  apply COMP.
+  right.
+  left.
+  reflexivity.
+  left.
+  reflexivity.
+  symmetry.
+  assumption.
+  }
+  rewrite <- G.
+  rewrite FF'.
+  reflexivity.
+  apply IHl.
+  assumption.
   assumption.
   unfold comp in *.
   intros.
@@ -646,7 +897,7 @@ Proof.
 Qed.
 
 Lemma xOf_exists A:
-  forall l z O (X: location -> A)
+  forall l z O (X: location Z -> A)
          (XOF: xOf X l z = Some O),
     exists x (IN: In x l) (EQ1: Aof x = z), X x = O.
 Proof.
@@ -675,7 +926,7 @@ Proof.
   assumption.
 Qed.
 
-Lemma xOf_exists1 A (f: location -> A):
+Lemma xOf_exists1 A (f: location Z -> A):
   forall l z,
     xOf f l z = None <-> ~ exists x (IN: In x l), Aof x = z.
 Proof.
@@ -725,15 +976,71 @@ Proof.
   assumption.
 Qed.
 
-Definition xcomp (l: list location) :=
+Lemma xof_mon' A (X: location Z -> A):
+  forall l l' x z
+         (XOF: xOf X l x = Some z)
+         (COMP: comp (l ++ l') (fun x => Aof x)),
+    xOf X (l' ++ l) x = Some z.
+Proof.
+  intros.
+  apply xOf_exists in XOF.
+  destruct XOF as (x0,(IN,(EQ,Xx))).
+  unfold comp, inj in COMP.
+  destruct (xOf X (l' ++ l) x) eqn:XOF.
+  apply xOf_exists in XOF.
+  destruct XOF as (x1,(IN1,(EQ1,Xx1))).
+  rewrite <- Xx1.
+  rewrite <- Xx.
+  replace x1 with x0.
+  reflexivity.
+  apply COMP.
+  apply in_app_iff.
+  left.
+  assumption.
+  apply in_app_iff in IN1.
+  apply in_app_iff.
+  destruct IN1.
+  right. assumption.
+  left. assumption.
+  rewrite EQ, EQ1.
+  reflexivity.
+  apply xOf_exists1 in XOF.
+  exfalso.
+  apply XOF.
+  exists x0.
+  exists.
+  apply in_app_iff.
+  right. assumption.
+  assumption.
+Qed.
+
+Lemma xof_app_or A (X: location Z -> A):
+  forall l l' a,
+    xOf X (l ++ l') a = xOf X l a \/
+    xOf X (l ++ l') a = xOf X l' a.
+Proof.
+  induction l.
+  simpl.
+  intros.
+  right.
+  reflexivity.
+  simpl.
+  intros.
+  destruct (Z.eq_dec a0 (Aof a)).
+  left.
+  reflexivity.
+  apply IHl.
+Qed.
+
+Definition xcomp (l: list (location Z)) :=
   forall x1 (IN1: In x1 l) x2 (IN1: In x2 l) (EQ1: Lof x1 = Aof x2),
     Xof x1 = Xof x2.
 
-Definition lcomp (l: list location) :=
+Definition lcomp (l: list (location Z)) :=
   forall x (IN: In x l), In (Lof x) (map (fun x => Aof x) l).
 
 Lemma xOf_same1:
-  forall (l: list location) x O
+  forall (l: list (location Z)) x O
          (IN: In x l)
          (COMP: comp l (fun x => Aof x))
          (XCOM: xcomp l)
@@ -796,7 +1103,7 @@ Qed.
 Lemma eq_xof0:
   forall l a x (NEQ: x <> Aof a),
     xOf (fun x => Lof x) l x =
-    xOf (fun x => Lof x) (remove location_eq_dec a l) x.
+    xOf (fun x => Lof x) (remove (location_eq_dec Z.eq_dec) a l) x.
 Proof.
   induction l.
   simpl.
@@ -812,14 +1119,16 @@ Lemma eq_xof:
   forall l x e i 
          (IN: In e l)
          (COMP: comp l (fun x => Aof x)),
-     xOf (fun x => Lof x) l x = xOf (fun x => Lof x) ((Aof e, Rof e, i, Lof e, Xof e, Mof e, Pof e) :: remove location_eq_dec e l) x.
+     xOf (fun x => Lof x) l x = xOf (fun x => Lof x) ((Oof e, i, Mof e, M'of e) :: remove (location_eq_dec Z.eq_dec) e l) x.
 Proof.
   simpl.
   intros.
-  destruct (Z.eq_dec x (Aof (Aof e, Rof e, i, Lof e, Xof e, Mof e, Pof e))).
+  destruct (Z.eq_dec x (Aof (Oof e, i, Mof e, M'of e))).
   rewrite e0.
   unfold Aof.
   unfold Lof.
+  unfold Aofo.
+  unfold Oof.
   simpl.
   apply xOf_same.
   apply in_map_iff.
@@ -856,7 +1165,7 @@ Proof.
   assumption.
 Qed.
 
-Lemma xof_mon A (X: location -> A):
+Lemma xof_mon A (X: location Z -> A):
   forall l x z a
          (XOF: xOf X l x = Some z)
          (NIN: forall l' (EQ: Aof l' = Aof a), ~ In l' l),
@@ -878,6 +1187,24 @@ Proof.
 Qed.
 
 (** # <font size="5"><b> oplus </b></font> # *)
+
+Lemma sn_oplus A (o:option (list A)):
+  oplus None o o.
+Proof.
+  destruct o.
+  apply sn_op.
+  apply Permutation_refl.
+  apply None_op.
+Qed.
+
+Lemma fs_oplus A (o:option (list A)):
+  oplus o None o.
+Proof.
+  destruct o.
+  apply fs_op.
+  apply Permutation_refl.
+  apply None_op.
+Qed.
 
 Lemma oplus_assoc A:
   forall (o1 o2 o3 o4 o1o2 o2o4: option (list A))
@@ -1054,7 +1381,7 @@ Lemma phpdef_v:
   forall p1 p2 z v
          (PHPDL: phplusdef p1 p2)
          (P1z: p2 z = None),
-    phplusdef (upd location_eq_dec p1 z v) p2.
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z v) p2.
 Proof.
   unfold phplusdef; intros; specialize PHPDL with x;
   repeat dstr_.
@@ -1074,7 +1401,7 @@ Qed.
 Lemma phpdef_none:
   forall p1 p2 z
          (phpdefp1p2: phplusdef p1 p2),
-    phplusdef (upd location_eq_dec p1 z None) p2.
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z None) p2.
 Proof.
   unfold phplusdef.
   unfold upd.
@@ -1099,6 +1426,8 @@ Proof.
   inversion p1p2z.
   destruct (p2 z).
   destruct k;
+  inversion p1p2z.
+  inversion p1p2z.
   inversion p1p2z.
   inversion p1p2z.
   inversion p1p2z.
@@ -1148,7 +1477,7 @@ Lemma phpdef_locked:
   forall p1 p2 wt ot z
          (PHPDL: phplusdef p1 p2)
          (P1z: exists wt1 ot1, p1 z = (Some (Locked wt1 ot1))),
-    phplusdef (upd location_eq_dec p1 z (Some (Locked wt ot))) p2.
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot))) p2.
 Proof.
   unfold phplusdef; intros; specialize PHPDL with x;
   repeat dstr_; destruct P1z as (wt1,(ot1,p1z)); inversion p1z.
@@ -1158,7 +1487,7 @@ Lemma phpdef_locked':
   forall p1 p2 wt ot z
          (PHPDL: phplusdef p1 p2)
          (P2z: p2 z = Some Lock \/ p2 z = None),
-    phplusdef (upd location_eq_dec p1 z (Some (Locked wt ot))) p2.
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot))) p2.
 Proof.
   unfold phplusdef; intros; specialize PHPDL with x;
   repeat dstr_; destruct P2z as [P2z|P2z]; inversion P2z.
@@ -1176,11 +1505,34 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma phplus_lock_none':
+  forall p1 p2 z
+         (phpdefp1p2: phplusdef p1 p2)
+         (P1z: phplus p1 p2 z = Some Lock \/ phplus p1 p2 z = None),
+    p2 z = Some Lock \/ p2 z = None.
+Proof.
+  unfold phplus; intros.
+  unfold phplusdef in phpdefp1p2.
+  specialize phpdefp1p2 with z.
+  destruct P1z as [P1z|P1z].
+  repeat dstr_; try inversion P1z.
+  left. reflexivity.
+  left. reflexivity.
+  right. reflexivity.
+  repeat dstr_; try inversion P1z.
+  left. reflexivity.
+  right. reflexivity.
+  right. reflexivity.
+  right. reflexivity.
+  right. reflexivity.
+  right. reflexivity.
+Qed.
+
 Lemma phpdef_ulock:
   forall p1 p2 wt ot z
          (PHPDL: phplusdef p1 p2)
          (P1z: p2 z = None),
-    phplusdef (upd location_eq_dec p1 z (Some (Ulock wt ot))) p2.
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z (Some (Ulock wt ot))) p2.
 Proof.
   unfold phplusdef; intros; specialize PHPDL with x;
   repeat dstr_.
@@ -1194,6 +1546,53 @@ Lemma phplus_ulock':
 Proof.
   unfold phplus; unfold phplusdef; intros;
   specialize PHPD with l; repeat dstr_.
+Qed.
+
+Definition dstr_cells' A (f: location Z -> A) (l: list (location Z)) (default: A) (a: location Z) := 
+  if in_dec (location_eq_dec Z.eq_dec) a l then default else f a.
+
+Lemma phplus_dstr1:
+  forall p1 p2 n m z' 
+         (NIN: ~ In z' (map m (seq 0 n))),
+    phplus (dstr_cells' p1 (map m (seq 0 n)) (Some (Cell full 0))) p2 z' =
+    phplus p1 p2 z'.
+Proof.
+  intros.
+  unfold phplus.
+  unfold dstr_cells'.
+  destruct (in_dec (location_eq_dec Z.eq_dec) z' (map m (seq 0 n))).
+  contradiction.
+  reflexivity.
+Qed.
+
+Lemma phpdef_ucond:
+  forall p1 p2 z
+        (PHPD: phplusdef p1 p2)
+        (P1z: p1 z = Some Ucond),
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z (Some Cond)) p2.
+Proof.
+  unfold phplusdef; intros; specialize PHPD with x; repeat dstr_;
+  destruct P1z as (wt,(ot,p1z)); destruct p1z as [p1z|p1z]; inversion p1z.
+Qed.
+
+Lemma phpdef_icond:
+  forall p1 p2 z
+        (PHPD: phplusdef p1 p2)
+        (P1z: p1 z = Some Ucond),
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z (Some Icond)) p2.
+Proof.
+  unfold phplusdef; intros; specialize PHPD with x; repeat dstr_;
+  destruct P1z as (wt,(ot,p1z)); destruct p1z as [p1z|p1z]; inversion p1z.
+Qed.
+
+Lemma phpdef_upd_none:
+  forall p1 p2 z v
+         (PHPDL: phplusdef p1 p2)
+         (P1z: p2 z = None),
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z v) p2.
+Proof.
+  unfold phplusdef; intros; specialize PHPDL with x;
+  repeat dstr_.
 Qed.
 
 Lemma phpdef_updl A m:
@@ -1230,7 +1629,7 @@ Lemma phpdef_locked_lock:
   forall p1 p2 z
         (PHPD: phplusdef p1 p2)
         (P1z: exists wt ot, p1 z = Some (Locked wt ot) \/ p1 z = Some (Ulock wt ot)),
-    phplusdef (upd location_eq_dec p1 z (Some Lock)) p2.
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z (Some Lock)) p2.
 Proof.
   unfold phplusdef; intros; specialize PHPD with x; repeat dstr_;
   destruct P1z as (wt,(ot,p1z)); destruct p1z as [p1z|p1z]; inversion p1z.
@@ -1251,7 +1650,7 @@ Lemma phpdef_upd_locked:
   forall p1 p2 z wt ot
          (PHPD: phplusdef p1 p2)
          (p2z: p2 z = Some Lock \/ p2 z = None),
-    phplusdef (upd location_eq_dec p1 z (Some (Locked wt ot))) p2.
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot))) p2.
 Proof.
   unfold phplusdef; intros; specialize PHPD with x; repeat dstr_;
   destruct p2z as [p2z|p2z]; inversion p2z.
@@ -1302,6 +1701,32 @@ Proof.
   right; exists wt, ot; reflexivity.
 Qed.
 
+Lemma phplus_lock':
+  forall p1 p2 l
+         (phpdefp1p2: phplusdef p1 p2)
+         (P2l: p2 l = Some Lock \/ exists wt ot, p2 l = Some (Locked wt ot)),
+    (phplus p1 p2) l = Some Lock \/ exists wt ot, (phplus p1 p2) l = Some (Locked wt ot).
+Proof.
+  unfold phplusdef; unfold phplus; intros.
+  unfold phplusdef in phpdefp1p2.
+  specialize phpdefp1p2 with l.
+  destruct P2l as [p2l|p2l].
+  rewrite p2l in *.
+  destruct (p1 l).
+  destruct k; try contradiction; try reflexivity.
+  left. reflexivity.
+  right. exists Wt, Ot.
+  reflexivity.
+  left. reflexivity.
+  destruct p2l as (wt,(ot,p2l)); rewrite p2l in *.
+  destruct (p1 l).
+  destruct k; try contradiction; try reflexivity.
+  right. exists wt, ot.
+  reflexivity.
+  right. exists wt, ot.
+  reflexivity.
+Qed.
+
 Lemma phplus_locked:
   forall p1 p2 l wt ot
          (PHPD: phplusdef p1 p2)
@@ -1345,7 +1770,7 @@ Lemma phplus_upd:
          (CELL: ~ exists v f v' f' (Z': z' = Some (Cell f v)), p2 z = Some (Cell f' v'))
          (LOCKED: z' = Some Lock -> ~ exists wt ot, p2 z = Some (Locked wt ot))
          (NONE: z' = None -> p2 z = None),
-    phplus (upd location_eq_dec p1 z z') p2 = upd location_eq_dec (phplus p1 p2) z z'.
+    phplus (upd (location_eq_dec Z.eq_dec) p1 z z') p2 = upd (location_eq_dec Z.eq_dec) (phplus p1 p2) z z'.
 Proof.
   intros; unfold phplus; apply functional_extensionality; repeat dstr_.
   exfalso; apply CELL; repeat eexists.
@@ -1356,13 +1781,13 @@ Qed.
 
 Lemma phplus_upd1:
   forall p1 p2 z v z' (NEQ: z <> z'),
-    phplus (upd location_eq_dec p1 z v) p2 z' =
+    phplus (upd (location_eq_dec Z.eq_dec) p1 z v) p2 z' =
     phplus p1 p2 z'.
 Proof.
   intros.
   unfold phplus.
   unfold upd.
-  destruct (location_eq_dec z' z).
+  destruct ((location_eq_dec Z.eq_dec) z' z).
   rewrite e in NEQ.
   contradiction.
   reflexivity.
@@ -1383,6 +1808,26 @@ Lemma phplus_Cond':
          (PHPD: phplusdef p1 p2)
          (P2v: p2 z = Some Cond),
     phplus p1 p2 z = Some Cond.
+Proof.
+  unfold phplus; unfold phplusdef; intros;
+  specialize PHPD with z; rewrite P2v in *; repeat dstr_.
+Qed.
+
+Lemma phplus_Icond:
+  forall p1 p2 z
+         (PHPD: phplusdef p1 p2)
+         (P1v: p1 z = Some Icond),
+    phplus p1 p2 z = Some Icond.
+Proof.
+  unfold phplus; unfold phplusdef; intros; specialize PHPD with z;
+  rewrite P1v in *; reflexivity.
+Qed.
+
+Lemma phplus_Icond':
+  forall p1 p2 z
+         (PHPD: phplusdef p1 p2)
+         (P2v: p2 z = Some Icond),
+    phplus p1 p2 z = Some Icond.
 Proof.
   unfold phplus; unfold phplusdef; intros;
   specialize PHPD with z; rewrite P2v in *; repeat dstr_.
@@ -1420,7 +1865,7 @@ Qed.
 
 Lemma phplus_upd_lock:
   forall p1 p2 z (P2: p2 z = Some Lock \/ p2 z = None),
-    phplus (upd location_eq_dec p1 z (Some Lock)) p2 z = Some Lock.
+    phplus (upd (location_eq_dec Z.eq_dec) p1 z (Some Lock)) p2 z = Some Lock.
 Proof.
   unfold phplus; repeat dstr_; destruct P2 as [p2z|p2z]; inversion p2z.
 Qed.
@@ -1473,12 +1918,12 @@ Lemma boundph_phplus_upd:
          (BP: boundph (phplus p1 p2))
          (V1: forall f1 v1 (VCELL: v = Some (Cell f1 v1)), 0 < f1 /\ f1 <= 1 )
          (V2: forall f1 f2 (CELL: exists v1 v2 (V1: v = Some (Cell f1 v1)), p2 z = Some (Cell f2 v2)), f1 + f2 <= 1 ),
-    boundph (phplus (upd location_eq_dec p1 z v) p2).
+    boundph (phplus (upd (location_eq_dec Z.eq_dec) p1 z v) p2).
 Proof.
   unfold boundph; unfold phplusdef; unfold phplus; unfold upd; intros;
   specialize BP1 with (x:=x); specialize BP2 with (x:=x);
   specialize PHPD with (x:=x); specialize BP with (x:=x).
-  destruct (location_eq_dec x z).
+  destruct ((location_eq_dec Z.eq_dec) x z).
   rewrite e in *.
   destruct v;
   try tauto.
@@ -1560,6 +2005,8 @@ Proof.
   inversion H.
   inversion H.
   inversion H.
+  inversion H.
+  inversion H.
   apply BP2 with z0.
   assumption.
 Qed.
@@ -1568,10 +2015,10 @@ Lemma boundph_upd:
   forall p z v
          (BP: boundph p)
          (BV: forall f, (exists z', v = Some (Cell f z')) -> 0 < f /\ f <= 1),
-    boundph (upd location_eq_dec p z v).
+    boundph (upd (location_eq_dec Z.eq_dec) p z v).
 Proof.
   unfold boundph; unfold upd; intros; specialize BP with (x:=x).
-  destruct (location_eq_dec x z).
+  destruct ((location_eq_dec Z.eq_dec) x z).
   rewrite e in *; apply BV; exists z0; try assumption.
   apply BP with z0; assumption.
 Qed.
@@ -1686,36 +2133,49 @@ Proof.
   }
   tauto.
   inversion H.
-  rewrite <- H1.
-  assumption.
-  inversion H.
-  rewrite <- H1.
-  assumption.
-  inversion H.
-  rewrite <- H1.
-  assumption.
-  inversion H.
-  rewrite <- H1.
-  assumption.
-  inversion H.
-  rewrite <- H1.
-  assumption.
-  inversion H.
-
-  destruct (p2 x).
-  destruct k;
-  inversion H;
-  try tauto.
-  inversion H.
-  inversion H.
-  inversion H.
-  destruct (p2 x).
-  destruct k;
-  inversion H;
-  try tauto.
-  rewrite <- H1.
-  apply BP2 with z0.
+  apply BP134 with z0.
   reflexivity.
+  inversion H.
+  apply BP134 with z0.
+  reflexivity.
+  inversion H.
+  rewrite <- H1.
+  assumption.
+  inversion H.
+  rewrite <- H1.
+  assumption.
+  inversion H.
+  rewrite <- H1.
+  assumption.
+  inversion H.
+  rewrite <- H1.
+  assumption.
+  inversion H.
+  rewrite <- H1.
+  assumption.
+  inversion H.
+  rewrite <- H1.
+  assumption.
+  inversion H.
+  rewrite <- H1.
+  assumption.
+  inversion H.
+  destruct (p2 x).
+  destruct k;
+  inversion H;
+  try tauto.
+  inversion H.
+  inversion H.
+  inversion H.
+  inversion H.
+  inversion H.
+  destruct (p2 x).
+  destruct k;
+  inversion H;
+  try tauto.
+  inversion H.
+  apply BP2 with z.
+  assumption.
   inversion H.
 Qed.
 
@@ -1724,7 +2184,7 @@ Qed.
 Lemma phtoh_upd_locked:
   forall p1 z wt ot
          (P1z: exists wt1 ot1, p1 z = Some (Locked wt1 ot1)),
-    forall h, phtoh (upd location_eq_dec p1 z (Some (Locked wt ot))) h -> phtoh p1 h.
+    forall h, phtoh (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot))) h -> phtoh p1 h.
 Proof.
   unfold upd.
   intros.
@@ -1733,13 +2193,13 @@ Proof.
   split.
   intros.
   specialize PH with l.
-  destruct (location_eq_dec l z).
+  destruct ((location_eq_dec Z.eq_dec) l z).
   rewrite e in *; rewrite p1z; tauto.
   assumption.
   intros.
   apply PH1.
   intros.
-  destruct (location_eq_dec l z).
+  destruct ((location_eq_dec Z.eq_dec) l z).
   rewrite e in *.
   apply NONE in EQ.
   rewrite p1z in EQ.
@@ -1751,7 +2211,7 @@ Qed.
 Lemma phtoh_upd_locked':
   forall p1 z wt ot
          (P1z: exists wt1 ot1, p1 z = Some (Locked wt1 ot1)),
-    forall h, phtoh p1 h -> phtoh (upd location_eq_dec p1 z (Some (Locked wt ot))) h.
+    forall h, phtoh p1 h -> phtoh (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot))) h.
 Proof.
   unfold phtoh.
   unfold upd.
@@ -1760,7 +2220,7 @@ Proof.
   split.
   intros.
   specialize H with l.
-  destruct (location_eq_dec l z).
+  destruct ((location_eq_dec Z.eq_dec) l z).
   rewrite e in *.
   destruct P1z as (wt1,(ot1,p1z)).
   rewrite p1z in *.
@@ -1770,7 +2230,7 @@ Proof.
   apply I.
   intros.
   apply NONE in EQ.
-  destruct (location_eq_dec l z).
+  destruct ((location_eq_dec Z.eq_dec) l z).
   inversion EQ.
   assumption.
 Qed.
@@ -2198,6 +2658,238 @@ Ltac php_ :=
 
 (** # <font size="5"><b> sat </b></font> # *)
 
+Theorem sat_mon:
+  forall a p O C p' O' O'' C'
+         (BP: boundph p)
+         (BP': boundph p')
+         (PHPDEF: phplusdef p p')
+         (BPP': boundph (phplus p p'))
+         (BC' : boundgh C')
+         (GHPDEF: ghplusdef C C')
+         (BCC': boundgh (ghplus C C'))
+         (OP: oplus O O' O'')
+         (SAT: sat p O C a),
+    sat (phplus p p') O'' (ghplus C C') a.
+Proof.
+  induction a; simpl; intros; try assumption.
+  {
+  destruct SAT as (S1,S2).
+  split.
+  apply IHa1 with O O'; try assumption.
+  apply IHa2 with O O'; try assumption.
+  }
+  {
+  destruct SAT as [S|S].
+  left. apply IHa1 with O O'; try assumption.
+  right. apply IHa2 with O O'; try assumption.
+  }
+  {
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(sat1,(sat2,(p1p2,C1C2)))))))))))))))))).
+  subst.
+  assert (phpdefp1p'p2p': phplusdef p1 p' /\ phplusdef p2 p'). repeat php_.
+  assert (ghpdefp1p'p2p': ghplusdef C1 C' /\ ghplusdef C2 C'). repeat php_.
+  assert (eqh: phplus (phplus p2 p') p1 = phplus (phplus p1 p2) p'). rewrite phplus_comm; repeat php_.
+  assert (bp2p'p1: boundph (phplus (phplus p2 p') p1)). rewrite eqh; assumption.
+  assert (eqg: ghplus (ghplus C2 C') C1 = ghplus (ghplus C1 C2) C'). rewrite ghplus_comm; repeat php_.
+  assert (bgp2p'p1: boundgh (ghplus (ghplus C2 C') C1)). rewrite eqg; assumption.
+
+  assert (exoo: exists o2o, oplus o1 o2o O'' /\ oplus o2 O' o2o).
+  {
+  destruct OP.
+  inversion opO1O2.
+  exists None.
+  split; apply None_op.
+  inversion opO1O2.
+  exists None.
+  split.
+  apply fs_op.
+  apply Permutation_trans with o; try assumption.
+  apply None_op.
+  exists (Some o0).
+  split.
+  apply sn_op.
+  apply Permutation_trans with o; try assumption.
+  apply fs_op. apply Permutation_refl.
+  inversion opO1O2.
+  exists (Some o).
+  split.
+  apply sn_op; assumption.
+  apply sn_op. apply Permutation_refl.
+  }
+  destruct exoo as (o2o,(opo1o2,opo2o')).
+  exists p1, (phplus p2 p').
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply boundph_mon with p1; repeat php_.
+  exists. repeat php_.
+  exists o1, o2o, C1, (ghplus C2 C').
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. assumption.
+  split. assumption.
+  split.
+  apply IHa2 with o2 O'; repeat php_.
+  split; repeat php_.
+  }
+  {
+  assert (phpdefp0p'0: phplusdef p p'0 /\ phplusdef p' p'0). repeat php_.
+  assert (ghpdefp0p'0: ghplusdef C g' /\ ghplusdef C' g'). repeat php_.
+  rewrite phplus_assoc; repeat php_.
+  rewrite ghplus_assoc; repeat php_.
+  assert (exo1: exists O1, oplus O O1 O''0).
+  {
+  destruct O''.
+  inversion OPLUS.
+  inversion OP.
+  exists None.
+  apply fs_op.
+  apply Permutation_trans with l; assumption.
+  exists (Some o').
+  apply sn_op. apply Permutation_refl.
+  inversion OP.
+  exists O''0.
+  destruct O''0.
+  apply sn_op. apply Permutation_refl.
+  apply None_op.
+  }
+  destruct exo1 as (O1,o1p).
+
+  apply SAT with O1; repeat php_.
+  rewrite phplus_comm; repeat php_.
+  rewrite <- phplus_assoc; repeat php_.
+  rewrite <- phplus_assoc; repeat php_.
+  rewrite ghplus_comm; repeat php_.
+  rewrite <- ghplus_assoc; repeat php_.
+  rewrite <- ghplus_assoc; repeat php_.
+
+  rewrite phplus_comm; repeat php_.
+  rewrite ghplus_comm; repeat php_.
+
+  assert (exo2: exists O2, oplus O'0 O2 O1).
+  {
+  destruct O''0.
+  inversion o1p.
+  rewrite <- H in OP.
+  inversion OP.
+  rewrite <- H4 in OPLUS.
+  inversion OPLUS.
+  exists None.
+  apply None_op.
+  destruct O'0.
+  exists None.
+  apply fs_op.
+  inversion OPLUS.
+  apply Permutation_trans with l; try assumption.
+  apply Permutation_sym; assumption.
+  exists (Some o).
+  apply sn_op.
+  apply Permutation_refl.
+  inversion o1p.
+  inversion OPLUS.
+  exists None.
+  apply None_op.
+  }
+  destruct exo2 as (O2, eqo2).
+  apply IHa1 with O'0 O2; repeat php_.
+  apply boundph_mon with p; repeat php_.
+  rewrite phplus_assoc; repeat php_.
+  rewrite phplus_comm; repeat php_.
+  replace (phplus p' p) with (phplus p p'); repeat php_.
+  apply boundgh_mon with C; repeat php_.
+  rewrite ghplus_assoc; repeat php_.
+  rewrite ghplus_comm; repeat php_.
+  replace (ghplus C' C) with (ghplus C C'); repeat php_.
+  }
+  {
+  destruct SAT as (f',(lef',pl)).
+  unfold phplusdef in PHPDEF.
+  specialize PHPDEF with (evall a).
+  unfold phplus.
+  rewrite pl in *.
+  destruct (p' (evall a)) eqn:p'a.
+  destruct k; try contradiction.
+  exists (f'+f).
+  exists.
+  assert (0 < f).
+  {
+  eapply BP'.
+  apply p'a.
+  }
+  apply Qc_Lte_plus; assumption.
+  rewrite Qcplus_assoc.
+  reflexivity.
+  exists f', lef'.
+  reflexivity.
+  }
+  {
+  unfold phplus.
+  rewrite SAT.
+  reflexivity.
+  }
+  {
+  apply phplus_lock. assumption.
+  }
+  {
+  unfold phplus.
+  rewrite SAT.
+  reflexivity.
+  }
+  {
+  unfold phplus.
+  rewrite SAT.
+  reflexivity.
+  }
+  {
+  unfold phplus.
+  rewrite SAT.
+  reflexivity.
+  }
+  {
+  unfold phplus.
+  rewrite SAT.
+  reflexivity.
+  }
+  {
+  inversion SAT.
+  rewrite <- H1 in OP.
+  inversion OP.
+  apply fs_op.
+  apply Permutation_trans with o'; assumption.
+  }
+  {
+  destruct SAT as (n,(o,ce)).
+  unfold ghplus.
+  rewrite ce.
+  destruct (C' ([[e]])).
+  destruct p0.
+  unfold lift'.
+  destruct o.
+  exists (n+n0)%nat, (Some n1). reflexivity.
+  exists (n+n0)%nat, o0. reflexivity.
+  exists n, o. reflexivity.
+  }
+  {
+  destruct SAT as (n0,ce).
+  unfold ghplus.
+  rewrite ce.
+  destruct (C' ([[e]])).
+  destruct p0.
+  exists (n0+n1)%nat. reflexivity.
+  exists n0. reflexivity.
+  }
+  {
+  destruct SAT as (v,SAT).
+  exists v.
+  apply H with O O'; repeat php_.
+  }
+  {
+  intros.
+  apply H with O O'; repeat php_.
+  }
+Qed.
+
 Lemma sat_comm:
   forall a a' p O C
          (SAT: sat p O C (a ** a')),
@@ -2407,10 +3099,10 @@ Proof.
 Qed.
 
 Lemma sat_fold_imp:
-  forall l p C b b' (BP: boundph p) (BG: boundgh C)
-         (SAT: sat p None C (fold_left Astar l b))
+  forall l p O C b b' (BP: boundph p) (BG: boundgh C)
+         (SAT: sat p O C (fold_left Astar l b))
          (IMP: b |= b'),
-    sat p None C (fold_left Astar l b').
+    sat p O C (fold_left Astar l b').
 Proof.
   induction l.
   simpl.
@@ -2464,15 +3156,10 @@ Proof.
   simpl;
   intros;
   try assumption.
-  destruct SAT as (pn,(on,cn)).
-  inversion on.
+  destruct SAT as (SAT1,SAT2).
   split.
-  apply IHa1 with O.
-  assumption.
-  tauto.
-  apply IHa2 with O.
-  assumption.
-  tauto.
+  apply IHa1 with O; assumption.
+  apply IHa2 with O; assumption.
   destruct SAT as [S|S].
   left.
   apply IHa1 with O; try assumption.
@@ -2503,6 +3190,7 @@ Proof.
   apply SAT.
 Qed.
 
+
 (** # <font size="5"><b> defl </b></font> # *)
 
 Lemma defl_Notify A m:
@@ -2514,7 +3202,7 @@ Lemma defl_Notify A m:
           (phpdefp1pm: phplusdef p1 pm)
           (IN': In (p',id') (map (fun x => (m x, snd x)) l))
           (P1z: exists wt1 ot1, p1 z = Some (Locked wt1 ot1))
-          (X1: (m x1, snd x1) = (upd location_eq_dec p1 z (Some (Locked wt ot)), id))
+          (X1: (m x1, snd x1) = (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot)), id))
           (X2: (m x2, snd x2) = (phplus p' pm, id')),
      defl phplusdef (map (fun x => (m x, snd x)) (updl (updl l id x1) id' x2)).
 Proof.
@@ -2537,7 +3225,7 @@ Proof.
   tauto.
   }
 
-  assert (phpdefp'mp1u: phplusdef (phplus p' pm) (upd location_eq_dec p1 z (Some (Locked wt ot)))).
+  assert (phpdefp'mp1u: phplusdef (phplus p' pm) (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot)))).
   {
   apply phpdef_comm.
   apply phpdef_locked.
@@ -2548,7 +3236,7 @@ Proof.
   assumption.
   }
 
-  assert (phpdefp1up'm: phplusdef (upd location_eq_dec p1 z (Some (Locked wt ot))) (phplus p' pm)).
+  assert (phpdefp1up'm: phplusdef (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot))) (phplus p' pm)).
   {
   apply phpdef_locked.
   apply phpdef_pair;
@@ -2591,7 +3279,7 @@ Proof.
   }
 
   assert (phpdefp1ux: forall x (INx: In x l) (NEQ: id <> (snd x)), 
-    phplusdef (upd location_eq_dec p1 z (Some (Locked wt ot))) (m x)).
+    phplusdef (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot))) (m x)).
   {
   intros.
   apply phpdef_locked.
@@ -2825,7 +3513,7 @@ Lemma defl_NotifyAll A m (m': (A * Z) -> (A * Z)):
           (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
           (P1z: exists wt1 ot1, p z = Some (Locked wt1 ot1))
-          (X1: (m x1, snd x1) = (upd location_eq_dec p z (Some (Locked wt ot)), id))
+          (X1: (m x1, snd x1) = (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot)), id))
           (M': forall x, (m x, snd x) = (m (m' x), snd (m' x))),
      defl phplusdef (map (fun x => (m x, snd x)) (updl (map m' l) id x1)).
 Proof.
@@ -2900,7 +3588,7 @@ Lemma defl_Wait A m:
           (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
           (IN: In (phplus p1 p2,id) (map (fun x => (m x, snd x)) l))
           (P1z: exists wt1 ot1, p1 z = Some (Locked wt1 ot1) \/ p1 z = Some (Ulock wt1 ot1))
-          (X: (m x, snd x) = (upd location_eq_dec p1 z (Some Lock), id)),
+          (X: (m x, snd x) = (upd (location_eq_dec Z.eq_dec) p1 z (Some Lock), id)),
      defl phplusdef (map (fun x => (m x, snd x)) (updl l id x)).
 Proof.
   unfold defl in *.
@@ -4727,9 +5415,9 @@ Lemma fold_left_upd_Notify_1 A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
           (P1z: exists wt1 ot1, p z = Some (Locked wt1 ot1))
-          (X1: (m x1, snd x1) = (upd location_eq_dec p z (Some (Locked wt ot)), id)),
+          (X1: (m x1, snd x1) = (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot)), id)),
       fold_left phplus (map m (updl l id x1)) b = 
-        upd location_eq_dec (fold_left phplus (map m l) b) z (Some (Locked wt ot)).
+        upd (location_eq_dec Z.eq_dec) (fold_left phplus (map m l) b) z (Some (Locked wt ot)).
 Proof.
   intros.
   inversion X1.
@@ -4737,7 +5425,7 @@ Proof.
   specialize EXT with z0 (emp knowledge).
   destruct EXT as (empx, memp).
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec p z (Some (Locked wt ot)))(id:=z0)(x:=empx).
+    (x2:=upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot)))(id:=z0)(x:=empx).
   {
   rewrite updl_updl.
   replace (fold_left phplus (map m l) b) with
@@ -4951,6 +5639,389 @@ Proof.
   }
 Qed.
 
+Lemma cond_finlc A m:
+  forall (l: list (A * Z)) id z p x b
+         (EXT: forall z p, exists x, m (x, z) = p)
+         (NODUP: NoDup (map snd l))
+         (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
+         (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
+         (IN: In (p,id) (map (fun x => (m x, snd x)) l))
+         (P1z: p z = Some Icond)
+         (X: (m x, snd x) = (upd (location_eq_dec Z.eq_dec) p z (Some Cond), id)),
+     fold_left phplus (map m (updl l id x)) b z = Some Cond.
+Proof.
+  intros.
+  destruct x.
+  inversion X.
+  rewrite H1 in *.
+  subst.
+
+  assert (IN1:=IN).
+  apply in_map_iff in IN1.
+  destruct IN1 as (x12,(EQx,INx)).
+  assert (EXTE:=EXT).
+  specialize EXT with id (emp knowledge).
+  destruct EXT as (x2, mx2).
+
+  assert (DEFL2: defl phplusdef (map (fun x : A * Z => (m x, snd x)) (updl l id (x2, id)))).
+  {
+  unfold defl.
+  intros.
+  unfold updl in IN1.
+  rewrite map_map in IN1.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  destruct (Z.eq_dec (snd x1) id).
+  simpl in EQ1.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  omega.
+  inversion EQ2.
+  rewrite <- H2.
+  rewrite mx2.
+  repeat php_.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  rewrite <- H4.
+  rewrite mx2.
+  repeat php_.
+  inversion EQ2.
+  apply DEFL with id1 id2.
+  omega.
+  apply in_map_iff.
+  rewrite <- H2.
+  exists x1. auto.
+  apply in_map_iff.
+  rewrite <- H4.
+  exists x3. auto.
+  }
+
+  assert (INP: In p (map m l)).
+  {
+  apply in_map_iff in IN.
+  destruct IN as (x,(EQx1,INx1)).
+  apply in_map_iff.
+  exists x.
+  inversion EQx1.
+  auto.
+  }
+
+  assert (PHPD1: phplusdef (fold_left phplus (map m (updl l id (x2, id))) b) p).
+  {
+  apply phpdef_fold; repeat php_.
+  apply NoDup_updl.
+  assumption.
+  intros.
+  unfold updl in IN0.
+  rewrite map_map in IN0.
+  apply in_map_iff in IN0.
+  destruct IN0 as (x,(EQa,INa)).
+  destruct (Z.eq_dec (snd x) id).
+  rewrite <- EQa.
+  rewrite mx2.
+  repeat php_.
+  rewrite <- EQa.
+  apply DEFLb.
+  apply in_map.
+  assumption.
+  intros.
+  unfold updl in IN0.
+  rewrite map_map in IN0.
+  apply in_map_iff in IN0.
+  destruct IN0 as (x,(EQa,INa)).
+  destruct (Z.eq_dec (snd x) id).
+  rewrite <- EQa.
+  rewrite mx2.
+  repeat php_.
+  rewrite <- EQa.
+  apply DEFL with (snd x) id.
+  omega.
+  apply in_map_iff.
+  exists x.
+  auto.
+  assumption.
+  apply phpdef_comm.
+  apply DEFLb.
+  assumption.
+  }
+
+  assert (EQH2: fold_left phplus (map m (updl l id (x2, id))) b z = None).
+  {
+  apply phpdef_comm in PHPD1.
+  unfold phplusdef in PHPD1.
+  specialize PHPD1 with z.
+  rewrite P1z in PHPD1.
+  destruct (fold_left phplus (map m (updl l id (x2, id))) b z).
+  contradiction.
+  reflexivity.
+  }
+
+  assert (PHPD0: forall p0, In p0 (map m (updl l id (x2, id))) -> phplusdef p0 b).
+  {
+  intros p0 IN0.
+  unfold updl in IN0.
+  rewrite map_map in IN0.
+  apply in_map_iff in IN0.
+  destruct IN0 as (x,(EQa,INa)).
+  destruct (Z.eq_dec (snd x) id).
+  rewrite <- EQa.
+  rewrite mx2.
+  repeat php_.
+  rewrite <- EQa.
+  apply DEFLb.
+  apply in_map.
+  assumption.
+  }
+
+  assert (NONE1: forall p (IN: In p (map m (updl l id (x2, id))) \/ p = b), p z = None).
+  {
+  apply fold_None; repeat php_.
+  apply NoDup_updl.
+  assumption.
+  }
+
+  assert (DEFL1: defl phplusdef (map (fun x : A * Z => (m x, snd x)) (updl l id (a, id)))).
+  {
+  unfold defl.
+  intros.
+  unfold updl in IN1.
+  rewrite map_map in IN1.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  destruct (Z.eq_dec (snd x1) id).
+  simpl in EQ1.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  omega.
+  inversion EQ2.
+  rewrite <- H2.
+  rewrite H0.
+  assert (PHPDu1: phplusdef (upd (location_eq_dec Z.eq_dec) p z None) (m x3)).
+  {
+  apply phpdef_none.
+  apply DEFL with id id2.
+  omega.
+  assumption.
+  apply in_map_iff.
+  rewrite <- H4.
+  exists x3.
+  auto.
+  }
+  apply phpdef_v.
+  apply DEFL with id id2.
+  omega.
+  apply in_map_iff.
+  exists x12.
+  inversion EQx.
+  auto.
+  apply in_map_iff.
+  exists x3.
+  inversion EQ2.
+  auto.
+  apply NONE1.
+  left.
+  apply in_map.
+  destruct x3.
+  apply in_updl_neq.
+  simpl in H4.
+  omega.
+  assumption.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  rewrite <- H4.
+  rewrite H0.
+  assert (PHPDu1: phplusdef (upd (location_eq_dec Z.eq_dec) p z None) (m x1)).
+  {
+  apply phpdef_none.
+  apply DEFL with id id1.
+  omega.
+  assumption.
+  apply in_map_iff.
+  rewrite <- H2.
+  exists x1.
+  auto.
+  }
+  apply phpdef_comm.
+  apply phpdef_v.
+  apply DEFL with id id1.
+  omega.
+  apply in_map_iff.
+  exists x12.
+  inversion EQx.
+  auto.
+  apply in_map_iff.
+  exists x1.
+  inversion EQ1.
+  auto.
+  apply NONE1.
+  left.
+  apply in_map.
+  destruct x1.
+  apply in_updl_neq.
+  simpl in n.
+  omega.
+  assumption.
+  apply DEFL with id1 id2.
+  omega.
+  apply in_map_iff.
+  exists x1.
+  rewrite <- H2.
+  auto.
+  apply in_map_iff.
+  exists x3.
+  auto.
+  }
+
+  assert (PHPDB: forall x : pheap, In x (map m (updl l id (a, id))) -> phplusdef x b).
+  {
+  intros x IN1.
+  unfold updl in IN1.
+  rewrite map_map in IN1.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  destruct (Z.eq_dec (snd x1) id).
+  rewrite <- EQ1.
+  rewrite H0.
+  assert (PHPDu1: phplusdef (upd (location_eq_dec Z.eq_dec) p z None) b).
+  {
+  apply phpdef_none.
+  apply DEFLb.
+  assumption.
+  }
+  apply phpdef_v.
+  apply DEFLb.
+  assumption.
+  apply NONE1.
+  right.
+  reflexivity.
+  apply DEFLb.
+  rewrite <- EQ1.
+  apply in_map.
+  assumption.
+  }
+
+  assert (EQH1: fold_left phplus (map m (updl l id (a, id))) b =
+    phplus (upd (location_eq_dec Z.eq_dec) p z (Some Cond))
+    (fold_left phplus (map m (updl (updl l id (a, id)) id (x2,id))) b)).
+  {
+  apply fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge); repeat php_.
+  apply can_phpdef.
+  apply NoDup_updl.
+  assumption.
+  unfold updl.
+  rewrite map_map.
+  apply in_map_iff.
+  apply in_map_iff in IN.
+  destruct IN as (x,(EQx1,INx1)).
+  exists x.
+  inversion EQx1.
+  rewrite eqz.
+  rewrite H2.
+  rewrite H1.
+  rewrite H0.
+  auto.
+  }
+
+  rewrite updl_updl in EQH1.
+
+  assert (UPDcond:upd (location_eq_dec Z.eq_dec) p z (Some Cond) z = Some Cond).
+  {
+  unfold upd.
+  destruct (location_eq_dec Z.eq_dec z z).
+  reflexivity.
+  contradiction.
+  }
+
+  rewrite EQH1.
+  unfold phplus at 1.
+  rewrite UPDcond.
+  reflexivity.
+Qed.
+
+Lemma fold_icond A m:
+  forall (l: list (A * Z)) z b 
+         (EXT: forall z p, exists x, m (x, z) = p)
+         (NODUP: NoDup (map snd l))
+         (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
+         (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
+         (P1z: b z = Some Icond \/ exists p (IN: In p (map m l)), p z = Some Icond),
+    (fold_left phplus (map m l) b) z = Some Icond.
+Proof.
+  intros.
+  destruct P1z as [p1z|p1z].
+  {
+  replace b with (phplus b (emp knowledge)).
+  rewrite fold_left_f_m_def with (def:=phplusdef).
+  unfold phplus.
+  rewrite p1z.
+  reflexivity.
+  apply can_phpdef.
+  assumption.
+  assumption.
+  apply phpdef_emp.
+  intros.
+  split.
+  apply DEFLb.
+  assumption.
+  apply phpdef_emp.
+  apply phplus_emp.
+  }
+  {
+  destruct p1z as (p, (INp, EQp)).
+  assert (INp2:=INp).
+  apply in_map_iff in INp2.
+  destruct INp2 as (x, (EXx, INx)).
+  destruct x.
+  specialize EXT with z0 (emp knowledge).
+  destruct EXT as (empx, memp).
+  erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
+    (x2:=p)(id:=z0)(x:=empx).
+  unfold phplus.
+  rewrite EQp.
+  reflexivity.
+  apply can_phpdef.
+  assumption.
+  assumption.
+  apply phpdef_comm.
+  apply phpdef_emp.
+  assumption.
+  rewrite phplus_comm.
+  rewrite phplus_emp.
+  apply in_map_iff.
+  exists (a,z0).
+  simpl.
+  rewrite EXx.
+  tauto.
+  apply phpdef_comm.
+  apply phpdef_emp.
+  assumption.
+  }
+Qed.
+
 Lemma fold_cond A m:
   forall (l: list (A * Z)) z b 
          (EXT: forall z p, exists x, m (x, z) = p)
@@ -5009,6 +6080,86 @@ Proof.
   apply phpdef_emp.
   assumption.
   }
+Qed.
+
+Lemma fold_ucond A m:
+  forall (l: list (A * Z)) z b 
+         (EXT: forall z p, exists x, m (x, z) = p)
+         (NODUP: NoDup (map snd l))
+         (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
+         (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
+         (P1z: b z = Some Ucond \/ exists p (IN: In p (map m l)), p z = Some Ucond),
+    (fold_left phplus (map m l) b) z = Some Ucond.
+Proof.
+  intros.
+  destruct P1z as [p1z|p1z].
+  {
+  replace b with (phplus b (emp knowledge)).
+  rewrite fold_left_f_m_def with (def:=phplusdef).
+  unfold phplus.
+  rewrite p1z.
+  reflexivity.
+  apply can_phpdef.
+  assumption.
+  assumption.
+  apply phpdef_emp.
+  intros.
+  split.
+  apply DEFLb.
+  assumption.
+  apply phpdef_emp.
+  apply phplus_emp.
+  }
+  {
+  destruct p1z as (p, (INp, EQp)).
+  assert (INp2:=INp).
+  apply in_map_iff in INp2.
+  destruct INp2 as (x, (EXx, INx)).
+  destruct x.
+  specialize EXT with z0 (emp knowledge).
+  destruct EXT as (empx, memp).
+  erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
+    (x2:=p)(id:=z0)(x:=empx).
+  unfold phplus.
+  rewrite EQp.
+  reflexivity.
+  apply can_phpdef.
+  assumption.
+  assumption.
+  apply phpdef_comm.
+  apply phpdef_emp.
+  assumption.
+  rewrite phplus_comm.
+  rewrite phplus_emp.
+  apply in_map_iff.
+  exists (a,z0).
+  simpl.
+  rewrite EXx.
+  tauto.
+  apply phpdef_comm.
+  apply phpdef_emp.
+  assumption.
+  }
+Qed.
+
+Lemma phplus_Ucond:
+  forall p1 p2 z
+         (PHPD: phplusdef p1 p2)
+         (P1v: p1 z = Some Ucond),
+    phplus p1 p2 z = Some Ucond.
+Proof.
+  unfold phplus; unfold phplusdef; intros; specialize PHPD with z;
+  rewrite P1v in *; reflexivity.
+Qed.
+
+Lemma phplus_Ucond':
+  forall p1 p2 z
+         (PHPD: phplusdef p1 p2)
+         (P2v: p2 z = Some Ucond),
+    phplus p1 p2 z = Some Ucond.
+Proof.
+  unfold phplus; unfold phplusdef; intros;
+  specialize PHPD with z; rewrite P2v in *; repeat dstr_.
 Qed.
 
 Lemma phplus_cell:
@@ -5195,6 +6346,987 @@ Proof.
   right.
   exists p, H.
   assumption.
+Qed.
+
+Lemma fold_cell_full A m:
+  forall (l: list (A * Z)) z b v p' id'
+         (EXT: forall z p, exists x, m (x, z) = p)
+         (NODUP: NoDup (map snd l))
+         (INP1: In (p',id') (map (fun x => (m x, snd x)) l))
+         (P1z: p' z = Some (Cell full v))
+         (NONE: forall p id (NEQ: id' <> id) (IN: In (p,id) (map (fun x => (m x, snd x)) l)), p z = None)
+         (NONEb: b z = None)
+         (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
+         (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b),
+    fold_left phplus (map m l) b z = Some (Cell full v).
+Proof.
+  induction l.
+  simpl.
+  intros.
+  contradiction.
+  simpl.
+  intros.
+
+  assert (NDP1: NoDup (map snd l)).
+  {
+  inversion NODUP.
+  assumption.
+  }
+  assert (DEFL1: defl phplusdef (map (fun x : A * Z => (m x, snd x)) l)).
+  {
+  unfold defl in *.
+  intros.
+  apply DEFL with id1 id2;
+  try assumption.
+  right.
+  assumption.
+  right.
+  assumption.
+  }
+  assert (PHPD1: forall p0 : pheap, In p0 (map m l) -> phplusdef p0 b).
+  {
+  intros.
+  apply DEFLb.
+  right.
+  assumption.
+  }
+  assert (defmab: phplusdef (m a) b).
+  {
+  apply DEFLb.
+  left.
+  reflexivity.
+  }
+  assert (defb1: forall x : pheap, In x (map m l) -> phplusdef x (m a) /\ phplusdef x b).
+  {
+  intros.
+  apply in_map_iff in H.
+  destruct H as (x0,(EQx,INx)).
+  destruct x0 as (x0,id0).
+  rewrite <- EQx in *.
+  split.
+  apply DEFL with id0 (snd a).
+  inversion NODUP.
+  unfold not.
+  intros.
+  apply H1.
+  rewrite <- H3.
+  apply in_map_iff.
+  exists (x0, id0).
+  tauto.
+  right.
+  apply in_map_iff.
+  exists (x0, id0).
+  tauto.
+  left.
+  reflexivity.
+  apply DEFLb.
+  right.
+  apply in_map_iff.
+  exists (x0, id0).
+  tauto.
+  }
+  assert (phpd2: forall p0 : pheap, In p0 (map m l) -> phplusdef p0 (phplus b (m a))).
+  {
+  intros.
+  apply phpdef_pair.
+  apply phpdef_comm.
+  assumption.
+  apply PHPD1.
+  assumption.
+  apply defb1.
+  assumption.
+  }
+  rewrite phplus_comm.
+  rewrite fold_left_f_m_def with (def:=phplusdef);
+  try assumption.
+  destruct INP1 as [EQ1|IN1].
+  inversion EQ1.
+  rewrite H0.
+  unfold phplus at 1.
+  rewrite P1z.
+  rewrite fold_none'; repeat php_.
+  intros.
+  apply in_map_iff in IN.
+  destruct IN as (x,(EQx,INx)).
+  apply NONE with (snd x).
+  unfold not.
+  intros.
+  rewrite H1 in NODUP.
+  rewrite H in NODUP.
+  inversion NODUP.
+  apply H4.
+  apply in_map. assumption.
+  right.
+  rewrite <- EQx.
+  apply in_map_iff.
+  exists x. auto.
+
+  assert (foldlz: fold_left phplus (map m l) b z = Some (Cell full v)).
+  {
+  apply IHl with p' id';
+  try assumption.
+  intros.
+  apply NONE with id.
+  assumption.
+  right. assumption.
+  }
+  unfold phplus at 1.
+  rewrite foldlz.
+  erewrite NONE with (id:=snd a); repeat php_.
+  unfold not.
+  intros.
+  rewrite <- H in NODUP.
+  inversion NODUP.
+  apply H2.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  apply in_map_iff.
+  exists x1.
+  inversion EQ1. auto.
+  left. reflexivity.
+  apply can_phpdef.
+  repeat php_.
+Qed.
+
+Lemma cond_initc A m:
+  forall (l: list (A * Z)) id z z' p x b
+         (EXT: forall z p, exists x, m (x, z) = p)
+         (NODUP: NoDup (map snd l))
+         (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
+         (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
+         (IN: In (p,id) (map (fun x => (m x, snd x)) l))
+         (P1z: p z = Some Ucond)
+         (PzN: z <> z' -> fold_left phplus (map m l) b z' = None)
+         (X: (m x, snd x) = (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p z None) z' (Some Icond), id)),
+     (z' <> z -> fold_left phplus (map m (updl l id x)) b z = None) /\
+     fold_left phplus (map m (updl l id x)) b z' = Some Icond.
+Proof.
+  intros.
+  destruct x.
+  inversion X.
+  rewrite H1 in *.
+  subst.
+
+  assert (IN1:=IN).
+  apply in_map_iff in IN1.
+  destruct IN1 as (x12,(EQx,INx)).
+  assert (EXTE:=EXT).
+  specialize EXT with id (emp knowledge).
+  destruct EXT as (x2, mx2).
+
+  assert (DEFL2: defl phplusdef (map (fun x : A * Z => (m x, snd x)) (updl l id (x2, id)))).
+  {
+  unfold defl.
+  intros.
+  unfold updl in IN1.
+  rewrite map_map in IN1.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  destruct (Z.eq_dec (snd x1) id).
+  simpl in EQ1.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  omega.
+  inversion EQ2.
+  rewrite <- H2.
+  rewrite mx2.
+  repeat php_.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  rewrite <- H4.
+  rewrite mx2.
+  repeat php_.
+  inversion EQ2.
+  apply DEFL with id1 id2.
+  omega.
+  apply in_map_iff.
+  rewrite <- H2.
+  exists x1. auto.
+  apply in_map_iff.
+  rewrite <- H4.
+  exists x3. auto.
+  }
+
+  assert (INP: In p (map m l)).
+  {
+  apply in_map_iff in IN.
+  destruct IN as (x,(EQx1,INx1)).
+  apply in_map_iff.
+  exists x.
+  inversion EQx1.
+  auto.
+  }
+
+  assert (PHPD1: phplusdef (fold_left phplus (map m (updl l id (x2, id))) b) p).
+  {
+  apply phpdef_fold; repeat php_.
+  apply NoDup_updl.
+  assumption.
+  intros.
+  unfold updl in IN0.
+  rewrite map_map in IN0.
+  apply in_map_iff in IN0.
+  destruct IN0 as (x,(EQa,INa)).
+  destruct (Z.eq_dec (snd x) id).
+  rewrite <- EQa.
+  rewrite mx2.
+  repeat php_.
+  rewrite <- EQa.
+  apply DEFLb.
+  apply in_map.
+  assumption.
+  intros.
+  unfold updl in IN0.
+  rewrite map_map in IN0.
+  apply in_map_iff in IN0.
+  destruct IN0 as (x,(EQa,INa)).
+  destruct (Z.eq_dec (snd x) id).
+  rewrite <- EQa.
+  rewrite mx2.
+  repeat php_.
+  rewrite <- EQa.
+  apply DEFL with (snd x) id.
+  omega.
+  apply in_map_iff.
+  exists x.
+  auto.
+  assumption.
+  apply phpdef_comm.
+  apply DEFLb.
+  assumption.
+  }
+
+  assert (EQH2: fold_left phplus (map m (updl l id (x2, id))) b z = None).
+  {
+  apply phpdef_comm in PHPD1.
+  unfold phplusdef in PHPD1.
+  specialize PHPD1 with z.
+  rewrite P1z in PHPD1.
+  destruct (fold_left phplus (map m (updl l id (x2, id))) b z).
+  contradiction.
+  reflexivity.
+  }
+
+  assert (PHPD0: forall p0, In p0 (map m (updl l id (x2, id))) -> phplusdef p0 b).
+  {
+  intros p0 IN0.
+  unfold updl in IN0.
+  rewrite map_map in IN0.
+  apply in_map_iff in IN0.
+  destruct IN0 as (x,(EQa,INa)).
+  destruct (Z.eq_dec (snd x) id).
+  rewrite <- EQa.
+  rewrite mx2.
+  repeat php_.
+  rewrite <- EQa.
+  apply DEFLb.
+  apply in_map.
+  assumption.
+  }
+
+  assert (NONE1: forall p (IN: In p (map m (updl l id (x2, id))) \/ p = b), p z = None).
+  {
+  apply fold_None; repeat php_.
+  apply NoDup_updl.
+  assumption.
+  }
+
+  assert (NONE2: z <> z' -> forall p (IN: In p (map m l) \/ p = b), p z' = None).
+  {
+  intro neq.
+  apply fold_None; repeat php_.
+  apply PzN.
+  assumption.
+  }
+
+
+  assert (DEFL1: defl phplusdef (map (fun x : A * Z => (m x, snd x)) (updl l id (a, id)))).
+  {
+  unfold defl.
+  intros.
+  unfold updl in IN1.
+  rewrite map_map in IN1.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  destruct (Z.eq_dec (snd x1) id).
+  simpl in EQ1.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  omega.
+  inversion EQ2.
+  rewrite <- H2.
+  rewrite H0.
+  assert (PHPDu1: phplusdef (upd (location_eq_dec Z.eq_dec) p z None) (m x3)).
+  {
+  apply phpdef_none.
+  apply DEFL with id id2.
+  omega.
+  assumption.
+  apply in_map_iff.
+  rewrite <- H4.
+  exists x3.
+  auto.
+  }
+  destruct (location_eq_dec Z.eq_dec z z').
+  rewrite <- e0.
+  apply phpdef_v.
+  assumption.
+  apply NONE1.
+  left.
+  apply in_map.
+  unfold updl.
+  apply in_map_iff.
+  exists x3.
+  destruct (Z.eq_dec (snd x3) id).
+  omega.
+  auto.
+  apply phpdef_v.
+  assumption.
+  apply NONE2.
+  assumption.
+  left.
+  apply in_map.
+  assumption.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  rewrite <- H4.
+  rewrite H0.
+  assert (PHPDu1: phplusdef (upd (location_eq_dec Z.eq_dec) p z None) (m x1)).
+  {
+  apply phpdef_none.
+  apply DEFL with id id1.
+  omega.
+  assumption.
+  apply in_map_iff.
+  rewrite <- H2.
+  exists x1.
+  auto.
+  }
+  apply phpdef_comm.
+  destruct (location_eq_dec Z.eq_dec z z').
+  rewrite <- e0.
+  apply phpdef_v.
+  assumption.
+  apply NONE1.
+  left.
+  apply in_map.
+  unfold updl.
+  apply in_map_iff.
+  exists x1.
+  destruct (Z.eq_dec (snd x1) id).
+  omega.
+  auto.
+  apply phpdef_v.
+  assumption.
+  apply NONE2.
+  assumption.
+  left.
+  apply in_map.
+  assumption.
+  inversion EQ2.
+  apply DEFL with id1 id2.
+  omega.
+  apply in_map_iff.
+  exists x1.
+  rewrite <- H2.
+  auto.
+  apply in_map_iff.
+  exists x3.
+  rewrite <- H4.
+  auto.
+  }
+
+  assert (PHPDB: forall x : pheap, In x (map m (updl l id (a, id))) -> phplusdef x b).
+  {
+  intros x IN1.
+  unfold updl in IN1.
+  rewrite map_map in IN1.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  destruct (Z.eq_dec (snd x1) id).
+  rewrite <- EQ1.
+  rewrite H0.
+  assert (PHPDu1: phplusdef (upd (location_eq_dec Z.eq_dec) p z None) b).
+  {
+  apply phpdef_none.
+  apply DEFLb.
+  assumption.
+  }
+  destruct (location_eq_dec Z.eq_dec z z').
+  rewrite <- e0.
+  apply phpdef_v.
+  assumption.
+  apply NONE1.
+  right.
+  reflexivity.
+  apply phpdef_v.
+  assumption.
+  apply NONE2.
+  assumption.
+  right.
+  reflexivity.
+  apply DEFLb.
+  rewrite <- EQ1.
+  apply in_map.
+  assumption.
+  }
+
+  assert (EQH1: fold_left phplus (map m (updl l id (a, id))) b =
+    phplus (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) 
+    p z None) z' (Some Icond))
+    (fold_left phplus (map m (updl (updl l id (a, id)) id (x2,id))) b)).
+  {
+  apply fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge); repeat php_.
+  apply can_phpdef.
+  apply NoDup_updl.
+  assumption.
+  unfold updl.
+  rewrite map_map.
+  apply in_map_iff.
+  apply in_map_iff in IN.
+  destruct IN as (x,(EQx1,INx1)).
+  exists x.
+  inversion EQx1.
+  rewrite eqz.
+  rewrite H2.
+  rewrite H1.
+  rewrite H0.
+  auto.
+  }
+
+  rewrite updl_updl in EQH1.
+
+  assert (UPDcond:upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) 
+    p z None) z' (Some Icond) z' = Some Icond).
+  {
+  unfold upd.
+  destruct (location_eq_dec Z.eq_dec z' z').
+  reflexivity.
+  contradiction.
+  }
+
+  assert (UPDnone: z' <> z -> upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) 
+    p z None) z' (Some Icond) z = None).
+  {
+  unfold upd.
+  intros.
+  destruct (location_eq_dec Z.eq_dec z z').
+  symmetry in e.
+  contradiction.
+  destruct (location_eq_dec Z.eq_dec z z).
+  reflexivity.
+  contradiction.
+  }
+
+  rewrite EQH1.
+  split.
+  {
+  intros.
+  unfold phplus at 1.
+  rewrite UPDnone.
+  rewrite EQH2.
+  reflexivity.
+  assumption.
+  }
+  unfold phplus at 1.
+  rewrite UPDcond.
+  reflexivity.
+Qed.
+
+Lemma eq_heap_dstr A m:
+  forall (l: list (A * Z)) id z' p x b a n
+         (EXT: forall z p, exists x2, m (x2, z) = p)
+         (NODUP: NoDup (map snd l))
+         (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
+         (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
+         (DEFU: forall p0 id' (NEQ: id <> id') (IN: In (p0,id') (map (fun x => (m x, snd x)) l)), phplusdef p0 
+             (dstr_cells' p (map  (fun x : nat =>
+             ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+             (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0))))
+         (DEFUb: phplusdef (dstr_cells' p (map  (fun x : nat =>
+             ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+             (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0))) b)
+         (IN: In (p,id) (map (fun x => (m x, snd x)) l))
+         (X: m (x,id) = dstr_cells' p (map  (fun x : nat =>
+             ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+             (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0)))
+         (NIN: ~ In z' (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))),
+    fold_left phplus (map m (updl l id (x, id))) b z' = fold_left phplus (map m l) b z'.
+Proof.
+  intros.
+  assert (EXT2:=EXT).
+  specialize EXT with id (emp knowledge).
+  destruct EXT as (empx,memp).
+
+  assert (Inp: In p (map m l)).
+  {
+  apply in_map_iff.
+  apply in_map_iff in IN.
+  destruct IN as (x0,(EQx0,INx0)).
+  exists x0.
+  inversion EQx0.
+  tauto.
+  }
+
+  assert (phpdefpp12: phplusdef p b).
+  {
+  apply DEFLb.
+  assumption.
+  }  
+
+  assert (deflu: defl phplusdef (map (fun x0 : A * Z => (m x0, snd x0)) (updl l id (empx, id)))).
+  {
+  apply defl_updl.
+  intros.
+  rewrite memp.
+  apply phpdef_emp.
+  assumption.
+  }
+
+  replace (fold_left phplus (map m l) b) with
+    (phplus p (fold_left phplus (map m (updl l id (empx, id))) b)); try tauto.
+
+  erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
+    (x2:=(dstr_cells' p (map  (fun x : nat =>
+             ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+             (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0))))(id:=id)(x:=empx); try tauto.
+  rewrite updl_updl.
+  apply phplus_dstr1.
+  assumption.
+  apply can_phpdef.
+  apply NoDup_updl.
+  assumption.
+
+  unfold defl.
+  unfold updl.
+  rewrite map_map.
+  intros.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  inversion EQ1.
+  destruct (Z.eq_dec (snd x1) id).
+  rewrite X.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x2,(EQ2,IN2)).
+  inversion EQ2.
+  destruct (Z.eq_dec (snd x2) id).
+  omega.
+  apply phpdef_comm.
+  apply DEFU with (id':=snd x2).
+  omega.
+  inm_.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x2,(EQ2,IN2)).
+  inversion EQ2.
+  destruct (Z.eq_dec (snd x2) id).
+  rewrite X.
+  apply DEFU with (snd x1).
+  omega.
+  inm_.
+  apply DEFL with (snd x1) (snd x2).
+  omega.
+  inm_.
+  inm_.
+  repeat php_.
+  unfold updl.
+  rewrite map_map.
+  intros.
+  apply in_map_iff in IN0.
+  destruct IN0 as (x1,(EQ0,IN0)).
+  inversion EQ0.
+  destruct (Z.eq_dec (snd x1) id).
+  rewrite X.
+  apply DEFUb.
+  apply DEFLb.
+  inm_.
+  rewrite phplus_comm; repeat php_.
+
+  apply in_map_iff.
+  exists (x,id).
+  split.
+  rewrite X.
+  reflexivity.
+  apply in_updl_eq.
+  apply in_map_iff in IN.
+  destruct IN as (x1,(EQ0,IN0)).
+  inversion EQ0.
+  destruct x1.
+  exists a0.
+  tauto.
+  symmetry.
+  apply fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge); try tauto.
+  apply can_phpdef.
+  repeat php_.
+Qed.
+
+Lemma eq_heap_initc A m:
+  forall (l: list (A * Z)) id z p x z' z'' b
+          (EXT: forall z p, exists x2, m (x2, z) = p)
+          (NODUP: NoDup (map snd l))
+          (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
+          (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
+          (IN: In (p,id) (map (fun x => (m x, snd x)) l))
+          (P1z: p z = Some Ucond)
+          (PzN: z <> z' -> fold_left phplus (map m l) b z' = None)
+          (X: m (x,id) = upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p z None) z' (Some Icond))
+          (NEQ: z <> z'' /\ z' <> z''),
+    fold_left phplus (map m (updl l id (x,id))) b z'' = fold_left phplus (map m l) b z''.
+Proof.
+  intros.
+  assert (IN1:=IN).
+  apply in_map_iff in IN1.
+  destruct IN1 as (x12,(EQx,INx)).
+  assert (EXTE:=EXT).
+  specialize EXT with id (emp knowledge).
+  destruct EXT as (x2, mx2).
+
+  assert (DEFL2: defl phplusdef (map (fun x : A * Z => (m x, snd x)) (updl l id (x2, id)))).
+  {
+  unfold defl.
+  intros.
+  unfold updl in IN1.
+  rewrite map_map in IN1.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  destruct (Z.eq_dec (snd x1) id).
+  simpl in EQ1.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  omega.
+  inversion EQ2.
+  rewrite <- H1.
+  rewrite mx2.
+  repeat php_.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  rewrite <- H3.
+  rewrite mx2.
+  repeat php_.
+  inversion EQ2.
+  apply DEFL with id1 id2.
+  omega.
+  apply in_map_iff.
+  rewrite <- H1.
+  exists x1. auto.
+  apply in_map_iff.
+  rewrite <- H3.
+  exists x3. auto.
+  }
+
+  assert (INP: In p (map m l)).
+  {
+  apply in_map_iff in IN.
+  destruct IN as (x0,(EQx1,INx1)).
+  apply in_map_iff.
+  exists x0.
+  inversion EQx1.
+  auto.
+  }
+
+  assert (PHPD1: phplusdef (fold_left phplus (map m (updl l id (x2, id))) b) p).
+  {
+  apply phpdef_fold; repeat php_.
+  apply NoDup_updl.
+  assumption.
+  intros.
+  unfold updl in IN0.
+  rewrite map_map in IN0.
+  apply in_map_iff in IN0.
+  destruct IN0 as (x0,(EQa,INa)).
+  destruct (Z.eq_dec (snd x0) id).
+  rewrite <- EQa.
+  rewrite mx2.
+  repeat php_.
+  rewrite <- EQa.
+  apply DEFLb.
+  apply in_map.
+  assumption.
+  intros.
+  unfold updl in IN0.
+  rewrite map_map in IN0.
+  apply in_map_iff in IN0.
+  destruct IN0 as (x0,(EQa,INa)).
+  destruct (Z.eq_dec (snd x0) id).
+  rewrite <- EQa.
+  rewrite mx2.
+  repeat php_.
+  rewrite <- EQa.
+  apply DEFL with (snd x0) id.
+  omega.
+  apply in_map_iff.
+  exists x0.
+  auto.
+  assumption.
+  apply phpdef_comm.
+  apply DEFLb.
+  assumption.
+  }
+
+  assert (EQH2: fold_left phplus (map m (updl l id (x2, id))) b z = None).
+  {
+  apply phpdef_comm in PHPD1.
+  unfold phplusdef in PHPD1.
+  specialize PHPD1 with z.
+  rewrite P1z in PHPD1.
+  destruct (fold_left phplus (map m (updl l id (x2, id))) b z).
+  contradiction.
+  reflexivity.
+  }
+
+  assert (PHPD0: forall p0, In p0 (map m (updl l id (x2, id))) -> phplusdef p0 b).
+  {
+  intros p0 IN0.
+  unfold updl in IN0.
+  rewrite map_map in IN0.
+  apply in_map_iff in IN0.
+  destruct IN0 as (x0,(EQa,INa)).
+  destruct (Z.eq_dec (snd x0) id).
+  rewrite <- EQa.
+  rewrite mx2.
+  repeat php_.
+  rewrite <- EQa.
+  apply DEFLb.
+  apply in_map.
+  assumption.
+  }
+
+  assert (NONE1: forall p (IN: In p (map m (updl l id (x2, id))) \/ p = b), p z = None).
+  {
+  apply fold_None; repeat php_.
+  apply NoDup_updl.
+  assumption.
+  }
+
+  assert (NONE2: z <> z' -> forall p (IN: In p (map m l) \/ p = b), p z' = None).
+  {
+  intro neq.
+  apply fold_None; repeat php_.
+  apply PzN.
+  assumption.
+  }
+
+  assert (DEFL1: defl phplusdef (map (fun x : A * Z => (m x, snd x)) (updl l id (x, id)))).
+  {
+  unfold defl.
+  intros.
+  unfold updl in IN1.
+  rewrite map_map in IN1.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  destruct (Z.eq_dec (snd x1) id).
+  simpl in EQ1.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  omega.
+  inversion EQ2.
+  rewrite <- H1.
+  rewrite X.
+  assert (PHPDu1: phplusdef (upd (location_eq_dec Z.eq_dec) p z None) (m x3)).
+  {
+  apply phpdef_none.
+  apply DEFL with id id2.
+  omega.
+  assumption.
+  apply in_map_iff.
+  rewrite <- H3.
+  exists x3.
+  auto.
+  }
+  destruct (location_eq_dec Z.eq_dec z z').
+  rewrite <- e0.
+  apply phpdef_v.
+  assumption.
+  apply NONE1.
+  left.
+  apply in_map.
+  unfold updl.
+  apply in_map_iff.
+  exists x3.
+  destruct (Z.eq_dec (snd x3) id).
+  omega.
+  auto.
+  apply phpdef_v.
+  assumption.
+  apply NONE2.
+  assumption.
+  left.
+  apply in_map.
+  assumption.
+  inversion EQ1.
+  unfold updl in IN2.
+  rewrite map_map in IN2.
+  apply in_map_iff in IN2.
+  destruct IN2 as (x3,(EQ2,IN2)).
+  destruct (Z.eq_dec (snd x3) id).
+  simpl in EQ2.
+  inversion EQ2.
+  rewrite <- H3.
+  rewrite X.
+  assert (PHPDu1: phplusdef (upd (location_eq_dec Z.eq_dec) p z None) (m x1)).
+  {
+  apply phpdef_none.
+  apply DEFL with id id1.
+  omega.
+  assumption.
+  apply in_map_iff.
+  rewrite <- H1.
+  exists x1.
+  auto.
+  }
+  apply phpdef_comm.
+  destruct (location_eq_dec Z.eq_dec z z').
+  rewrite <- e0.
+  apply phpdef_v.
+  assumption.
+  apply NONE1.
+  left.
+  apply in_map.
+  unfold updl.
+  apply in_map_iff.
+  exists x1.
+  destruct (Z.eq_dec (snd x1) id).
+  omega.
+  auto.
+  apply phpdef_v.
+  assumption.
+  apply NONE2.
+  assumption.
+  left.
+  apply in_map.
+  assumption.
+  inversion EQ2.
+  apply DEFL with id1 id2.
+  omega.
+  apply in_map_iff.
+  exists x1.
+  rewrite <- H1.
+  auto.
+  apply in_map_iff.
+  exists x3.
+  rewrite <- H3.
+  auto.
+  }
+
+  assert (PHPDB: forall x0 : pheap, In x0 (map m (updl l id (x, id))) -> phplusdef x0 b).
+  {
+  intros x0 IN1.
+  unfold updl in IN1.
+  rewrite map_map in IN1.
+  apply in_map_iff in IN1.
+  destruct IN1 as (x1,(EQ1,IN1)).
+  destruct (Z.eq_dec (snd x1) id).
+  rewrite <- EQ1.
+  rewrite X.
+  assert (PHPDu1: phplusdef (upd (location_eq_dec Z.eq_dec) p z None) b).
+  {
+  apply phpdef_none.
+  apply DEFLb.
+  assumption.
+  }
+  destruct (location_eq_dec Z.eq_dec z z').
+  rewrite <- e0.
+  apply phpdef_v.
+  assumption.
+  apply NONE1.
+  right.
+  reflexivity.
+  apply phpdef_v.
+  assumption.
+  apply NONE2.
+  assumption.
+  right.
+  reflexivity.
+  apply DEFLb.
+  rewrite <- EQ1.
+  apply in_map.
+  assumption.
+  }
+
+  assert (EQH1: fold_left phplus (map m (updl l id (x, id))) b =
+    phplus (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) 
+    p z None) z' (Some Icond))
+    (fold_left phplus (map m (updl (updl l id (x, id)) id (x2,id))) b)).
+  {
+  apply fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge); repeat php_.
+  apply can_phpdef.
+  apply NoDup_updl.
+  assumption.
+  unfold updl.
+  rewrite map_map.
+  apply in_map_iff.
+  apply in_map_iff in IN.
+  destruct IN as (x0,(EQx1,INx1)).
+  exists x0.
+  inversion EQx1.
+  rewrite eqz.
+  rewrite H1.
+  rewrite X.
+  rewrite H0.
+  auto.
+  }
+
+  rewrite updl_updl in EQH1.
+
+  assert (EQH3: fold_left phplus (map m l) b =
+    phplus p (fold_left phplus (map m (updl l id (x2,id))) b)).
+  {
+  apply fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge); repeat php_.
+  apply can_phpdef.
+  }
+  rewrite EQH1.
+  rewrite EQH3.
+  apply phplus_mon.
+  unfold upd.
+  destruct NEQ as (NEQ1,NEQ2).
+  destruct (location_eq_dec Z.eq_dec z'' z').
+  symmetry in e.
+  contradiction.
+  destruct (location_eq_dec Z.eq_dec z'' z).
+  symmetry in e.
+  contradiction.
+  reflexivity.
 Qed.
 
 Lemma phplus_fold_lock A m:
@@ -5391,10 +7523,10 @@ Lemma fold_left_upd_Notify A m:
           (phpdefp1pm: phplusdef p1 pm)
           (IN': In (p',id') (map (fun x => (m x, snd x)) l))
           (P1z: exists wt1 ot1, p1 z = Some (Locked wt1 ot1))
-          (X1: (m x1, snd x1) = (upd location_eq_dec p1 z (Some (Locked wt ot)), id))
+          (X1: (m x1, snd x1) = (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot)), id))
           (X2: (m x2, snd x2) = (phplus p' pm, id')),
       fold_left phplus (map m (updl (updl l id x1) id' x2)) b = 
-        upd location_eq_dec (fold_left phplus (map m l) b) z (Some (Locked wt ot)).
+        upd (location_eq_dec Z.eq_dec) (fold_left phplus (map m l) b) z (Some (Locked wt ot)).
 Proof.
   intros.
   inversion X1.
@@ -5555,7 +7687,7 @@ Proof.
   tauto.
   }
   unfold upd.
-  destruct (location_eq_dec x z).
+  destruct ((location_eq_dec Z.eq_dec) x z).
   {
   rewrite e.  
   apply fold_locked;
@@ -5700,7 +7832,7 @@ Proof.
   apply in_map.
   assumption.
   right.
-  exists (upd location_eq_dec p1 z (Some (Locked wt ot))).
+  exists (upd (location_eq_dec Z.eq_dec) p1 z (Some (Locked wt ot))).
   exists.
   apply in_map_iff.
   exists (a,id).
@@ -5718,7 +7850,7 @@ Proof.
   rewrite <- H5.
   tauto.
   unfold upd.
-  destruct (location_eq_dec z z).
+  destruct ((location_eq_dec Z.eq_dec) z z).
   reflexivity.
   contradiction.
 }
@@ -6219,7 +8351,7 @@ Proof.
   apply phplus_comm.
   tauto.
   unfold upd.
-  destruct (location_eq_dec x z).
+  destruct ((location_eq_dec Z.eq_dec) x z).
   tauto.
   reflexivity.
   omega.
@@ -6902,7 +9034,7 @@ Lemma lock_Wait A m:
          (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
          (IN: In (phplus p1 p2,id) (map (fun x => (m x, snd x)) l))
          (P1z: exists wt1 ot1, p1 z = Some (Locked wt1 ot1) \/ p1 z = Some (Ulock wt1 ot1))
-         (X: (m x, snd x) = (upd location_eq_dec p1 z (Some Lock), id)),
+         (X: (m x, snd x) = (upd (location_eq_dec Z.eq_dec) p1 z (Some Lock), id)),
      fold_left phplus (map m (updl l id x)) (phplus b p2) z = Some Lock.
 Proof.
   intros.
@@ -7164,7 +9296,7 @@ Proof.
   }
 
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec p1 z (Some Lock))(id:=id)(x:=empx).
+    (x2:=upd (location_eq_dec Z.eq_dec) p1 z (Some Lock))(id:=id)(x:=empx).
   {
   destruct x.
   inversion X.
@@ -7290,7 +9422,7 @@ Lemma eq_heap_Wait A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
           (IN: In (phplus p1 p2,id) (map (fun x => (m x, snd x)) l))
           (P1z: exists wt1 ot1, p1 z = Some (Locked wt1 ot1) \/ p1 z = Some (Ulock wt1 ot1))
-          (X: m (x,id) = upd location_eq_dec p1 z (Some Lock))
+          (X: m (x,id) = upd (location_eq_dec Z.eq_dec) p1 z (Some Lock))
           (NEQ: z <> z'),
     fold_left phplus (map m (updl l id (x,id))) (phplus b p2) z' = fold_left phplus (map m l) b z'.
 Proof.
@@ -7298,7 +9430,7 @@ Proof.
   specialize EXT with id (emp knowledge).
   destruct EXT as (empx, memp).
 
-  assert (phpdefp2up1: phplusdef p2 (upd location_eq_dec p1 z (Some Lock))).
+  assert (phpdefp2up1: phplusdef p2 (upd (location_eq_dec Z.eq_dec) p1 z (Some Lock))).
   {
   apply phpdef_comm.
   apply phpdef_locked_lock.
@@ -7336,7 +9468,7 @@ Proof.
   assumption.
   }
 
-  assert (phpdefup1fold: phplusdef (upd location_eq_dec p1 z (Some Lock)) (fold_left phplus (map m (updl l id (empx, id))) b)).
+  assert (phpdefup1fold: phplusdef (upd (location_eq_dec Z.eq_dec) p1 z (Some Lock)) (fold_left phplus (map m (updl l id (empx, id))) b)).
   {
   apply phpdef_comm.
   apply phpdef_fold.
@@ -7484,7 +9616,7 @@ Proof.
   rewrite fold_left_f_m_def with (def:=phplusdef).
   {
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec p1 z (Some Lock))(id:=id)(x:=empx).
+    (x2:=upd (location_eq_dec Z.eq_dec) p1 z (Some Lock))(id:=id)(x:=empx).
   {
   rewrite updl_updl.
   replace (fold_left phplus (map m l) b) with 
@@ -7495,7 +9627,7 @@ Proof.
   rewrite phplus_comm.
   unfold upd.
   unfold phplus.
-  destruct (location_eq_dec z' z).
+  destruct ((location_eq_dec Z.eq_dec) z' z).
   symmetry in e.
   contradiction.
   reflexivity.
@@ -7624,7 +9756,7 @@ Lemma boundph_Wait A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
           (IN: In (phplus p1 p2,id) (map (fun x => (m x, snd x)) l))
           (P1z: exists wt ot, p1 z = Some (Locked wt ot) \/ p1 z = Some (Ulock wt ot))
-          (X: (m x, snd x) = (upd location_eq_dec p1 z (Some Lock), id))
+          (X: (m x, snd x) = (upd (location_eq_dec Z.eq_dec) p1 z (Some Lock), id))
           (BP: boundph (fold_left phplus (map m l) b)),
      boundph (fold_left phplus (map m (updl l id x)) (phplus b p2)).
 Proof.
@@ -7645,7 +9777,7 @@ Proof.
   inversion X.
   rewrite H2 in *.
   unfold upd in *.
-  destruct (location_eq_dec z x0).
+  destruct ((location_eq_dec Z.eq_dec) z x0).
   rewrite <- e in *.
 
   assert (CO: fold_left phplus (map m (updl l id (a, id))) (phplus b p2) z = Some Lock \/
@@ -7725,7 +9857,7 @@ Proof.
   inversion EQ1.
   tauto.
   right.
-  exists (upd location_eq_dec p1 z (Some Lock)).
+  exists (upd (location_eq_dec Z.eq_dec) p1 z (Some Lock)).
   exists.
   apply in_map_iff.
   exists (a,id).
@@ -8369,10 +10501,10 @@ Lemma fold_left_upd_NotifyAll A m (m': (A * Z) -> (A * Z)):
          (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
          (IN: In (p,id) (map (fun x => (m x, snd x)) l))
          (P1z: exists wt1 ot1, p z = Some (Locked wt1 ot1))
-         (X1: (m x, snd x) = (upd location_eq_dec p z (Some (Locked wt ot)), id))
+         (X1: (m x, snd x) = (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot)), id))
          (M': forall x, m x = m (m' x) /\ snd (m' x) = snd x),
      fold_left phplus (map m (updl (map m' l) id x)) b = 
-       upd location_eq_dec (fold_left phplus (map m l) b) z (Some (Locked wt ot)).
+       upd (location_eq_dec Z.eq_dec) (fold_left phplus (map m l) b) z (Some (Locked wt ot)).
 Proof.
   intros.
   rewrite eq_map.
@@ -8383,7 +10515,7 @@ Qed.
 
 
 Lemma eq_heap_Acquire A m:
-  forall (l: list (A * Z)) id (z z': location) (p p1 p2: pheap) x
+  forall (l: list (A * Z)) id (z z': location Z) (p p1 p2: pheap) x
          (EXT: forall z p, exists x2, m (x2, z) = p)
          (NODUP: NoDup (map snd l))
          (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
@@ -8391,7 +10523,7 @@ Lemma eq_heap_Acquire A m:
          (PHPD: phplusdef p1 p2)
          (IN: In (p,id) (map (fun x => (m x, snd x)) l))
          (Pl : p z = Some Lock \/ (exists wt ot, p z = Some (Locked wt ot)))
-         (X: exists wt ot, m (x,id) = phplus (upd location_eq_dec p z (Some (Locked wt ot))) p1)
+         (X: exists wt ot, m (x,id) = phplus (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot))) p1)
          (p0l: forall p0 (IN: In p0 (map m l) \/ p0 = phplus p1 p2), p0 z = None \/ p0 z = Some Lock)
          (NEQ: z <> z'),
     fold_left phplus (map m (updl l id (x, id))) p2 z' = fold_left phplus (map m l) (phplus p1 p2) z'.
@@ -8552,7 +10684,7 @@ Proof.
   reflexivity.
   }
 
-  assert (phpdefupp1: phplusdef (upd location_eq_dec p z (Some (Locked wt ot))) p1).
+  assert (phpdefupp1: phplusdef (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot))) p1).
   {
   apply phpdef_upd_locked.
   tauto.
@@ -8560,7 +10692,7 @@ Proof.
   tauto.
   }
 
-  assert (phpdefupp2: phplusdef (upd location_eq_dec p z (Some (Locked wt ot))) p2).
+  assert (phpdefupp2: phplusdef (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot))) p2).
   {
   apply phpdef_upd_locked.
   tauto.
@@ -8572,7 +10704,7 @@ Proof.
 
   rewrite fold_left_f_m_def with (def:=phplusdef).
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=phplus (upd location_eq_dec p z (Some (Locked wt ot))) p1)(id:=id)(x:=empx).
+    (x2:=phplus (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot))) p1)(id:=id)(x:=empx).
   rewrite updl_updl.
   replace (fold_left phplus (map m l) p2) with
     (phplus p (fold_left phplus (map m (updl l id (empx,id))) p2)).
@@ -8581,7 +10713,7 @@ Proof.
   replace (phplus p1 p) with (phplus p p1).
   unfold phplus.
   unfold upd.
-  destruct (location_eq_dec z' z).
+  destruct ((location_eq_dec Z.eq_dec) z' z).
   rewrite e in NEQ.
   contradiction.
   reflexivity.
@@ -8741,7 +10873,7 @@ Lemma locked_Acquire A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 (phplus p1 p2))
           (PHPD: phplusdef p1 p2)
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
-          (X: m (x,id) = phplus (upd location_eq_dec p z (Some (Locked wt ot))) p1)
+          (X: m (x,id) = phplus (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot))) p1)
           (Pl : p z = Some Lock \/ (exists wt ot, p z = Some (Locked wt ot)))
           (p'z: forall p0 (IN: In p0 (map m l) \/ p0 = phplus p1 p2), p0 z = None \/ p0 z = Some Lock),
     fold_left phplus (map m (updl l id (x,id))) p2 z = Some (Locked wt ot).
@@ -8792,10 +10924,10 @@ Proof.
   destruct EXT as (empx,memp).
 
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=phplus (upd location_eq_dec p z (Some (Locked wt ot))) p1)(id:=id)(x:=empx).
+    (x2:=phplus (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot))) p1)(id:=id)(x:=empx).
   unfold phplus.
   unfold upd.
-  destruct (location_eq_dec z z).
+  destruct ((location_eq_dec Z.eq_dec) z z).
   reflexivity.
   contradiction.
   apply can_phpdef.
@@ -8893,7 +11025,7 @@ Lemma defl_Acquire A m:
           (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
           (Pl : p z = Some Lock \/ (exists wt ot ct : bag, p z = Some (Locked wt ot)))
-          (X: exists wt ot, m (x,id) = phplus (upd location_eq_dec p z (Some (Locked wt ot))) p1)
+          (X: exists wt ot, m (x,id) = phplus (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot))) p1)
           (p'z: forall p0 (IN: In p0 (map m l) \/ p0 = phplus p1 p2), p0 z = None \/ p0 z = Some Lock),
      defl phplusdef (map (fun x => (m x, snd x)) (updl l id (x,id))).
 Proof.
@@ -9057,7 +11189,7 @@ Lemma boundph_Acquire A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 (phplus p1 p2))
           (PHPD: phplusdef p1 p2)
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
-          (X: exists wt ot, m (x,id) = phplus (upd location_eq_dec p z (Some (Locked wt ot))) p1)
+          (X: exists wt ot, m (x,id) = phplus (upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot))) p1)
           (Pl : p z = Some Lock \/ (exists wt ot, p z = Some (Locked wt ot)))
           (BPT: boundph (fold_left phplus (map m l) (phplus p1 p2)))
           (p'z: forall p0 (IN: In p0 (map m l) \/ p0 = phplus p1 p2), p0 z = None \/ p0 z = Some Lock),
@@ -9067,7 +11199,7 @@ Proof.
   unfold boundph.
   intros.
   destruct X as (wt,(ot,X)).
-  destruct (location_eq_dec x0 z).
+  destruct ((location_eq_dec Z.eq_dec) x0 z).
   rewrite e in *.
   rewrite locked_Acquire with (p:=p) (p1:=p1) (wt:=wt) (ot:=ot) in H; try assumption.
   inversion H.
@@ -9550,7 +11682,7 @@ Lemma ulock_dischu A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
           (pz: exists wt ot, p z = Some (Ulock wt ot))
-          (X: m (x,id) = upd location_eq_dec p z (Some (Ulock wt ot))),
+          (X: m (x,id) = upd (location_eq_dec Z.eq_dec) p z (Some (Ulock wt ot))),
     fold_left phplus (map m (updl l id (x,id))) b z = Some (Ulock wt ot).
 Proof.
   intros.
@@ -9578,7 +11710,7 @@ Proof.
   specialize EXT with id (emp knowledge).
   destruct EXT as (empx,memp).
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec p z (Some (Ulock wt ot)))(id:=id)(x:=empx).
+    (x2:=upd (location_eq_dec Z.eq_dec) p z (Some (Ulock wt ot)))(id:=id)(x:=empx).
   unfold phplus.
   unfold upd.
   repeat dstr_.
@@ -9664,7 +11796,7 @@ Lemma eq_heap_dischu A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
           (pz: exists wt ot, p z = Some (Ulock wt ot))
-          (X: exists wt ot, m (x,id) = upd location_eq_dec p z (Some (Ulock wt ot)))
+          (X: exists wt ot, m (x,id) = upd (location_eq_dec Z.eq_dec) p z (Some (Ulock wt ot)))
           (NEQ: z <> z'),
     fold_left phplus (map m (updl l id (x,id))) b z' = fold_left phplus (map m l) b z'.
 Proof.
@@ -9695,13 +11827,13 @@ Proof.
   specialize EXT with id (emp knowledge).
   destruct EXT as (empx,memp).
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec p z (Some (Ulock wt ot)))(id:=id)(x:=empx).
+    (x2:=upd (location_eq_dec Z.eq_dec) p z (Some (Ulock wt ot)))(id:=id)(x:=empx).
   rewrite updl_updl.
   replace (fold_left phplus (map m l) b) with 
     (phplus p (fold_left phplus (map m (updl l id (empx,id))) b)).
   unfold phplus.
   unfold upd.
-  destruct (location_eq_dec z' z).
+  destruct ((location_eq_dec Z.eq_dec) z' z).
   symmetry in e.
   contradiction.
   reflexivity.
@@ -9796,14 +11928,14 @@ Lemma boundph_dischu A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
           (pz: exists wt ot, p z = Some (Ulock wt ot))
-          (X: exists wt ot, m (x,id) = upd location_eq_dec p z (Some (Ulock wt ot)))
+          (X: exists wt ot, m (x,id) = upd (location_eq_dec Z.eq_dec) p z (Some (Ulock wt ot)))
           (BPT: boundph (fold_left phplus (map m l) b)),
     boundph (fold_left phplus (map m (updl l id (x,id))) b).
 Proof.
   intros.
   unfold boundph.
   intros.
-  destruct (location_eq_dec x0 z).
+  destruct ((location_eq_dec Z.eq_dec) x0 z).
   rewrite e in *.
   destruct X as (wt,(ot,X)).
   rewrite ulock_dischu with (p:=p)(wt:=wt)(ot:=ot) in H;
@@ -10202,7 +12334,7 @@ Lemma lock_initl A m:
          (IN: In (phplus p1 p2,id) (map (fun x => (m x, snd x)) l))
          (P1z: exists wt1 ot1, p1 z = Some (Ulock wt1 ot1))
          (PzN: z <> z' -> fold_left phplus (map m l) b z' = None)
-         (X: (m x, snd x) = (upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock), id)),
+         (X: (m x, snd x) = (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock), id)),
      (z' <> z -> fold_left phplus (map m (updl l id x)) (phplus b p2) z = None) /\
      fold_left phplus (map m (updl l id x)) (phplus b p2) z' = Some Lock.
 Proof.
@@ -10341,7 +12473,7 @@ Proof.
   assumption.
   assumption.
   php_.
-  destruct (location_eq_dec z z').
+  destruct ((location_eq_dec Z.eq_dec) z z').
   rewrite <- e.
   assert (phpdefpp12: phplusdef p (phplus p1 p2)).
   {
@@ -10400,7 +12532,7 @@ Proof.
 
   assert (bz': b z' = None).
   {
-  destruct (location_eq_dec z z').
+  destruct ((location_eq_dec Z.eq_dec) z z').
   rewrite <- e.
   unfold phplusdef in phpdefp1b.
   specialize phpdefp1b with z.
@@ -10415,7 +12547,7 @@ Proof.
 
   assert (p2z': p2 z' = None).
   {
-  destruct (location_eq_dec z z').
+  destruct ((location_eq_dec Z.eq_dec) z z').
   rewrite <- e.
   unfold phplusdef in PHPD.
   specialize PHPD with z.
@@ -10473,7 +12605,7 @@ Proof.
   rewrite mx2.
   assumption.
   rewrite <- EQ0.
-  destruct (location_eq_dec z z').
+  destruct ((location_eq_dec Z.eq_dec) z z').
   rewrite <- e.
   assert (phpd: phplusdef (m (x0,id0)) p1).
   {
@@ -10755,7 +12887,7 @@ Proof.
 
 
 
-  assert (phpdefpnbp2: phplusdef (upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock))
+  assert (phpdefpnbp2: phplusdef (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock))
     (phplus b p2)).
   {
   apply phpdef_v.
@@ -10794,7 +12926,7 @@ Proof.
   auto.
   }
 
-  assert (INu: In (upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock), id)
+  assert (INu: In (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock), id)
     (map (fun x : A * Z => (m x, snd x)) (updl l id (a, id)))).
   {
   unfold updl.
@@ -10814,7 +12946,7 @@ Proof.
   {
   intros.
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock))(id:=id)(x:=empx); repeat php_.
+    (x2:=upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock))(id:=id)(x:=empx); repeat php_.
   {
   rewrite updl_updl.
   apply phplus_none.
@@ -10828,7 +12960,7 @@ Proof.
   }
 
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock))(id:=id)(x:=empx); repeat php_.
+    (x2:=upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock))(id:=id)(x:=empx); repeat php_.
   {
   rewrite updl_updl.
   unfold phplus at 1.
@@ -10848,14 +12980,14 @@ Lemma locked_disch A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
           (pz: exists wt ot, p z = Some (Locked wt ot))
-          (X: m (x,id) = upd location_eq_dec p z (Some (Locked wt ot))),
+          (X: m (x,id) = upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot))),
     fold_left phplus (map m (updl l id (x,id))) b z = Some (Locked wt ot).
 Proof.
   intros.
   specialize EXT with id (emp knowledge).
   destruct EXT as (empx,memp).
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec p z (Some (Locked wt ot)))(id:=id)(x:=empx).
+    (x2:=upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot)))(id:=id)(x:=empx).
   unfold phplus.
   unfold upd.
   repeat dstr_.
@@ -10925,7 +13057,7 @@ Lemma eq_heap_disch A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
           (pz: exists wt ot, p z = Some (Locked wt ot))
-          (X: exists wt ot, m (x,id) = upd location_eq_dec p z (Some (Locked wt ot)))
+          (X: exists wt ot, m (x,id) = upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot)))
           (NEQ: z <> z'),
     fold_left phplus (map m (updl l id (x,id))) b z' = fold_left phplus (map m l) b z'.
 Proof.
@@ -10935,13 +13067,13 @@ Proof.
   specialize EXT with id (emp knowledge).
   destruct EXT as (empx,memp).
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec p z (Some (Locked wt ot)))(id:=id)(x:=empx).
+    (x2:=upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot)))(id:=id)(x:=empx).
   rewrite updl_updl.
   replace (fold_left phplus (map m l) b) with 
     (phplus p (fold_left phplus (map m (updl l id (empx,id))) b)).
   unfold phplus.
   unfold upd.
-  destruct (location_eq_dec z' z).
+  destruct ((location_eq_dec Z.eq_dec) z' z).
   symmetry in e.
   contradiction.
   reflexivity.
@@ -11023,14 +13155,14 @@ Lemma boundph_disch A m:
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
           (pz: exists wt ot, p z = Some (Locked wt ot))
-          (X: exists wt ot, m (x,id) = upd location_eq_dec p z (Some (Locked wt ot)))
+          (X: exists wt ot, m (x,id) = upd (location_eq_dec Z.eq_dec) p z (Some (Locked wt ot)))
           (BPT: boundph (fold_left phplus (map m l) b)),
     boundph (fold_left phplus (map m (updl l id (x,id))) b).
 Proof.
   intros.
   unfold boundph.
   intros.
-  destruct (location_eq_dec x0 z).
+  destruct ((location_eq_dec Z.eq_dec) x0 z).
   rewrite e in *.
   destruct X as (wt,(ot,X)).
   rewrite locked_disch with (p:=p)(wt:=wt)(ot:=ot) in H;
@@ -11110,6 +13242,10 @@ Proof.
   reflexivity.
   apply UB with z.
   reflexivity.
+  apply UB with z.
+  reflexivity.
+  apply UB with z.
+  reflexivity.
 Qed.
 
 Definition lboundph (p: pheap) :=
@@ -11166,6 +13302,10 @@ Proof.
   tauto.
   rewrite <- H1.
   tauto.
+  rewrite <- H1.
+  tauto.
+  rewrite <- H1.
+  tauto.
   inversion H.
   rewrite <- H1.
   tauto.
@@ -11174,6 +13314,8 @@ Proof.
   destruct k;
   inversion H;
   try tauto.
+  inversion H.
+  inversion H.
   inversion H.
   inversion H.
   inversion H.
@@ -12258,10 +14400,10 @@ Lemma eq_heap A m:
          (NODUP: NoDup (map snd l))
          (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
          (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
-         (DEFU: forall p0 id' (NEQ: id <> id') (IN: In (p0,id') (map (fun x => (m x, snd x)) l)), phplusdef p0 (upd location_eq_dec p z v))
-         (DEFUb: phplusdef (upd location_eq_dec p z v) b)
+         (DEFU: forall p0 id' (NEQ: id <> id') (IN: In (p0,id') (map (fun x => (m x, snd x)) l)), phplusdef p0 (upd (location_eq_dec Z.eq_dec) p z v))
+         (DEFUb: phplusdef (upd (location_eq_dec Z.eq_dec) p z v) b)
          (IN: In (p,id) (map (fun x => (m x, snd x)) l))
-         (X: m (x,id) = upd location_eq_dec p z v)
+         (X: m (x,id) = upd (location_eq_dec Z.eq_dec) p z v)
          (NEQ: z <> z'),
     fold_left phplus (map m (updl l id (x, id))) b z' = fold_left phplus (map m l) b z'.
 Proof.
@@ -12299,7 +14441,7 @@ Proof.
     (phplus p (fold_left phplus (map m (updl l id (empx, id))) b)); try tauto.
 
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec p z v)(id:=id)(x:=empx); try tauto.
+    (x2:=upd (location_eq_dec Z.eq_dec) p z v)(id:=id)(x:=empx); try tauto.
   rewrite updl_updl.
   apply phplus_upd1; try tauto.
   apply can_phpdef.
@@ -12378,7 +14520,7 @@ Lemma eq_heap_initl A m:
           (IN: In (phplus p1 p2,id) (map (fun x => (m x, snd x)) l))
           (P1z: exists wt1 ot1, p1 z = Some (Ulock wt1 ot1))
           (PzN: z <> z' -> fold_left phplus (map m l) b z' = None)
-          (X: m (x,id) = upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock))
+          (X: m (x,id) = upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock))
           (NEQ: z <> z'' /\ z' <> z''),
     fold_left phplus (map m (updl l id (x,id))) (phplus b p2) z'' = fold_left phplus (map m l) b z''.
 Proof.
@@ -12418,7 +14560,7 @@ Proof.
 
   assert (bz': b z' = None).
   {
-  destruct (location_eq_dec z z').
+  destruct ((location_eq_dec Z.eq_dec) z z').
   rewrite <- e.
   unfold phplusdef in phpdefp1b.
   specialize phpdefp1b with z.
@@ -12433,7 +14575,7 @@ Proof.
 
   assert (p2z': p2 z' = None).
   {
-  destruct (location_eq_dec z z').
+  destruct ((location_eq_dec Z.eq_dec) z z').
   rewrite <- e.
   unfold phplusdef in PHPD.
   specialize PHPD with z.
@@ -12449,7 +14591,7 @@ Proof.
   assumption.
   }
 
-  assert (phpdefp2u: phplusdef p2 (upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock))).
+  assert (phpdefp2u: phplusdef p2 (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock))).
   {
   apply phpdef_comm.
   apply phpdef_v.
@@ -12458,7 +14600,7 @@ Proof.
   assumption.
   }
 
-  assert (phpdefub: phplusdef (upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock)) b).
+  assert (phpdefub: phplusdef (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock)) b).
   {
   apply phpdef_v.
   apply phpdef_none.
@@ -12566,7 +14708,7 @@ Proof.
   }
 
   assert (phpdefp0un: forall x1 id' (NEQ: id <> id'), In (x1, id') l -> phplusdef (m (x1, id'))
-    (upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock))).
+    (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock))).
   {
   intros.
   assert (phpd: phplusdef p1 (m (x1, id'))).
@@ -12586,7 +14728,7 @@ Proof.
   apply phpdef_v.
   apply phpdef_none.
   assumption.
-  destruct (location_eq_dec z z').
+  destruct ((location_eq_dec Z.eq_dec) z z').
   rewrite <- e.
   unfold phplusdef in phpd.
   specialize phpd with z.
@@ -12603,7 +14745,7 @@ Proof.
   }
 
   assert (phpdefp0u: forall p0 : pheap, In p0 (map m (updl l id (empx, id))) ->
-    phplusdef p0 (upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock))).
+    phplusdef p0 (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock))).
   {
   unfold updl.
   rewrite map_map.
@@ -12621,7 +14763,7 @@ Proof.
   assumption.
   }
 
-  assert (phpdefpuf: phplusdef (upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock))
+  assert (phpdefpuf: phplusdef (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock))
     (fold_left phplus (map m (updl l id (empx, id))) b)).
   {
   apply phpdef_comm; repeat php_.
@@ -12649,7 +14791,7 @@ Proof.
   assumption.
   assumption.
   php_.
-  destruct (location_eq_dec z z').
+  destruct ((location_eq_dec Z.eq_dec) z z').
   rewrite <- e.
   assert (phpdefpp12: phplusdef p (phplus p1 p2)).
   {
@@ -12682,7 +14824,7 @@ Proof.
   rewrite fold_left_f_m_def with (def:=phplusdef); repeat php_.
   {
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
-    (x2:=upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock))(id:=id)(x:=empx); repeat php_.
+    (x2:=upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock))(id:=id)(x:=empx); repeat php_.
   {
   rewrite updl_updl.
   replace (fold_left phplus (map m l) b) with 
@@ -12693,10 +14835,10 @@ Proof.
   rewrite phplus_comm; repeat php_.
   unfold upd.
   unfold phplus.
-  destruct (location_eq_dec z'' z).
+  destruct ((location_eq_dec Z.eq_dec) z'' z).
   symmetry in e.
   contradiction.
-  destruct (location_eq_dec z'' z').
+  destruct ((location_eq_dec Z.eq_dec) z'' z').
   symmetry in e.
   contradiction.
   reflexivity.
@@ -12733,7 +14875,7 @@ Lemma defl_initl A m:
           (IN: In (phplus p1 p2,id) (map (fun x => (m x, snd x)) l))
           (P1z: exists wt1 ot1, p1 z = Some (Ulock wt1 ot1))
           (PzN: z <> z' -> fold_left phplus (map m l) b z' = None)
-          (X: (m x, snd x) = (upd location_eq_dec (upd location_eq_dec p1 z None) z' (Some Lock), id)),
+          (X: (m x, snd x) = (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 z None) z' (Some Lock), id)),
      defl phplusdef (map (fun x => (m x, snd x)) (updl l id x)).
 Proof.
   intros.
@@ -12761,7 +14903,7 @@ Proof.
   apply phpdef_v.
   apply phpdef_none.
   assumption.
-  destruct (location_eq_dec z z').
+  destruct ((location_eq_dec Z.eq_dec) z z').
   rewrite <- e.
   unfold phplusdef in phpd.
   specialize phpd with z.
@@ -12787,10 +14929,10 @@ Lemma defl_New A m:
           (NODUP: NoDup (map snd l))
           (DEFL: defl phplusdef (map (fun x => (m x, snd x)) l))
           (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
-          (DEFU: forall p0 id0 (NEQ: id <> id0) (IN: In (p0,id0) (map (fun x => (m x, snd x)) l)), phplusdef p0 (upd location_eq_dec p z v))
+          (DEFU: forall p0 id0 (NEQ: id <> id0) (IN: In (p0,id0) (map (fun x => (m x, snd x)) l)), phplusdef p0 (upd (location_eq_dec Z.eq_dec) p z v))
           (IN: In (p,id) (map (fun x => (m x, snd x)) l))
           (P1z: fold_left phplus (map m l) b z = None)
-          (X: (m x, snd x) = (upd location_eq_dec p z v, id)),
+          (X: (m x, snd x) = (upd (location_eq_dec Z.eq_dec) p z v, id)),
      defl phplusdef (map (fun x => (m x, snd x)) (updl l id x)).
 Proof.
   unfold defl.
@@ -12826,4 +14968,286 @@ Proof.
   omega.
   inm_.
   inm_.
+Qed.
+
+Lemma sat_fold_move0:
+  forall l a b c p O C
+         (SAT: sat p O C (fold_left Astar l (a ** b) ** c)),
+    sat p O C (fold_left Astar l (a ** c) ** b).
+Proof.
+  induction l.
+  {
+  simpl.
+  intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(sat1,(sat2,(p1p2,C1C2)))))))))))))))))).
+  destruct sat1 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,C3C4)))))))))))))))))).
+  subst.
+  assert (phpp32p42: phplusdef p3 p2 /\ phplusdef p4 p2). repeat php_.
+  assert (ghpp32p42: ghplusdef C3 C2 /\ ghplusdef C4 C2). repeat php_.
+  assert (eqh: phplus (phplus p3 p2) p4 = phplus (phplus p3 p4) p2). rewrite phplus_assoc; repeat php_.
+  assert (bp324: boundph (phplus (phplus p3 p2) p4)). rewrite eqh; assumption.
+  assert (eqg: ghplus (ghplus C3 C2) C4 = ghplus (ghplus C3 C4) C2). rewrite ghplus_assoc; repeat php_.
+  assert (bgp324: boundgh (ghplus (ghplus C3 C2) C4)). rewrite eqg; assumption.
+
+
+  assert (exo: exists O', oplus O' O4 O /\ oplus O3 o2 O').
+  {
+  inversion opO1O2.
+  rewrite <- H in opO3O4.
+  inversion opO3O4.
+  exists None.
+  split; apply None_op.
+  exists O3.
+  split.
+  apply oplus_trans with o.
+  rewrite H. assumption.
+  assumption.
+  destruct O3.
+  apply fs_op.
+  apply Permutation_refl.
+  apply None_op.
+  rewrite <- H in opO3O4.
+  inversion opO3O4.
+  exists (Some o).
+  split.
+  apply fs_op.
+  assumption.
+  apply sn_op.
+  apply Permutation_refl.
+  }
+  destruct exo as (O',(op1,op2)).
+
+  exists (phplus p3 p2), p4.
+  exists. repeat php_.
+  exists.
+  apply boundph_mon with p4; repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists O', O4, (ghplus C3 C2), C4.
+  exists. repeat php_.
+  exists.
+  apply boundgh_mon with C4; repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. assumption.
+  split.
+  exists p3, p2.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists O3, o2, C3, C2.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. assumption.
+  split; reflexivity.
+  split. assumption.
+  split; repeat php_.
+  }
+  intros.
+  apply IHl in SAT.
+  apply IHl.
+  simpl.
+  simpl in SAT.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(sat1,(sat2,(p1p2,C1C2)))))))))))))))))).
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, o1, o2, C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  split.
+  simpl.
+  apply sat_fold_imp with ((a0 ** b) ** c); repeat php_.
+  intros.
+  apply sat_comm in SAT; repeat php_.
+  apply sat_assoc in SAT; repeat php_.
+  apply sat_assoc_comm in SAT; repeat php_.
+  tauto.
+Qed.
+
+Lemma sat_fold_move:
+  forall l a b p O C
+         (SAT: sat p O C (Astar (fold_left Astar l a) b)),
+    sat p O C (fold_left Astar l (a ** b)).
+Proof.
+  induction l.
+  simpl.
+  intros.
+  assumption.
+  simpl.
+  intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(sat1,(sat2,(p1p2,C1C2)))))))))))))))))).
+  subst.
+  apply IHl.
+  apply sat_fold_move0.
+  apply sat_plus with o1 o2; repeat php_.
+Qed.
+
+Definition array (l: location exp) (index: nat) : location exp :=
+  ((Eplus (Aof l) (Enum (Z.of_nat index)), Rof l, Eplus (Lof l) (Enum (Z.of_nat index)), Xof l, Pof l), Iof l, Mof l, M'of l).
+
+Definition points_tos (ns: list nat) (l: location exp) : list assn := map (fun index => array l index |-> (Enum 0)) ns.
+
+Lemma sat_dstr:
+  forall n m a,
+    sat (dstr_cells' (emp knowledge) (map (fun x0 : nat =>
+     ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+     (0%Z, nil), (0%Z, nil), nil)) (seq m n)) (Some (Cell full 0))) None
+     (emp (option nat * nat))
+     (fold_left Astar (points_tos (seq m n)
+     (Enum a, 0%Z, Enum a, None, false, (0%Z, nil), (0%Z, nil), nil))
+     (Abool true)).
+Proof.
+  induction n.
+  reflexivity.
+  simpl.
+  intros.
+  replace (emp (option nat * nat)) with (ghplus (emp (option nat * nat)) (emp (option nat * nat))).
+  Focus 2. repeat php_.
+  assert (EQH: dstr_cells' (emp knowledge)
+     (((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)
+     :: map (fun x0 : nat =>
+     ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+     (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n)) (Some (Cell full 0)) =
+    phplus (dstr_cells' (emp knowledge)
+     (map (fun x0 : nat =>
+     ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+     (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n)) (Some (Cell full 0)))
+     (fun x => if location_eq_dec Z.eq_dec x 
+     ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil) then
+     Some (Cell full 0) else None)).
+  {
+  apply functional_extensionality.
+  intros.
+  unfold dstr_cells'.
+  unfold phplus.
+  destruct (in_dec (location_eq_dec Z.eq_dec) x (map
+    (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
+  destruct (in_dec (location_eq_dec Z.eq_dec) x
+    (((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),(0%Z, nil), nil)
+    :: map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
+  destruct (location_eq_dec Z.eq_dec x
+    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
+  rewrite e in i.
+  apply in_map_iff in i.
+  destruct i as (y1,(y2,y3)).
+  inversion y2.
+  assert (CO: y1 = m).
+  {
+  omega.
+  }
+  rewrite CO in y3.
+  apply in_seq in y3.
+  omega.
+  reflexivity.
+  exfalso.
+  apply n0.
+  right.
+  assumption.
+  destruct (in_dec (location_eq_dec Z.eq_dec) x
+    (((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)
+    :: map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
+  destruct i as [i1|i2].
+  rewrite <- i1.
+  destruct (location_eq_dec Z.eq_dec
+    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)
+    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
+  reflexivity.
+  contradiction.
+  contradiction.
+  destruct (location_eq_dec Z.eq_dec x
+    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
+  exfalso.
+  apply n1.
+  left.
+  rewrite e.
+  reflexivity.
+  reflexivity.
+  }
+  rewrite EQH.
+  apply sat_fold_move.
+  apply sat_plus with None None; repeat php_.
+  {
+  unfold phplusdef.
+  unfold dstr_cells'.
+  intros.
+  destruct (in_dec (location_eq_dec Z.eq_dec) x
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
+  destruct (location_eq_dec Z.eq_dec x
+    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
+    (0%Z, nil), nil)); reflexivity.
+  destruct (location_eq_dec Z.eq_dec x
+    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
+    (0%Z, nil), nil)); reflexivity.
+  }
+  {
+  unfold boundph.
+  unfold dstr_cells'.
+  intros.
+  destruct (in_dec (location_eq_dec Z.eq_dec) x
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
+  inversion H.
+  apply full_bound.
+  inversion H.
+  }
+  {
+  unfold boundph.
+  intros.
+  destruct (location_eq_dec Z.eq_dec x
+    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false,
+    (0%Z, nil), (0%Z, nil), nil)).
+  inversion H.
+  apply full_bound.
+  inversion H.
+  }
+  {
+  unfold boundph.
+  unfold dstr_cells'.
+  unfold phplus.
+  intros.
+  destruct (in_dec (location_eq_dec Z.eq_dec) x
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
+  destruct (location_eq_dec Z.eq_dec x
+    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
+    (0%Z, nil), nil)).
+  rewrite e in i.
+  apply in_map_iff in i.
+  destruct i as (y1,(y2,y3)).
+  inversion y2.
+  assert (CO: y1 = m).
+  {
+  omega.
+  }
+  rewrite CO in y3.
+  apply in_seq in y3.
+  omega.
+  inversion H.
+  apply full_bound.
+  destruct (location_eq_dec Z.eq_dec x
+    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
+    (0%Z, nil), nil)).
+  unfold emp in H.
+  inversion H.
+  apply full_bound.
+  unfold emp in H.
+  inversion H.
+  }
+  apply None_op.
+  simpl.
+  exists 0.
+  exists.
+  unfold Qcle.
+  unfold QArith_base.Qle.
+  simpl.
+  omega.
+  destruct (location_eq_dec Z.eq_dec (evall (array (Enum a, 0%Z, Enum a, None, false, (0%Z, nil), (0%Z, nil), nil) m))
+    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
+  reflexivity.
+  contradiction.
 Qed.

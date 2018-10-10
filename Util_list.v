@@ -7,6 +7,12 @@ Require Import Util_Z.
 
 Set Implicit Arguments.
 
+Fixpoint seqof A (item: A) (len:nat) : list A :=
+    match len with
+      | O => nil
+      | S len => item :: seqof item len
+    end.
+
 Ltac inm_ := 
   repeat match goal with 
           | _: In ?x ?l |- In (?f1 ?x, ?f2 ?x) (map (fun x1 => (?f1 x1, ?f2 x1)) ?l) => 
@@ -125,6 +131,16 @@ Proof.
   - rewrite IHl1; reflexivity.
 Qed.
 
+Lemma length_filter_app A f:
+  forall (l1 l2: list A),
+    length (filter f (l1 ++ l2)) = length (filter f l1) + length (filter f l2).
+Proof.
+  induction l1; simpl; intros.
+  - reflexivity.
+  - destruct (f a). simpl. rewrite IHl1; reflexivity.
+    apply IHl1.
+Qed.
+
 Lemma filter_filter_eq A f1 f2:
   forall (l: list A)
     (EQF: forall x (IN: In x l), f1 x = f2 x),
@@ -159,6 +175,39 @@ Proof.
   intros.
   apply EQF.
   right.
+  assumption.
+Qed.
+
+Lemma filter_filter_le A f1 f2:
+  forall (l: list A)
+    (EQF: forall x (IN: In x l) (F1: f1 x = true), f2 x = true),
+    length (filter f1 l) <= length (filter f2 l).
+Proof.
+  induction l.
+  simpl.
+  intros.
+  reflexivity.
+  simpl.
+  intros.
+  assert (IH: length (filter f1 l) <= length (filter f2 l)).
+  {
+  apply IHl.
+  intros.
+  apply EQF.
+  right.
+  assumption.
+  assumption.
+  }
+  destruct (f1 a) eqn:f1a.
+  rewrite EQF.
+  simpl.
+  omega.
+  left.
+  reflexivity.
+  assumption.
+  destruct (f2 a) eqn:f2a.
+  simpl.
+  omega.
   assumption.
 Qed.
 
@@ -2874,7 +2923,6 @@ Proof.
   assumption.
 Qed.
 
-
 (** # <font size="5"><b> fold_left </b></font> # *)
 
 Lemma fold_left_eq A (f1: A -> A -> A) f2:
@@ -3985,3 +4033,49 @@ Proof.
   assumption.
   assumption.
 Qed.
+
+Lemma map_updl_eq A m:
+  forall (l:list (A * Z)) z x 
+         (UNQ: NoDup (map snd l))
+         (RED: forall x' (IN: In (x',z) l), m (x',z) = m (x,z)),
+    count_occ Z.eq_dec (concat (map m l)) = count_occ Z.eq_dec (concat (map m (updl l z (x,z)))).
+Proof.
+  induction l.
+  simpl.
+  reflexivity.
+  simpl.
+  intros.
+  destruct a.
+  simpl in *.
+  destruct (Z.eq_dec z0 z).
+  apply functional_extensionality.
+  intros.
+  rewrite <- count_app.
+  rewrite <- count_app.
+  rewrite <- IHl.
+  rewrite <- RED with a.
+  rewrite <- e.
+  reflexivity.
+  rewrite <- e.
+  left.
+  reflexivity.
+  inversion UNQ.
+  assumption.
+  intros.
+  apply RED.
+  right.
+  assumption.
+  apply functional_extensionality.
+  intros.
+  rewrite <- count_app.
+  rewrite <- count_app.
+  rewrite <- IHl.
+  reflexivity.
+  inversion UNQ.
+  assumption.
+  intros.
+  apply RED.
+  right.
+  assumption.
+Qed.
+

@@ -79,6 +79,12 @@ Qed.
 Definition exc_op A (o1 o2: option A) :=
   o1 = None \/ o2 = None.
 
+Definition leb_o (x: Z) (y: option Z) :=
+  match y with
+    | None => false
+    | Some y' => Z.leb x y'
+  end.
+
 Lemma lift_comm A:
   forall (o1 o2: option A)
          (EXC: exc_op o1 o2),
@@ -155,6 +161,21 @@ Proof.
   - omega.
 Qed.
 
+Lemma Z_ltb_falseL:
+  forall a b (LEB: (b <? a)%Z = false),
+    Z.le a b.
+Proof.
+  intros; unfold Z.ltb in LEB.
+  destruct (b ?= a)%Z eqn:ba; inversion LEB.
+  apply Z.compare_eq_iff in ba.
+  rewrite ba.
+  omega.
+  simpl in *.
+  assert (b>a)%Z.
+  assumption.
+  omega.
+Qed.
+
 Lemma some_none A:
   forall (a: A), Some a <> None.
 Proof.
@@ -171,7 +192,7 @@ Definition filterb (L: Z -> option Z) (l: Z) (b: Z -> nat) :=
             | Some lx => if Z.eq_dec x l then 0 else if Z.eq_dec lx l then b x else 0
            end.
 
-(** # <font size="5"><b> COMM_ASSOC_NEUTRAL </b></font> # *)
+(** # <font size="5"><b> comm_assoc_neutral </b></font> # *)
 
 Definition neutral A (f: A -> A -> A) (n: A) :=
   forall x, f x n = x /\ f n x = x.
@@ -409,3 +430,53 @@ Proof.
   rewrite <- Qcplus_assoc.
   tauto.
 Qed.
+
+Lemma Qc_Ltet_plus:
+  forall (q1 q2: Qc)
+         (LT1: 0 <= q1)
+         (LT2: 0 < q2),
+    0 < q1 + q2.
+Proof.
+  intros.
+  rewrite Qcplus_comm.
+  apply Qcle_lt_trans with q1.
+  assumption.
+  rewrite Qcplus_comm.
+  apply qcpluslt.
+  assumption.
+Qed.
+
+Lemma Qc_Lte_plus:
+  forall (q1 q2: Qc)
+         (LT1: 0 <= q1)
+         (LT2: 0 < q2),
+    0 <= q1 + q2.
+Proof.
+  intros.
+  rewrite Qcplus_comm.
+  apply Qcle_trans with q1.
+  assumption.
+  rewrite Qcle_minus_iff.
+  rewrite <- Qcplus_assoc.
+  rewrite Qcplus_opp_r.
+  rewrite Qcplus_0_r.
+  apply Qclt_le_weak.
+  assumption.
+Qed.
+
+Definition full := 1%Qc.
+
+Lemma full_bound: Qclt 0 full /\ Qcle full 1.
+Proof.
+  split.
+  unfold Qclt.
+  unfold QArith_base.Qlt.
+  simpl.
+  omega.
+  unfold Qcle.
+  unfold QArith_base.Qle.
+  simpl.
+  omega.
+Qed.
+
+

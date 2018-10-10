@@ -1,3 +1,4 @@
+Require Import Coq.Bool.Bool.
 Require Import ZArith.
 Require Import List.
 Require Import Util_Z.
@@ -26,7 +27,6 @@ Inductive cmd :=
   | Fork (c: cmd)
   | Let (x: Z) (c1 c2: cmd)
   | If (c c1 c2: cmd)
-  | While (c1 c2: cmd)
   | Newlock
   | Acquire (e: exp)
   | Release (e: exp)
@@ -36,8 +36,10 @@ Inductive cmd :=
   | Notify (x: exp)
   | NotifyAll (x: exp)
   | Waiting4cond (v l: exp)
+  | WasWaiting4cond (v l: exp)
   | g_initl (x: exp)
-  | g_dupl (x:exp)
+  | g_initc (x: exp)
+  | g_finlc (x: exp)
   | g_chrg (x:exp)
   | g_chrgu (x:exp)
   | g_disch (x:exp)
@@ -107,7 +109,6 @@ Fixpoint subs (c:cmd) (se: exp -> exp) : cmd :=
     | Fork c => Fork (subs c se)
     | Let x' c1 c2 => Let x' (subs c1 se) (subs c2 se)
     | If c c1 c2 => If (subs c se) (subs c1 se) (subs c2 se)
-    | While c c1 => While (subs c se) (subs c1 se)
     | Newlock => Newlock
     | Acquire e => Acquire (se e)
     | Release e => Release (se e)
@@ -117,8 +118,10 @@ Fixpoint subs (c:cmd) (se: exp -> exp) : cmd :=
     | Notify v => Notify (se v)
     | NotifyAll v => NotifyAll (se v)
     | Waiting4cond v l => Waiting4cond (se v) (se l)
-    | g_dupl e => g_dupl (se e)
+    | WasWaiting4cond v l => WasWaiting4cond (se v) (se l)
     | g_initl e => g_initl (se e)
+    | g_initc e => g_initc (se e)
+    | g_finlc e => g_finlc (se e)
     | g_chrg e => g_chrg (se e)
     | g_chrgu e => g_chrgu (se e)
     | g_disch e => g_disch (se e)
@@ -144,7 +147,6 @@ Fixpoint is_free (c: cmd) (x: Z): bool :=
     | Fork c => is_free c x
     | Let x' c1 c2 => orb (is_free c1 x) (is_free c2 x)
     | If c c1 c2 => orb (orb (is_free c x) (is_free c1 x)) (is_free c2 x)
-    | While c c1 => orb (is_free c x) (is_free c1 x)
     | Newlock => false
     | Acquire e => is_free_e e x
     | Release e => is_free_e e x
@@ -154,8 +156,10 @@ Fixpoint is_free (c: cmd) (x: Z): bool :=
     | Notify v => is_free_e v x
     | NotifyAll v => is_free_e v x
     | Waiting4cond v l => orb (is_free_e v x) (is_free_e l x)
-    | g_dupl e => is_free_e e x
+    | WasWaiting4cond v l => orb (is_free_e v x) (is_free_e l x)
     | g_initl e => is_free_e e x
+    | g_initc e => is_free_e e x
+    | g_finlc e => is_free_e e x
     | g_chrg e => is_free_e e x
     | g_chrgu e => is_free_e e x
     | g_disch e => is_free_e e x
@@ -170,7 +174,8 @@ Fixpoint is_free (c: cmd) (x: Z): bool :=
 
 Definition wakeupcmd (z:Z) (c:cmd) :=
   match c with
-    | Waiting4cond v l => if Z.eq_dec ([[v]]) z then (Waiting4lock l) else (Waiting4cond v l)
+    | Waiting4cond v l => if Z.eq_dec ([[v]]) z then (Waiting4lock l) else c
+    | WasWaiting4cond v l => if Z.eq_dec ([[v]]) z then (Waiting4lock l) else c
     | c => c
   end.
 
@@ -187,61 +192,69 @@ Definition tt := Val (Enum 0).
 
 Definition dstr_cells A (f: Z -> A) (l: list Z) (default: A) a := if in_dec Z.eq_dec a l then default else f a.
 
-Inductive red: thrds -> heap -> thrds -> heap -> Prop := 
-  | red_Cons: forall n a h id t tx (CMD: t id = Some (Cons n,tx)) 
+Inductive red: bool -> thrds -> heap -> thrds -> heap -> Prop := 
+  | red_Cons: forall sp n a h id t tx (CMD: t id = Some (Cons n,tx)) 
               (NIN: forall z' (IN: In z' (map Z.of_nat (seq O n))), h (a+z') = None),
-      red t h (upd Z.eq_dec t id (Some (tt,tx))) (dstr_cells h (map (fun x => a + (Z.of_nat x)) (seq O n)) (Some 0))
-  | red_Lookup: forall e h v id t tx (CMD: t id = Some (Lookup e,tx)) (ALC: h ([[e]]) = Some v),
-      red t h (upd Z.eq_dec t id (Some (Val (Enum v),tx))) h
-  | red_Mutate: forall e1 e2 v h id t tx (CMD: t id = Some (Mutate e1 e2,tx)) (ALC: h ([[e1]]) = Some v),
-      red t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[e1]]) (Some ([[e2]])))
-  | red_Fork: forall c h id t id' tx (CMD: t id = Some (Fork c,tx))(NIN: t id' = None),
-      red t h (upd Z.eq_dec (upd Z.eq_dec t id (Some (tt,tx))) id' (Some (c,done))) h
-  | red_Val: forall e x c h id t tx (CMD: t id = Some (Val e, Let' x c tx)),
-      red t h (upd Z.eq_dec t id (Some (subs c (subse x ([[e]])),tx))) h
-  | red_Terminate: forall e h id t (CMD: t id = Some (Val e,done)),
-      red t h (upd Z.eq_dec t id None) h
-  | red_Let: forall c1 c2 x h id t tx (CMD: t id = Some (Let x c1 c2,tx)),
-      red t h (upd Z.eq_dec t id (Some (c1,Let' x c2 tx))) h
-  | red_If: forall c c1 c2 h id t tx (CMD: t id = Some (If c c1 c2,tx)),
-      red t h (upd Z.eq_dec t id (Some (c,If' c1 c2 tx))) h
-  | red_If_true: forall e c1 c2 h id t tx (CMD: t id = Some (Val e, If' c1 c2 tx)) (TRUE: 0 < ([[e]])),
-      red t h (upd Z.eq_dec t id (Some (c1,tx))) h
-  | red_If_false: forall e c1 c2 h id t tx (CMD: t id = Some (Val e, If' c1 c2 tx)) (TRUE: ([[e]]) <= 0),
-      red t h (upd Z.eq_dec t id (Some (c2,tx))) h
-  | red_While: forall c c1 x h id t tx (CMD: t id = Some (While c c1,tx)) (NOTFREE: is_free (While c c1) x = false),
-      red t h (upd Z.eq_dec t id (Some (If c (Let x c1 (While c c1)) tt, tx))) h
-  | red_Newlock: forall h l id t tx (CMD: t id = Some (Newlock,tx)) (NIN: h l = None),
-      red t h (upd Z.eq_dec t id (Some (Val (Enum l),tx))) (upd Z.eq_dec h l (Some 1))
-  | red_Acquire: forall l h id t tx (CMD: t id = Some (Acquire l,tx)) (OPEN: h ([[l]]) = Some 1),
-      red t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[l]]) (Some 0))
-  | red_Acquire0: forall l h id t tx (CMD: t id = Some (Acquire l,tx)) (HELD: h ([[l]]) <> Some 1),
-      red t h (upd Z.eq_dec t id (Some (Waiting4lock l,tx))) h
-  | red_Acquire1: forall l h id t tx (CMD: t id = Some (Waiting4lock l,tx)) (OPEN: h ([[l]]) = Some 1),
-      red t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[l]]) (Some 0))
-  | red_Release: forall l h id t tx (CMD: t id = Some (Release l,tx)) (ALC: h ([[l]]) <> None) (HELD: h ([[l]]) <> Some 1),
-      red t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[l]]) (Some 1))
-  | red_Newcond: forall h v id t tx (CMD: t id = Some (Newcond,tx)) (NIN: h v = None),
-      red t h (upd Z.eq_dec t id (Some (Val (Enum v),tx))) (upd Z.eq_dec h v (Some 0))
-  | red_Wait: forall h id t v l tx (CMD: t id = Some (Wait v l,tx)) (ALCl: h ([[l]]) <> None) (ALCv: h ([[v]]) <> None) (HELD: h ([[l]]) <> Some 1),
-      red t h (upd Z.eq_dec t id (Some (Waiting4cond v l,tx))) (upd Z.eq_dec h ([[l]]) (Some 1))
-  | red_Notify0: forall h id t v tx (CMD: t id = Some (Notify v,tx)) (ALCv: h ([[v]]) <> None)
-                        (NWT: ~ exists id' v' l tx' (EQvv': ([[v]]) = ([[v']])) , t id' = Some (Waiting4cond v' l,tx')),
-      red t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_Notify: forall h id t v v' tx id' tx' l (ALCv: h ([[v]]) <> None)
+      red sp t h (upd Z.eq_dec t id (Some (Val (Enum a),tx))) (dstr_cells h (map (fun x => a + (Z.of_nat x)) (seq O n)) (Some 0))
+  | red_Lookup: forall sp e h v id t tx (CMD: t id = Some (Lookup e,tx)) (ALC: h ([[e]]) = Some v),
+      red sp t h (upd Z.eq_dec t id (Some (Val (Enum v),tx))) h
+  | red_Mutate: forall sp e1 e2 v h id t tx (CMD: t id = Some (Mutate e1 e2,tx)) (ALC: h ([[e1]]) = Some v),
+      red sp t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[e1]]) (Some ([[e2]])))
+  | red_Fork: forall sp c h id t id' tx (CMD: t id = Some (Fork c,tx))(NIN: t id' = None),
+      red sp t h (upd Z.eq_dec (upd Z.eq_dec t id (Some (tt,tx))) id' (Some (c,done))) h
+  | red_Val: forall sp e x c h id t tx (CMD: t id = Some (Val e, Let' x c tx)),
+      red sp t h (upd Z.eq_dec t id (Some (subs c (subse x ([[e]])),tx))) h
+  | red_Terminate: forall sp e h id t (CMD: t id = Some (Val e,done)),
+      red sp t h (upd Z.eq_dec t id None) h
+  | red_Let: forall sp c1 c2 x h id t tx (CMD: t id = Some (Let x c1 c2,tx)),
+      red sp t h (upd Z.eq_dec t id (Some (c1,Let' x c2 tx))) h
+  | red_If: forall sp c c1 c2 h id t tx (CMD: t id = Some (If c c1 c2,tx)),
+      red sp t h (upd Z.eq_dec t id (Some (c,If' c1 c2 tx))) h
+  | red_If_true: forall sp e c1 c2 h id t tx (CMD: t id = Some (Val e, If' c1 c2 tx)) (TRUE: 0 < ([[e]])),
+      red sp t h (upd Z.eq_dec t id (Some (c1,tx))) h
+  | red_If_false: forall sp e c1 c2 h id t tx (CMD: t id = Some (Val e, If' c1 c2 tx)) (TRUE: ([[e]]) <= 0),
+      red sp t h (upd Z.eq_dec t id (Some (c2,tx))) h
+  | red_Newlock: forall sp h l id t tx (CMD: t id = Some (Newlock,tx)) (NIN: h l = None),
+      red sp t h (upd Z.eq_dec t id (Some (Val (Enum l),tx))) (upd Z.eq_dec h l (Some 1))
+  | red_Acquire: forall sp l h id t tx (CMD: t id = Some (Acquire l,tx)) (OPEN: h ([[l]]) = Some 1),
+      red sp t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[l]]) (Some 0))
+  | red_Acquire0: forall sp l h id t tx (CMD: t id = Some (Acquire l,tx)) (HELD: h ([[l]]) <> Some 1),
+      red sp t h (upd Z.eq_dec t id (Some (Waiting4lock l,tx))) h
+  | red_Acquire1: forall sp l h id t tx (CMD: t id = Some (Waiting4lock l,tx)) (OPEN: h ([[l]]) = Some 1),
+      red sp t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[l]]) (Some 0))
+  | red_Release: forall sp l h id t tx (CMD: t id = Some (Release l,tx)) (ALC: h ([[l]]) <> None) (HELD: h ([[l]]) <> Some 1),
+      red sp t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[l]]) (Some 1))
+  | red_Newcond: forall sp h v id t tx (CMD: t id = Some (Newcond,tx)) (NIN: h v = None),
+      red sp t h (upd Z.eq_dec t id (Some (Val (Enum v),tx))) (upd Z.eq_dec h v (Some 0))
+  | red_Wait: forall sp h id t v l tx (CMD: t id = Some (Wait v l,tx)) (ALCl: h ([[l]]) <> None) (ALCv: h ([[v]]) <> None) (HELD: h ([[l]]) <> Some 1),
+      red sp t h (upd Z.eq_dec t id (Some (Waiting4cond v l,tx))) (upd Z.eq_dec h ([[l]]) (Some 1))
+  | red_Notify0: forall sp h id t v tx (CMD: t id = Some (Notify v,tx)) (ALCv: h ([[v]]) <> None)
+                        (NWT: ~ exists id' v' l tx' (EQvv': ([[v]]) = ([[v']])) , t id' = Some (Waiting4cond v' l,tx'))
+                        (NWWT: ~ exists id' v' l tx' (EQvv': ([[v]]) = ([[v']])) , t id' = Some (WasWaiting4cond v' l,tx')),
+      red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
+  | red_Notify01: forall sp h id t v tx id' tx' l (CMD: t id = Some (Notify v,tx)) (ALCv: h ([[v]]) <> None)
+                        (NWT: ~ exists id' v' l tx' (EQvv': ([[v]]) = ([[v']])) , t id' = Some (Waiting4cond v' l,tx'))
+                        (WWT: exists v' (EQvv': ([[v]]) = ([[v']])) , t id' = Some (WasWaiting4cond v' l,tx')),
+      red sp t h (upd Z.eq_dec (upd Z.eq_dec t id (Some (tt,tx))) id' (Some (Waiting4lock l,tx'))) h
+  | red_Notify: forall sp h id t v v' tx id' tx' l (ALCv: h ([[v]]) <> None)
                        (EQvv': ([[v]]) = ([[v']])) (CMD: t id = Some (Notify v,tx)) (CMD': t id' = Some (Waiting4cond v' l,tx')),
-      red t h (upd Z.eq_dec (upd Z.eq_dec t id (Some (tt,tx))) id' (Some (Waiting4lock l,tx'))) h
-  | red_NotifyAll: forall h id t v tx (CMD: t id = Some (NotifyAll v,tx)) (ALCv: h ([[v]]) <> None),
-      red t h (upd Z.eq_dec (wakeupthrds ([[v]]) t) id (Some (tt,tx))) h
-  | red_g_dupl: forall h id t l tx (CMD: t id = Some (g_dupl l,tx)), red t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_initl: forall h id t l tx (CMD: t id = Some (g_initl l,tx)), red t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_chrg: forall h id t e tx (CMD: t id = Some (g_chrg e,tx)), red t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_chrgu: forall h id t e tx (CMD: t id = Some (g_chrgu e,tx)), red t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_disch: forall h id t e tx (CMD: t id = Some (g_disch e,tx)), red t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_dischu: forall h id t e tx (CMD: t id = Some (g_dischu e,tx)), red t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_newctr: forall h id t tx (CMD: t id = Some (g_newctr,tx)), red t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_ctrinc: forall h id t e tx (CMD: t id = Some (g_ctrinc e,tx)), red t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_ctrdec: forall h id t e tx (CMD: t id = Some (g_ctrdec e,tx)), red t h (upd Z.eq_dec t id (Some (tt,tx))) h.
+      red sp t h (upd Z.eq_dec (upd Z.eq_dec t id (Some (tt,tx))) id' (Some (Waiting4lock l,tx'))) h
+  | red_SpuriousWakeup: forall h id t v tx l (CMD: t id = Some (Waiting4cond v l,tx)),
+      red true t h (upd Z.eq_dec t id (Some (WasWaiting4cond v l,tx))) h
+  | red_WasWait: forall sp h id t v l tx (CMD: t id = Some (WasWaiting4cond v l,tx)) (OPEN: h ([[l]]) = Some 1),
+      red sp t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[l]]) (Some 0))
+  | red_NotifyAll: forall sp h id t v tx (CMD: t id = Some (NotifyAll v,tx)) (ALCv: h ([[v]]) <> None),
+      red sp t h (upd Z.eq_dec (wakeupthrds ([[v]]) t) id (Some (tt,tx))) h
+  | red_g_initl: forall sp h id t l tx (CMD: t id = Some (g_initl l,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
+  | red_g_initc: forall sp h id t l tx (CMD: t id = Some (g_initc l,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
+  | red_g_finlc: forall sp h id t l tx (CMD: t id = Some (g_finlc l,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
+  | red_g_chrg: forall sp h id t e tx (CMD: t id = Some (g_chrg e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
+  | red_g_chrgu: forall sp h id t e tx (CMD: t id = Some (g_chrgu e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
+  | red_g_disch: forall sp h id t e tx (CMD: t id = Some (g_disch e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
+  | red_g_dischu: forall sp h id t e tx (CMD: t id = Some (g_dischu e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
+  | red_g_newctr: forall sp h id t tx (CMD: t id = Some (g_newctr,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
+  | red_g_ctrinc: forall sp h id t e tx (CMD: t id = Some (g_ctrinc e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
+  | red_g_ctrdec: forall sp h id t e tx (CMD: t id = Some (g_ctrdec e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h.
 
 
 (** # <font size="5"><b> Semantics of Abort </b></font> # *)
@@ -274,6 +287,8 @@ Inductive aborts : thrds -> heap -> Prop :=
       aborts thrds h
   | aborts_Waiting4lock: forall h l tid thrds tx (NUL: h ([[l]]) = None)(CMD: thrds tid = Some (Waiting4lock l,tx)),
       aborts thrds h
+  | aborts_WasWaiting4cond: forall h v l tid thrds tx (NUL: h ([[l]]) = None \/ h ([[v]]) = None)(CMD: thrds tid = Some (WasWaiting4cond v l,tx)),
+      aborts thrds h
   | aborts_Release: forall h l tid thrds tx (NUL: h ([[l]]) = None \/ h ([[l]]) = Some 1)(CMD: thrds tid = Some (Release l,tx)),
       aborts thrds h
   | aborts_Wait: forall v h l tid thrds tx (NUL: h ([[l]]) = None \/ h ([[l]]) = Some 1 \/ h ([[v]]) = None) (CMD: thrds tid = Some (Wait v l,tx)),
@@ -285,11 +300,13 @@ Inductive aborts : thrds -> heap -> Prop :=
   | aborts_NotifyAll: forall v h tid thrds tx (NIN: h ([[v]]) = None) (CMD: thrds tid = Some (NotifyAll v,tx)),
       aborts thrds h.
 
+
 (** # <font size="5"><b> Suspension </b></font> # *)
 
 Definition waiting_for (h:heap) (c:cmd) : option Z :=
   match c with
     | Waiting4cond v l => Some ([[v]])
+    | WasWaiting4cond v l => if opZ_eq_dec (h ([[l]])) (Some 1%Z) then None else Some ([[l]])
     | Waiting4lock l => if opZ_eq_dec (h ([[l]])) (Some 1%Z) then None else Some ([[l]])
     | rest => None
   end.
@@ -297,12 +314,14 @@ Definition waiting_for (h:heap) (c:cmd) : option Z :=
 Definition waiting_for_cond (c:cmd) : option Z :=
   match c with
     | Waiting4cond v l => Some ([[v]])
+    | WasWaiting4cond v l => Some ([[v]])
     | rest => None
   end.
 
 Fixpoint not_waiting_in (c:cmd) :=
   match c with
     | Waiting4cond v l => False
+    | WasWaiting4cond v l => False
     | Waiting4lock l => False
     | Let x c1 c2 => not_waiting_in c1 /\ not_waiting_in c2
     | Fork c => not_waiting_in c
@@ -349,14 +368,32 @@ Qed.
 Lemma waiting_for_lock_cond:
   forall c h o
          (W4lc: waiting_for h c = Some o),
-    exists e (EQ: o = ([[e]])), c = Waiting4lock e \/ exists l, c = Waiting4cond e l.
+    exists e (EQ: o = ([[e]])), c = Waiting4lock e \/ exists l, c = Waiting4cond e l \/ c = WasWaiting4cond l e.
 Proof.
   induction c; simpl; intros;
   inversion W4lc.
   - destruct (opZ_eq_dec (h ([[l]])) (Some 1%Z)); inversion W4lc.
     exists l. exists. reflexivity. tauto.
-  - exists v. exists. reflexivity. right. exists l. reflexivity.
+  - exists v. exists. reflexivity. right. exists l. left. reflexivity.
+  - exists l. exists. destruct (opZ_eq_dec (h ([[l]])) (Some 1%Z)); inversion W4lc.
+    reflexivity. right. exists v. right. reflexivity.
 Qed.
+
+
+(*
+Lemma waiting_for_lock_cond:
+  forall c h o
+         (W4lc: waiting_for h c = Some o),
+    exists e (EQ: o = ([[e]])), c = Waiting4lock e \/ exists l, c = Waiting4cond e l \/ c = WasWaiting4cond e l.
+Proof.
+  induction c; simpl; intros;
+  inversion W4lc.
+  - destruct (opZ_eq_dec (h ([[l]])) (Some 1%Z)); inversion W4lc.
+    exists l. exists. reflexivity. tauto.
+  - exists v. exists. reflexivity. right. exists l. left. reflexivity.
+  - exists l. exists. reflexivity. right. exists v. right. reflexivity.
+Qed.
+*)
 
 Lemma wfwk:
   forall c z,
@@ -365,6 +402,8 @@ Proof.
   induction c; repeat dstr_.
 Qed.
 
+
+(*
 Lemma waiting_for_dstr_neq:
   forall c h z v
          (NEQ: waiting_for_cond c <> waiting_for (upd Z.eq_dec h z v) c),
@@ -380,6 +419,7 @@ Lemma waiting_for_dstr_neq2a:
 Proof.
   induction c; repeat dstr_; exists l; reflexivity.
 Qed.
+*)
 
 Lemma waiting_for_dstr_eq:
   forall c h z z' v
@@ -388,14 +428,6 @@ Lemma waiting_for_dstr_eq:
     ifb (opZ_eq_dec (waiting_for (upd Z.eq_dec h z v) c) (Some z')).
 Proof.
   induction c; repeat dstr_.
-Qed.
-
-Lemma waiting_for_cond_neq:
-  forall c h 
-         (NEQ: waiting_for_cond c <> waiting_for h c),
-    exists l, c = Waiting4lock l.
-Proof.
-  induction c; repeat dstr_; exists l; reflexivity.
 Qed.
 
 Lemma waiting_for_upd_eq:
@@ -407,31 +439,79 @@ Proof.
   induction c;
   simpl;
   intros;
-  try reflexivity.
+  try reflexivity;
   repeat dstr_.
 Qed.
 
 (** # <font size="5"><b> Wellformed Commands </b></font> # *)
 
-Definition wellformed_cmd (c:cmd) :=
+Fixpoint wellformed_cmd (c:cmd) :=
   match c with
-    | Let x c1 c2 => not_waiting_in c1 /\ not_waiting_in c2
-    | Fork c => not_waiting_in c
+    | Let x c1 c2 => wellformed_cmd c1 /\ wellformed_cmd c2 /\ not_waiting_in c1 /\ not_waiting_in c2
+    | Fork c => not_waiting_in c /\ wellformed_cmd c
+    | If c c1 c2 => wellformed_cmd c /\ wellformed_cmd c1 /\ wellformed_cmd c2 /\ not_waiting_in c /\ not_waiting_in c1 /\ not_waiting_in c2
     | _ => True
   end.
 
 Fixpoint wellformed_ctx (ct:context) :=
   match ct with
-    | Let' x c tx => not_waiting_in c /\ wellformed_ctx tx
-    | If' c1 c2 tx => not_waiting_in c1 /\ not_waiting_in c2 /\ wellformed_ctx tx
+    | Let' x c tx => wellformed_cmd c /\ not_waiting_in c /\ wellformed_ctx tx
+    | If' c1 c2 tx => wellformed_cmd c1 /\ wellformed_cmd c2 /\ not_waiting_in c1 /\ not_waiting_in c2 /\ wellformed_ctx tx
     | done => True
   end.
 
 Definition wellformed (ct: cmd * context) :=
   wellformed_cmd (fst ct) /\ wellformed_ctx (snd ct).
 
+Lemma wellformed_cmd_subs:
+  forall c se,
+    wellformed_cmd c <-> wellformed_cmd (subs c se).
+Proof.
+  induction c; simpl; intros; try reflexivity.
+  split.
+  intros.
+  destruct H as (N,W).
+  split.
+  apply not_waiting_subs; assumption.
+  apply IHc; assumption.
+  intros.
+  destruct H as (N,W).
+  split.
+  apply not_waiting_subs in N; assumption.
+  apply IHc in W; assumption.
+  split.
+  intros.
+  destruct H as (W1,(W2,(N1,N2))).
+  split. apply IHc1; assumption.
+  split. apply IHc2; assumption.
+  split. apply not_waiting_subs; assumption.
+  apply not_waiting_subs; assumption.
+  intros.
+  destruct H as (W1,(W2,(N1,N2))).
+  split. apply IHc1 in W1; assumption.
+  split. apply IHc2 in W2; assumption.
+  split. apply not_waiting_subs in N1; assumption.
+  apply not_waiting_subs in N2; assumption.
+  split.
+  intros.
+  destruct H as (W1,(W2,(W3,(N1,(N2,N3))))).
+  split. apply IHc1; assumption.
+  split. apply IHc2; assumption.
+  split. apply IHc3; assumption.
+  split. apply not_waiting_subs; assumption.
+  split. apply not_waiting_subs; assumption.
+  apply not_waiting_subs; assumption.
+  intros.
+  destruct H as (W1,(W2,(W3,(N1,(N2,N3))))).
+  split. apply IHc1 in W1; assumption.
+  split. apply IHc2 in W2; assumption.
+  split. apply IHc3 in W3; assumption.
+  split. apply not_waiting_subs in N1; assumption.
+  split. apply not_waiting_subs in N2; assumption.
+  apply not_waiting_subs in N3; assumption.
+Qed.
 
-(** # <font size="5"><b> Infinite Capacities </b></font> # *)
+(** # <font size="5"><b> Free Variables </b></font> # *)
 
 Fixpoint free_var_e (e: exp) : list Z :=
   match e with
@@ -469,7 +549,6 @@ Fixpoint free_var (c: cmd) : list Z :=
     | Fork c => free_var c
     | Let x' c1 c2 => free_var c1 ++ free_var c2
     | If c c1 c2 => free_var c ++ free_var c1 ++ free_var c2
-    | While c c1 => free_var c ++ free_var c1
     | Newlock => nil
     | Acquire e => free_var_e e
     | Release e => free_var_e e
@@ -479,8 +558,10 @@ Fixpoint free_var (c: cmd) : list Z :=
     | Notify v => free_var_e v
     | NotifyAll v => free_var_e v
     | Waiting4cond v l => free_var_e v ++ free_var_e l
-    | g_dupl e => free_var_e e
+    | WasWaiting4cond v l => free_var_e v ++ free_var_e l
     | g_initl e => free_var_e e
+    | g_initc e => free_var_e e
+    | g_finlc e => free_var_e e
     | g_chrg e => free_var_e e
     | g_chrgu e => free_var_e e
     | g_disch e => free_var_e e
@@ -545,10 +626,10 @@ Proof.
   apply Coq.Bool.Bool.orb_true_iff in H0.
   destruct H0.
   left.
-  apply IHc1.
+  apply is_free_var_e.
   assumption.
   right.
-  apply IHc2.
+  apply is_free_var_e.
   assumption.
   simpl.
   apply in_app_iff.
@@ -650,9 +731,9 @@ Proof.
 Qed.
 
 Lemma steps_preserve_inf_capacity:
-  forall t h t' h'
+  forall sp t h t' h'
          (INF_CAP: inf_capacity t /\ inf_capacity h)
-         (RED: red t h t' h'),
+         (RED: red sp t h t' h'),
     inf_capacity t' /\ inf_capacity h'.
 Proof.
   intros.
@@ -674,22 +755,25 @@ Proof.
   destruct i as (x1,(EQx,INx)).
   rewrite <- EQx in LE.
   assert (LE1: le x1 n).
-  destruct (Nat.eq_dec O n).
-  rewrite <- e in *.
-  simpl in INx.
-  contradiction.
+  {
   apply in_seq in INx.
   omega.
-  assert (G1: (Z.max x (a + Z.of_nat n) + 1 <= a + Z.of_nat n)%Z).
+  }
+  assert (G: (Z.max x (a + Z.of_nat n) + 1 <= a + Z.of_nat n)%Z).
+  {
   omega.
-  unfold Z.max in G1.
+  }
+  unfold Z.max in G.
   destruct (x ?= a + Z.of_nat n)%Z eqn:EQ.
   apply Z.compare_eq_iff in EQ.
+  rewrite EQ in *.
+  simpl in *.
   omega.
   omega.
   apply Z.compare_le_iff in EQ.
   omega.
   omega.
+
   apply INF.
   unfold Z.max in LE.
   destruct (x ?= a + Z.of_nat n)%Z eqn:EQ.
