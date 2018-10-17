@@ -3,6 +3,8 @@ Deadlock-Free Monitors: A Soundness Proof in Coq
 
 This repository contains a soundness proof, carried out by [Coq proof assistant v8.6](https://coq.inria.fr), for deadlock-free monitors, a modular approach to verify deadlock-freedom of programs synchronized by condition variables.
 
+An HTML representation of this proof can be found [here](https://www.hamin.be/dfm/html/dfm.html).
+
 For more details about the approach please look at:
 * [The Deadlock-Free Monitors Paper](https://link.springer.com/chapter/10.1007/978-3-319-89884-1_15), published in [27th European Symposium on Programming, ESOP 2018](https://link.springer.com/book/10.1007/978-3-319-89884-1)
 * [The extended version of this paper](https://lirias2repo.kuleuven.be/bitstream/id/500138/), published as a technical report in [Department of Computer Science, KU Leuven](https://wms.cs.kuleuven.be/cs/english)
