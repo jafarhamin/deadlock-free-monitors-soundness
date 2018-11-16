@@ -510,7 +510,7 @@ Proof.
   apply SOBS in tmp.
   destruct tmp as (WF,(SAT,rest)).
   apply sat_notify in SAT.
-  destruct SAT as (p1,(pm,(C1,(Cm,(wt,(ot,(lv,(ll,(Or,(PERMOr,(M'lv,(bp1,(bpm,(bp1pm,(phpdefp1pm,(p1pm,(ghpdefC1Cm,(C1Cm,(eqlv,(eqll,(p1ll,(p1lv,rest1)))))))))))))))))))))).
+  destruct SAT as (p1,(pm,(C1,(Cm,(wt,(ot,(lv,(ll,(Or,(PERMOr,(bp1,(bpm,(bp1pm,(phpdefp1pm,(p1pm,(ghpdefC1Cm,(C1Cm,(eqlv,(eqll,(p1ll,(p1lv,rest1))))))))))))))))))))).
 
   assert (flv: fold_left phplus (map pof T) (phplus Pinv Pleak) lv = Some Cond).
   {

@@ -847,9 +847,8 @@ Qed.
 (** # <font size="5"><b> Notify CV </b></font> # *)
 
 Theorem rule_Notify invs sp ev v l O wt ot: correct
-  (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[ev]]) ([[Aof v]])) 
-    (orb (ifb ((list_eq_dec (olocation_eq_dec exp_eq_dec) (M'of v) nil))) (Nat.ltb 0 (wt ([[Aof v]])))))) &* 
-    (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) ** Acond v ** Alocked l wt ot ** Aobs (M'of v ++ O))
+  (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[ev]]) ([[Aof v]]))) &* 
+    (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) ** Acond v ** Alocked l wt ot ** Aobs ((if Nat.ltb 0 (wt ([[Aof v]])) then (M'of v) else nil) ++ O))
   (Notify ev)
   (fun _ => Acond v ** Alocked l (upd Z.eq_dec wt ([[Aof v]]) (wt ([[Aof v]]) - 1)%nat) ot **
     (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb) |* Abool (Nat.ltb 0 (wt ([[Aof v]])))) ** Aobs (O)) invs sp.
@@ -882,7 +881,7 @@ Proof.
   exists.
   rewrite phplus_emp.
   assumption.
-  exists (Some (map evalol (M'of v ++ O))), None.
+  exists (Some (map evalol ((if Nat.ltb 0 (wt ([[Aof v]])) then (M'of v) else nil) ++ O))), None.
   exists C6, (emp (option nat*nat)).
   exists.
   apply ghpdef_emp.
@@ -890,8 +889,7 @@ Proof.
   exists.
   rewrite ghplus_emp.
   assumption.
-  exists.
-  assumption.
+  exists. assumption.
   split.
   apply fs_op.
   apply Permutation_refl.

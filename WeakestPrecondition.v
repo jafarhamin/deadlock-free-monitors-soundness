@@ -250,6 +250,8 @@ Definition spurious_ok (sp: bool) (l v: location Z) (invs: Z -> inv) :=
     subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)).
 
 (** # <font size="5"><b> Weakest Precondition </b></font> # *)
+Definition aa (a:nat) :=
+if ltb a a then a else a.
 
 Fixpoint weakest_pre (sp: bool) (c:cmd) (Q: Z -> assn) (se: exp -> exp) (invs: Z -> inv) : assn :=
   match c with
@@ -309,11 +311,13 @@ Fixpoint weakest_pre (sp: bool) (c:cmd) (Q: Z -> assn) (se: exp -> exp) (invs: Z
         (Acond v ** Alock l ** Aobs O) **
         (FA wt, (FA ot, ((Aobs (Oof l:: M'of v ++ O) ** Alocked l wt ot ** (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)) **
         (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) --* Q 0))))))
-    | Notify ev => EX O, (EX wt, (EX ot, (EX l, (EX v, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[se ev]]) ([[Aof v]])) 
-       (orb (ifb ((list_eq_dec (olocation_eq_dec exp_eq_dec) (M'of v) nil))) (ltb 0 (wt ([[Aof v]])))))) &* 
-       (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) ** Acond v ** Alocked l wt ot ** Aobs (M'of v ++ O) **
+    | Notify ev => EX O, (EX wt, (EX ot, (EX l, (EX v, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[se ev]]) ([[Aof v]]))) &*
+       (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) ** Acond v ** Alocked l wt ot ** 
+       Aobs ((if ltb 0 (wt ([[Aof v]])) then (M'of v) else nil) ++ O) **
        ((Acond v ** Alocked l (upd Z.eq_dec wt ([[Aof v]]) (wt ([[Aof v]]) - 1)%nat) ot **
        (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb) |* Abool (ltb 0 (wt ([[Aof v]])))) ** Aobs (O)) --* Q 0))))))
+
+
     | NotifyAll ev => EX wt, (EX ot, (EX l, (EX v, ((Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[se ev]]) ([[Aof v]])) 
       (ifb ((list_eq_dec (olocation_eq_dec exp_eq_dec) (M'of v) nil)))))
        &* Aprop (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb) = Abool true)) ** Acond v ** Alocked l wt ot ** 
@@ -4727,8 +4731,9 @@ Lemma sat_notify:
 forall p O C v tx invs sp
       (SAT: sat p (Some O) C (weakest_pre_ct sp (Notify v, tx) invs)),
   exists p1 pm C1 Cm wt ot lv ll O'
-         (PERM: Permutation (M'of lv ++ O') O)
-         (M'nil: M'of lv = nil \/ lt 0 (wt ([[v]])))
+         (PERM: Permutation ((if ltb 0 (wt (Aof lv)) then (M'of lv) else nil) ++ O') O)
+         (*PERM: Permutation (M'of lv ++ O') O*)
+         (*M'nil: M'of lv = nil \/ lt 0 (wt ([[v]]))*)
          (bp1: boundph p1)
          (bpm: boundph pm)
          (bp1pm: boundph (phplus p1 pm))
@@ -4753,8 +4758,39 @@ Proof.
 
   subst.
 
-  assert (o1n: Permutation (map evalol (M'of v4 ++ v0)) O /\ o1 = None /\ O8 = None).
+
+  assert (o1n: Permutation
+  ((if (0 <? v1 (Aof (evall v4)))%nat then M'of (evall v4) else nil) ++  map evalol v0) O
+   /\ o1 = None /\ O8 = None).
   {
+  replace (Aof (evall v4)) with ([[Aof v4]]).
+  destruct (0 <? v1 ([[Aof v4]]))%nat.
+  inversion tmp7.
+  rewrite <- H1 in opO7O8.
+  inversion opO7O8.
+  rewrite <- H4 in opO5O6.
+  inversion opO5O6.
+  rewrite <- H5 in opO3O4.
+  inversion opO3O4.
+  rewrite <- H8 in opO1O2.
+  inversion opO1O2.
+
+  split.
+  apply Permutation_trans with o'.
+  rewrite map_app in PERM.
+  replace (M'of (evall v4)) with (map evalol (M'of v4)).
+  assumption.
+  reflexivity.
+  apply Permutation_trans with o'0.
+  assumption.
+  apply Permutation_trans with o'1.
+  assumption.
+  apply Permutation_trans with o'2.
+  assumption.
+  assumption.
+  split;
+  reflexivity.
+  rewrite app_nil_l in *.
   inversion tmp7.
   rewrite <- H1 in opO7O8.
   inversion opO7O8.
@@ -4776,9 +4812,11 @@ Proof.
   assumption.
   split;
   reflexivity.
+  reflexivity.
   }
   destruct o1n as (PERM,(o1n,o8n)).
   rewrite o1n, o8n in *.
+
 
   assert (phpdefp13p156: phplusdef p1 p3 /\ phplusdef p1 (phplus p5 (phplus p7 p8))). repeat php_.
   assert (phpdefp15p16: phplusdef p1 p5 /\ phplusdef p1 (phplus p7 p8)). repeat php_.
@@ -4796,8 +4834,6 @@ Proof.
 
   apply Coq.Bool.Bool.andb_true_iff in EQ.
   destruct EQ as (EQ1,EQ2).
-  apply Coq.Bool.Bool.andb_true_iff in EQ2.
-  destruct EQ2 as (EQ2,EQ3).
   apply Z.eqb_eq in EQ1.
   apply Z.eqb_eq in EQ2.
   unfold id in *.
@@ -4807,26 +4843,7 @@ Proof.
   exists v1, v2.
   exists (evall v4), (evall v3).
   exists (map evalol v0).
-  exists.
-  replace (M'of (evall v4)) with (map evalol (M'of v4)).
-  rewrite <- map_app.
-  assumption.
-  reflexivity.
-  exists.
-  apply Coq.Bool.Bool.orb_true_iff in EQ3.
-  destruct EQ3 as [EQ3|EQ3].
-  left.
-  unfold ifb in EQ3.
-  destruct (list_eq_dec (olocation_eq_dec exp_eq_dec) (M'of v4) nil).
-  replace (M'of (evall v4)) with (map evalol (M'of v4)).
-  rewrite e.
-  reflexivity.
-  reflexivity.
-  inversion EQ3.
-  right.
-  apply Nat.ltb_lt in EQ3.
-  rewrite EQ2.
-  assumption.
+  exists. assumption.
   exists. assumption.
   exists. assumption.
   exists. repeat php_.
@@ -9304,12 +9321,12 @@ Proof.
   split. assumption.
 
   assert (os: o0 = None /\ O7 = None /\ O5 = None /\ O3 = None /\ O2 = None /\ 
-    (exists o (P: Permutation (map evalol (M'of v3 ++ v)) o), o9 = Some o) /\
-    (exists o (P: Permutation (map evalol (M'of v3 ++ v)) o), O8 = Some o) /\
-    (exists o (P: Permutation (map evalol (M'of v3 ++ v)) o), O6 = Some o) /\
-    (exists o (P: Permutation (map evalol (M'of v3 ++ v)) o), O4 = Some o) /\
-    (exists o (P: Permutation (map evalol (M'of v3 ++ v)) o), O1 = Some o) /\
-    (exists o (P: Permutation (map evalol (M'of v3 ++ v)) o), O = Some o)).
+    (exists o (P: Permutation (map evalol ((if ltb 0 (v0 ([[Aof v3]])) then (M'of v3) else nil) ++ v)) o), o9 = Some o) /\
+    (exists o (P: Permutation (map evalol ((if ltb 0 (v0 ([[Aof v3]])) then (M'of v3) else nil) ++ v)) o), O8 = Some o) /\
+    (exists o (P: Permutation (map evalol ((if ltb 0 (v0 ([[Aof v3]])) then (M'of v3) else nil) ++ v)) o), O6 = Some o) /\
+    (exists o (P: Permutation (map evalol ((if ltb 0 (v0 ([[Aof v3]])) then (M'of v3) else nil) ++ v)) o), O4 = Some o) /\
+    (exists o (P: Permutation (map evalol ((if ltb 0 (v0 ([[Aof v3]])) then (M'of v3) else nil) ++ v)) o), O1 = Some o) /\
+    (exists o (P: Permutation (map evalol ((if ltb 0 (v0 ([[Aof v3]])) then (M'of v3) else nil) ++ v)) o), O = Some o)).
   {
   assert (OP1:=opO1O2).
   assert (OP2:=opO3O4).

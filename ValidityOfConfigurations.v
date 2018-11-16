@@ -19321,8 +19321,8 @@ Proof.
   simpl in WF.
   apply sat_notify in WP.
 
-  destruct WP as (p1,(pm,(C1,(Cm,(wt,(ot,(lv,(ll,(Or,(PERMOr,(M'lv,(bp1,(bpm,(bp1pm,(phpdefp1pm,
-    (p1pm,(ghpdefC1Cm,(C1Cm,(eqlv,(eqll,(p1ll,(p1lv,(satm,(satp1,satp1m)))))))))))))))))))))))).
+  destruct WP as (p1,(pm,(C1,(Cm,(wt,(ot,(lv,(ll,(Or,(PERMOr,(bp1,(bpm,(bp1pm,(phpdefp1pm,
+    (p1pm,(ghpdefC1Cm,(C1Cm,(eqlv,(eqll,(p1ll,(p1lv,(satm,(satp1,satp1m))))))))))))))))))))))).
 
   assert (tmp: exists p' O' C', In (Waiting4cond v' l, tx', p', O', C', id') T).
   apply TOK.
@@ -19539,6 +19539,13 @@ Proof.
   apply some_none.
   omega.
   }
+
+  rewrite eqlv in PERMOr.
+  destruct (0 <? wt ([[v]])) eqn:wt00.
+  Focus 2.
+  apply Nat.ltb_lt in wtv.
+  rewrite wt00 in wtv.
+  inversion wtv.
 
   assert (tmp: Lof ll = Aof ll /\
         Pof ll = false /\
@@ -21176,7 +21183,7 @@ Proof.
   simpl in WF.
   apply sat_notify in WP.
 
-  destruct WP as (p1,(pm,(C1,(Cm,(wt,(ot,(lv,(ll,(Or,(PERMOr,(M'lv,(bp1,(bpm,(bp1pm,(phpdefp1pm,(p1pm,(ghpdefC1Cm,(C1Cm,(eqlv,(eqll,(p1ll,(p1lv,(satm,(satp1,satp1m)))))))))))))))))))))))).
+  destruct WP as (p1,(pm,(C1,(Cm,(wt,(ot,(lv,(ll,(Or,(PERMOr,(bp1,(bpm,(bp1pm,(phpdefp1pm,(p1pm,(ghpdefC1Cm,(C1Cm,(eqlv,(eqll,(p1ll,(p1lv,(satm,(satp1,satp1m))))))))))))))))))))))).
 
   assert (phpdefp0: forall p0, In p0 (map pof T) -> phplusdef p0 (phplus Pinv Pleak)).
   {
@@ -21304,6 +21311,11 @@ Proof.
   reflexivity.
   reflexivity.
   }
+  rewrite eqlv in PERMOr.
+  rewrite wtv in PERMOr.
+  destruct (0 <? 0) eqn:cont.
+  apply Nat.ltb_lt in cont.
+  omega.
 
   assert (EQ_1: map pof (updl T id (tt, tx, p, O, C, id)) = map pof T).
   {
@@ -21565,13 +21577,8 @@ Proof.
   assumption.
   exists.
   replace (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)) ot))) with p in satp1m.
-  destruct M'lv as [M'lv|CO].
-  rewrite M'lv in PERMOr.
-  simpl in PERMOr.
   apply sat_O_perm with Or; try assumption.
   apply satp1m.
-
-  omega.
   omega.
   unfold upd at 1.
   apply functional_extensionality.
@@ -21657,8 +21664,8 @@ Proof.
   simpl in WF.
   apply sat_notify in WP.
 
-  destruct WP as (p1,(pm,(C1,(Cm,(wt,(ot,(lv,(ll,(Or,(PERMOr,(M'lv,(bp1,(bpm,(bp1pm,(phpdefp1pm,
-    (p1pm,(ghpdefC1Cm,(C1Cm,(eqlv,(eqll,(p1ll,(p1lv,(satm,(satp1,satp1m)))))))))))))))))))))))).
+  destruct WP as (p1,(pm,(C1,(Cm,(wt,(ot,(lv,(ll,(Or,(PERMOr,(bp1,(bpm,(bp1pm,(phpdefp1pm,
+    (p1pm,(ghpdefC1Cm,(C1Cm,(eqlv,(eqll,(p1ll,(p1lv,(satm,(satp1,satp1m))))))))))))))))))))))).
 
   assert (tmp: exists p' O' C', In (WasWaiting4cond v' l, tx', p', O', C', id') T).
   {
@@ -21889,6 +21896,13 @@ Proof.
   apply some_none.
   omega.
   }
+
+  rewrite eqlv in PERMOr.
+  destruct (0 <? wt ([[v]])) eqn:wt00.
+  Focus 2.
+  apply Nat.ltb_lt in wtv.
+  rewrite wt00 in wtv.
+  inversion wtv.
 
   assert (tmp: Lof ll = Aof ll /\
         Pof ll = false /\

@@ -8,12 +8,13 @@ An HTML representation of this proof can be found [here](https://www.hamin.be/df
 For more details about the approach please look at:
 * [The Deadlock-Free Monitors Paper](https://link.springer.com/chapter/10.1007/978-3-319-89884-1_15), published in [27th European Symposium on Programming, ESOP 2018](https://link.springer.com/book/10.1007/978-3-319-89884-1)
 * [The extended version of this paper](https://lirias2repo.kuleuven.be/bitstream/id/500138/), published as a technical report in [Department of Computer Science, KU Leuven](https://wms.cs.kuleuven.be/cs/english)
-* [Some deadlock-free programs](https://github.com/verifast/verifast/tree/master/examples/monitors), verified in [VeriFast](https://people.cs.kuleuven.be/~bart.jacobs/verifast/), using the proposed proof rules
+* [Some deadlock-free programs](https://github.com/verifast/verifast/tree/master/examples/monitors), verified by [VeriFast](https://people.cs.kuleuven.be/~bart.jacobs/verifast/), using the proposed proof rules
 
 This project has received funding from [the European Union’s Horizon 2020 research and innovation programme](https://ec.europa.eu/programmes/horizon2020/en) under grant agreement No 731453 ([VESSEDIA](https://vessedia.eu/)).
 
 # Contents 
-
+* html : An HTML representation of the proof scripts
+* importer channels and CVs : Some programs verified by VeriFast, where the obligations are transferred through messages and notifications
 * Util_Z.v : Some basic lemmas related to Integers
 * Util_list.v : Some basic lemmas related to lists
 * RelaxedPrecedenceRelation.v : A lemma proving that a valid graph is deadlock-free
@@ -23,7 +24,7 @@ This project has received funding from [the European Union’s Horizon 2020 rese
 * ValidityOfConfigurations.v : The definition of the validity of configurations along with some lemmas proving that the small step preseves it
 * ProofRules.v : The proposed proof rules
 * Soundness.v : The soundness proof of the proposed proof rules, i.e. any program that is verified by the proposed proof rules is deadlock-free
-* html : An HTML representation of the proof scripts
+
 # Contact
 
 * [Jafar Hamin](https://distrinet.cs.kuleuven.be/people/jafar), imec-Distrinet reseach group, KU Leuven, Belgium
