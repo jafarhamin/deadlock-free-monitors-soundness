@@ -7,17 +7,13 @@ struct channel;
 typedef struct channel *channel;
 
 /*@
-fixpoint list<void*> N(void* o);
 fixpoint list<real> Mr(void* o);
-fixpoint predicate(T message) M<T>(void* o);
-fixpoint fixpoint(T message, list<void*>) M'<T>(void* o);
 fixpoint bool S(void* o);
 
-predicate MP<T>(void* o, predicate(T message) Mo) = M(o) == Mo;
-predicate M'P<T>(void* o, fixpoint(T message, list<void*>) M'o) = M'(o) == M'o;
-
-predicate create_channel_ghost_args<T>(real gamma_wlevel, list<void*> Nch, list<real> Mr, predicate(T message) Mch, fixpoint(T message, list<void*>) M'ch, bool server) = true;  
-
+predicate create_channel_ghost_args(real gamma_wlevel, list<real> Mr, bool server) = true;  
+predicate init_channel_ghost_args<T>(predicate(T message) Mch, fixpoint(T message, list<void*>) M'ch) = true;  
+predicate uchannel(struct channel *ch);
+predicate channel<T>(struct channel *ch, predicate(T message) M, fixpoint(T message, list<void*>) M');
 predicate credit(struct channel *ch);
 predicate trandit(struct channel *ch);
 
@@ -54,28 +50,30 @@ fixpoint bool id<T>(T x, T y){
   return x == y;
 }
 
-fixpoint bool can_transfer<T>(T message, void* ch, void* ch'){
-  return count((M')(ch)(message), (id)(ch')) == count(N(ch'), (id)(ch));
-}
-
 fixpoint bool mem'<t>(list<t> xs, t x){
   return mem(x,xs);
 }
 @*/
 
+/*@
+lemma void init_channel<T>(channel ch);
+  requires init_channel_ghost_args<T>(?Mch, ?M'ch) &*& uchannel(ch);
+  ensures channel(ch, Mch, M'ch);
+@*/
+
+
 struct channel *create_channel<T>();
-  //@ requires create_channel_ghost_args<T>(?level, ?Nch, ?Mrch, ?Mch, ?M'ch, ?server) &*& forall(Nch, (memMr)(level)) == true;
-  //@ ensures level_of(result) == level &*& N(result) == Nch &*& M'(result) == M'ch &*& Mr(result) == Mrch &*& S(result) == server;// &*& M(result) == Mch;
+  //@ requires create_channel_ghost_args(?level, ?Mrch, ?server);
+  //@ ensures uchannel(result) &*& level_of(result) == level &*& Mr(result) == Mrch &*& S(result) == server;
 
 void send<T>(struct channel *ch, T message);
-  /*@ requires obs(?O, ?R) &*& MP<T>(ch,?Mch) &*& Mch(message) &*& trandit(ch) &*&
-        forall(map(level_of, (M')(ch)(message)),(mem')(Mr(ch))) == true &*& 
-        forall((M')(ch)(message), (can_transfer)(message, ch)) == true; @*/
-  //@ ensures obs(remove(ch,minus(O,(M')(ch)(message))), R);        
+  /*@ requires obs(?O, ?R) &*& [?f]channel(ch,?Mch,?M'ch) &*& Mch(message) &*& (Mr(ch) == nil ? true : trandit(ch)) &*&
+        forall(map(level_of, M'ch(message)),(mem')(Mr(ch))) == true; @*/
+  //@ ensures obs(remove(ch,minus(O,M'ch(message))), R) &*& [f]channel(ch,Mch,M'ch);        
 
 T receive<T>(struct channel *ch);
-  /*@ requires obs(?O, ?R) &*& (S(ch) ? true : credit(ch)) &*& object_lt_objects(ch,O) == true &*& 
-        object_lt_Mrs(ch,O) == true &*& MP<T>(ch,?Mch) &*& S(ch) ? O==nil && count(R,(id)(ch)) == length(R) : true; @*/
-  //@ ensures obs(append(O,(M')(ch)(result)), remove(ch,R)) &*& Mch(result);
+  /*@ requires obs(?O, ?R) &*& [?f]channel<T>(ch,?Mch,?M'ch) &*& (S(ch) ? true : credit(ch)) &*& object_lt_objects(ch,O) == true &*& 
+        object_lt_Mrs(ch,O) == true &*& S(ch) ? O==nil && count(R,(id)(ch)) == length(R) : true; @*/
+  //@ ensures obs(append(O,M'ch(result)), remove(ch,R)) &*& [f]channel(ch,Mch,M'ch) &*& Mch(result);
 
 #endif  

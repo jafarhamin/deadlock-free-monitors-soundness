@@ -3,7 +3,7 @@
 #include "threads.h"
 
 /*@
-predicate Mch(pair<int, channel> message) = M(snd(message)) == Mch' &*& Mr(snd(message)) == nil &*& M'(snd(message)) == M'ch';
+predicate Mch(pair<int, channel> message) = [_]channel(snd(message),Mch',M'ch') &*& Mr(snd(message)) == nil;
 
 fixpoint list<void*> M'ch(pair<int, channel> message){
   return cons(snd(message),nil);
@@ -16,9 +16,8 @@ fixpoint list<void*> M'ch'(int message){
 }
 
 predicate_family_instance thread_run_data(server_thread)(list<void*> tobs, list<void*> tims, struct channel *ch) =
+  [_]channel(ch,Mch,M'ch) &*&
   credit(ch) &*& 
-  M(ch) == Mch &*&
-  M'(ch) == M'ch &*&
   S(ch) == false &*&  
   tobs == nil &*&
   tims == cons(ch,nil);
@@ -30,28 +29,25 @@ void server_thread(struct channel *ch)  //@ : thread_run
 {
   //@ open thread_run_data(server_thread)(_,_,_);
   pair<int, channel> reqch';
-  //@ close MP(ch,Mch);
   reqch' = receive(ch);
   //@ open Mch(_);  
-  //@ close MP(snd(reqch'),Mch');  
   //@ close Mch'(12);
-  //@ g_trandit(snd(reqch'));
   send(snd(reqch'),12);
 }
 
 void client(struct channel *ch)
-  //@ requires obs(cons(ch,nil), nil) &*& trandit(ch) &*& M(ch) == Mch &*& Mr(ch) == cons(2r,nil) &*& M'(ch) == M'ch;
+  //@ requires obs(cons(ch,nil), nil) &*& [_]channel(ch,Mch,M'ch) &*& trandit(ch) &*& Mr(ch) == cons(2r,nil);
   //@ ensures obs(nil, nil);
 {
-  //@ close create_channel_ghost_args<int>(2r, cons(ch,nil), nil, Mch', M'ch', false);
-  struct channel *ch' = create_channel();
-  //@ assume (M(ch')==Mch');    
+  //@ close create_channel_ghost_args(2r, nil, false);
+  struct channel *ch' = create_channel<int>();
+  //@ close init_channel_ghost_args<int>(Mch', M'ch');  
+  //@ init_channel(ch');
+  //@ leak channel(ch',Mch',M'ch');
   //@ close Mch(pair(12,ch'));
-  //@ close MP(ch,Mch);
   //@ g_credit(ch');
   send(ch,pair(12,ch'));
-  //@ close MP(ch',Mch');
-  receive(ch');
+  int res = receive(ch');
   //@ open Mch'(_);
 }
 
@@ -59,14 +55,15 @@ void main()
   //@ requires obs(nil, nil);
   //@ ensures obs(nil, nil);
 {
-  //@ close create_channel_ghost_args< pair<int, channel> >(1r, nil, cons(2r,nil), Mch, M'ch, false);
+  //@ close create_channel_ghost_args(1r, cons(2r,nil), false);
   struct channel *ch = create_channel();
-  //@ assume (M(ch) == Mch); // Can be avoided by adding an extra ghost command g_init_channel
-    
+  //@ close init_channel_ghost_args< pair<int, channel> >(Mch, M'ch);
+  //@ init_channel(ch);  
+  //@ leak channel(ch,_,_);
   //@ g_credit(ch);
   //@ g_trandit(ch);  
   
   //@ close thread_run_data(server_thread)(nil,cons(ch,nil),ch);
   thread_start(server_thread, ch);
-  client(ch);   
+  client(ch);
 }
