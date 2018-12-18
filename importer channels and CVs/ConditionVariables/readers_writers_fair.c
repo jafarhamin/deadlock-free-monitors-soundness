@@ -22,19 +22,15 @@ predicate reader_writer(struct read_write *b; void* grd, void* gwr, int ardrs, i
   [_]b->grdrs |-> ardrs &*&                
   [_]b->gawtrs |-> awrtrs &*&
   [_]mutex(m) &*& 
-  [_]cond(grd) &*&
-  [_]cond(gwr) &*&  
+  [_]cond(grd,no_transfer,nil) &*&
+  [_]cond(gwr,vwtrn(awrtrs),cons(gwr,nil)) &*&  
   inv(m) == read_write(b,grd,gwr) &*&
   wait_level_of(m) == pair({(create_readers_writers)}, 0r) &*&
   wait_level_lt(wait_level_of(m), wait_level_of(grd)) == true &*&
   wait_level_lt(wait_level_of(m), wait_level_of(gwr)) == true &*&
   wait_level_lt(wait_level_of(gwr), wait_level_of(grd)) == true &*&  
   mutex_of(grd)==m &*& 
-  mutex_of(gwr)==m &*&
-  M(gwr) == vwtrn(awrtrs) &*& 
-  M(grd) == no_transfer &*&
-  M'(gwr) == cons(gwr,nil) &*& 
-  M'(grd) == nil;
+  mutex_of(gwr)==m;
 
 predicate_ctor vwtrn(int i)() = tic(i);
 
@@ -48,7 +44,8 @@ predicate_ctor read_write(struct read_write *b, struct condvar *vr, struct condv
   [_]b->grdrs |-> ?grdrs &*&   
   [_]b->gawtrs |-> ?gawtrs &*&   
   ctr(grdrs,ar) &*&  
-  ctr(gawtrs,aw) &*&    
+  ctr(gawtrs,aw) &*&  
+  vr != vw &*&  
   aw >= 0 &*& 
   ar >= 0 &*& 
   ww >= 0 &*&
@@ -72,10 +69,14 @@ struct read_write *create_readers_writers()
     //@ int gawtrs = new_ctr();    
     //@ close create_condvar_ghost_args(wr_wlevel);    
     condvar vw = create_condvar();
-    //@ close init_condvar_ghost_args(m,vwtrn(gawtrs),cons(vw,nil));        
     //@ close create_condvar_ghost_args(rd_wlevel);
-    //@ init_condvar(vw); 
     condvar vr = create_condvar();
+    
+    //@ if (vw == vr) ucond_frac(vw);
+
+    //@ close init_condvar_ghost_args(m,vwtrn(gawtrs),cons(vw,nil));        
+    //@ init_condvar(vw); 
+    
     //@ close init_condvar_ghost_args(m,no_transfer,nil);    
    //@ init_condvar(vr); 
     struct read_write *b = malloc(sizeof(struct read_write));
@@ -96,8 +97,8 @@ struct read_write *create_readers_writers()
     //@ leak [_]b->grdrs |-> _;        
     //@ leak [_]b->gawtrs |-> _;    
     //@ leak [_]malloc_block_read_write(_);
-    //@ leak [_]cond(vr);
-    //@ leak [_]cond(vw);
+    //@ leak [_]cond(vr,_,_);
+    //@ leak [_]cond(vw,_,_);
     //@ close init_mutex_ghost_args(read_write(b,vr,vw));
     //@ close read_write(b,vr,vw)(empb,empb);
     //@ init_mutex(m);
@@ -129,9 +130,9 @@ void reader_enter(struct read_write *b)
 	[_]b->grdrs |-> ardrs &*&   
 	[_]b->gawtrs |-> awrtrs &*&   
 	ctr(ardrs,ar) &*&  
-	ctr(awrtrs,aw) &*&   
-	[_]cond(rd) &*&
-	[_]cond(wr) &*&
+	ctr(awrtrs,aw) &*& 
+	[_]cond(rd,no_transfer,nil) &*&
+	[_]cond(wr,vwtrn(awrtrs),cons(wr,nil)) &*&  
 	aw >= 0 &*& 
 	ar >= 0 &*& 
 	ww >= 0 &*&
@@ -145,8 +146,6 @@ void reader_enter(struct read_write *b)
   {
     //@ close read_write(b,rd,wr)(finc(Wt,rd),Ot);
     //@ close mutex_inv(m,read_write(b,rd,wr));
-    //@ close MP(rd,no_transfer);
-    //@ close M'P(rd,nil);    
     condvar_wait(b->vr, b->m);
     //@ open read_write(b,rd,wr)(_,_);        
     //@ open no_transfer();
@@ -177,8 +176,6 @@ void reader_exit(struct read_write *b)
   //@ dec_ctr(grdrs2);
   if (b->ww > 0){
     //@ inc_ctr(awrtrs);     
-    //@ close MP(wr,vwtrn(awrtrs));
-    //@ close M'P(wr,cons(wr,nil));  
     /*@ if (Wt2(wr)>0){
           close vwtrn(awrtrs)();
         }
@@ -215,8 +212,6 @@ void writer_enter(struct read_write *b)
     b->ww = b->ww + 1;
     //@ close read_write(b,rd,wr)(finc(Wt,wr),Ot);
     //@ close mutex_inv(m,read_write(b,rd,wr));
-    //@ close MP(wr,vwtrn(awrtrs));
-    //@ close M'P(wr,cons(wr,nil));    
     //@ wait_level_lt_below_obs(wait_level_of(wr), wait_level_of(rd), O);
     condvar_wait(b->vw, b->m);
     //@ open read_write(b,rd,wr)(_,_);
@@ -252,8 +247,6 @@ void writer_exit(struct read_write *b)
           close vwtrn(awrtrs)();
         }
     @*/
-    //@ close MP(wr,vwtrn(awrtrs));
-    //@ close M'P(wr,cons(wr,nil));
     condvar_signal(b->vw); 
     //@ minus_nil(cons(m,cons(wr,cons(rd,O))));
     b->ww --;
@@ -263,9 +256,6 @@ void writer_exit(struct read_write *b)
     //@ assert b->ww |-> ?ww;
     //@ assert ww <= 0;
     //@ g_dischl(wr);  
-    
-    //@ close MP(rd,no_transfer);
-    //@ close M'P(rd,nil);    
     condvar_broadcast(b->vr);
   }
   //@ g_dischl(rd);

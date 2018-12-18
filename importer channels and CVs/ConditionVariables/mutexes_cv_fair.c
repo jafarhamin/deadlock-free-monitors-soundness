@@ -18,8 +18,7 @@ predicate exclusive(struct exclusive *ex; void* v) =
   mutex_of(v) == m &*&
   inv(m) == exclusive_inv(ex, v) &*&
   wait_level_of(m) == pair({new_exclusive}, 0r) &*&
-  wait_level_lt(wait_level_of(m), wait_level_of(v)) == true &*&  
-  M'(v) == cons(v,nil);
+  wait_level_lt(wait_level_of(m), wait_level_of(v)) == true;
 @*/
 
 /*@
@@ -28,9 +27,8 @@ predicate_ctor exclusive_inv(struct exclusive *e, struct condvar *v)(fixpoint(vo
   e->b |-> ?b &*& 
   e->w |-> Wt(v) &*&   
   [_]e->v |-> v &*& 
-  [_]cond(v) &*&
+  [_]cond(v,no_transfer,cons(v,nil)) &*&
   mutex_of(v)==m &*& 
-  M(v) == no_transfer &*&
   0 <= Ot(v) &*&  
   (b ? 0 < Ot(v) : Wt(v) <= 0);
   
@@ -60,7 +58,7 @@ struct exclusive *new_exclusive()
     //@ leak [_]ex->v |-> _;
     //@ leak [_]ex->m |-> _;    
     //@ leak [_]malloc_block_exclusive(_);
-    //@ leak [_]cond(v);
+    //@ leak [_]cond(v,_,_);
     //@ close init_mutex_ghost_args(exclusive_inv(ex, v));
     //@ close exclusive_inv(ex,v)(empb,empb);  
     //@ init_mutex(m);
@@ -83,8 +81,6 @@ void enter_cs(struct exclusive *ex)
     ex->w++;
     //@ close exclusive_inv(ex,v)(finc(Wt,v),Ot);
     //@ close mutex_inv(m,exclusive_inv(ex, v));
-    //@ close MP(v,no_transfer);
-    //@ close M'P(v,cons(v,nil));    
     condvar_wait(ex->v, ex->m);
     //@ open exclusive_inv(ex,v)(_,_);   
     //@ open no_transfer();
@@ -112,8 +108,6 @@ void exit_cs(struct exclusive *ex)
   //@ open exclusive_inv(ex, v)(?Wt,?Ot); 
   ex->b = false;  
   if (ex->w > 0){
-  //@ close MP(v,no_transfer); 
-  //@ close M'P(v,cons(v,nil));   
   /*@ if (Wt(v)>0){
         close no_transfer();
       }

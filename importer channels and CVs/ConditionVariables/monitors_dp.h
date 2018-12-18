@@ -2,8 +2,8 @@
   Monitors
 */
 
-#ifndef MONITORS_H
-#define MONITORS_H
+#ifndef MONITORS_DP_H
+#define MONITORS_DP_H
 
 #include "levels.h"
 //@#include "ghost_cells.gh"
@@ -16,6 +16,8 @@ typedef struct condvar *condvar;
 
 /*@
 fixpoint mutex mutex_of(void* condvar);
+fixpoint predicate() M(condvar condvar);
+fixpoint list<void*> M'(condvar condvar);
 fixpoint predicate(fixpoint(void*, unsigned int), fixpoint(void*, unsigned int)) inv(struct mutex* mutex);
 @*/
 
@@ -28,7 +30,7 @@ predicate mutex_held(mutex mutex; real frac, fixpoint(void*, unsigned int) Wt, f
 
 predicate ucond(condvar condvar;);
 
-predicate cond(condvar condvar; predicate() M, list<void*> M');
+predicate cond(condvar condvar;);
 
 predicate create_mutex_ghost_args(pair<list<void*>, real> wlevel) = true;
 
@@ -36,9 +38,12 @@ predicate init_mutex_ghost_args(predicate(fixpoint(void*, unsigned int) Wt, fixp
 
 predicate create_condvar_ghost_args(pair<list<void*>, real> wlevel) = true;
 
-predicate init_condvar_ghost_args(mutex mutex, predicate() M, list<void*> M') = true;
+predicate init_condvar_ghost_args(mutex mutex, predicate() Mv, list<void*> M'v) = true;
 
 predicate mutex_inv(mutex mutex; predicate(fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot) lockinv) = lockinv == inv(mutex);
+
+predicate MP(condvar condvar, predicate() condvarp) = M(condvar) == condvarp;
+predicate M'P(condvar condvar, list<void*> O) = M'(condvar) == O;
 @*/
 
 /*@
@@ -104,8 +109,8 @@ lemma void init_mutex(mutex mutex);
     ensures mutex(mutex) &*& inv(mutex)==p;
 
 lemma void init_condvar(condvar condvar);
-    requires ucond(condvar) &*& init_condvar_ghost_args(?mutex,?M,?M'); 
-    ensures cond(condvar, M, M') &*& mutex_of(condvar) == mutex;
+    requires ucond(condvar) &*& init_condvar_ghost_args(?mutex,?transfer,?obs_transfer); 
+    ensures cond(condvar) &*& mutex_of(condvar) == mutex &*& M(condvar) == transfer &*& M'(condvar) == obs_transfer;
 
 lemma void g_chrgu(condvar condvar);
     requires umutex(mutex_of(condvar), ?Wt, ?Ot) &*& obs(?O);
@@ -132,16 +137,16 @@ lemma void g_Ot_isbag(mutex mutex, condvar condvar);
     ensures mutex_held(mutex, f, Wt, Ot) &*& Ot(condvar) >= 0;
 
 lemma void cond_plus(condvar cv)
-  requires [?f1]cond(cv,?M,?M') &*& [?f2]cond(cv,?M1,?M'1);
-  ensures [f1+f2]cond(cv,M,M');
+  requires [?f1]cond(cv) &*& [?f2]cond(cv);
+  ensures [f1+f2]cond(cv);
 {}
 
 lemma void cond_frac(struct condvar *c1);
-  requires cond(c1,?M,?M') &*& [?f]cond (c1,M,M') &*& 0 < f;
+  requires cond(c1) &*& [?f]cond (c1) &*& 0 < f;
   ensures false;        
 
 lemma void u_cond_frac(struct condvar *c1);
-  requires ucond(c1) &*& [?f]cond(c1,?M,?M');
+  requires ucond(c1) &*& [?f]cond(c1);
   ensures false;        
 
 lemma void ucond_frac(struct condvar *c1);
@@ -149,8 +154,8 @@ lemma void ucond_frac(struct condvar *c1);
   ensures false;        
 
 lemma void cond_frac'(struct condvar *c1);
-  requires [?f]cond(c1,?M,?M');
-  ensures [f]cond(c1,M,M') &*& 0 < f &*& f <= 1;        
+  requires [?f]cond(c1);
+  ensures [f]cond(c1) &*& 0 < f &*& f <= 1;        
 @*/
 
 mutex create_mutex();
@@ -170,16 +175,16 @@ condvar create_condvar();
     //@ ensures ucond(result) &*& wait_level_of(result) == wlevel;
 
 void condvar_wait(condvar condvar, mutex mutex);
-    /*@ requires [?fc]cond(condvar,?M,?M') &*& mutex_held(mutex, ?f, ?Wt, ?Ot) &*& mutex_inv(mutex,?inv) &*& inv(finc(Wt,condvar), Ot) &*& obs(?O) &*&
-                 w_level_below_all(condvar,remove(mutex,O))==true &*& w_level_below_all(mutex,append(M',remove(mutex,O))) == true &*& enfo(condvar,finc(Wt,condvar),Ot)==true;@*/
-    //@ ensures [fc]cond(condvar,M,M') &*& mutex_held(mutex, f, ?Wt', ?Ot') &*& inv(Wt', Ot') &*& obs(append(M',O)) &*& M();
+    /*@ requires [?fc]cond(condvar) &*& mutex_held(mutex, ?f, ?Wt, ?Ot) &*& mutex_inv(mutex,?inv) &*& inv(finc(Wt,condvar), Ot) &*& MP(condvar,?trn) &*& M'P(condvar,?O') &*& obs(?O) &*&
+                 w_level_below_all(condvar,remove(mutex,O))==true &*& w_level_below_all(mutex,append(O',remove(mutex,O))) == true &*& enfo(condvar,finc(Wt,condvar),Ot)==true;@*/
+    //@ ensures [fc]cond(condvar) &*& mutex_held(mutex, f, ?Wt', ?Ot') &*& inv(Wt', Ot') &*& obs(append(O',O)) &*& trn();
 
 void condvar_signal(condvar condvar);
-    //@ requires obs(?O) &*& [?fc]cond(condvar,?M,?M') &*& mutex_held(?mutex, ?f, ?Wt, ?Ot) &*& (Wt(condvar) <= 0 ? true : M()) &*& (0 < Wt(condvar) || M' == nil);
-    //@ ensures obs(minus(O,M')) &*& [fc]cond(condvar,M,M') &*& mutex_held(mutex, f, fdec(Wt,condvar), Ot);
+    //@ requires obs(?O) &*& [?fc]cond(condvar) &*& mutex_held(?mutex, ?f, ?Wt, ?Ot) &*& MP(condvar,?transfer) &*& M'P(condvar,?O') &*& (Wt(condvar) <= 0 ? true : transfer()) &*& (0 < Wt(condvar) || O' == nil);
+    //@ ensures obs(minus(O,O')) &*& [fc]cond(condvar) &*& mutex_held(mutex, f, fdec(Wt,condvar), Ot);
 
 void condvar_broadcast(condvar condvar);
-    //@ requires [?fc]cond(condvar,no_transfer,nil) &*& mutex_held(?mutex, ?f, ?Wt, ?Ot);
-    //@ ensures [fc]cond(condvar,no_transfer,nil) &*& mutex_held(mutex, f, removeAll(Wt,condvar), Ot);
+    //@ requires [?fc]cond(condvar) &*& mutex_held(?mutex, ?f, ?Wt, ?Ot) &*& MP(condvar,no_transfer) &*& M'P(condvar,nil);
+    //@ ensures [fc]cond(condvar) &*& mutex_held(mutex, f, removeAll(Wt,condvar), Ot);
 
 #endif    

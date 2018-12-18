@@ -1,5 +1,5 @@
 # include "stdlib.h"
-# include "monitors_dp.h"
+# include "monitors1.h"
 # include "dining_philosophers.h"
 //@ #include "ghost_counters.gh"
 
