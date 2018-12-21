@@ -60,11 +60,11 @@ lemma void load(struct channel *ch)
   assert [_]ch->m |-> ?m;
   close mutex_inv(m,channel_inv(ch,v,M,M'));
   produce_lemma_function_pointer_chunk invariant_preserved(m, channel_inv(ch,v,M,M'), O, cons(v,O), R, creditor(ch))() {
-    open channel_inv(ch,v,M,M')(?Wt2,?Ot2,?It2);
+    open channel_inv(ch,v,M,M')(?Wt2,?Ot2);
     assert [_]ch->gid |-> ?gid2;
     inc_ctr(gid2);
     g_chrgl(v);
-    close channel_inv(ch,v,M,M')(Wt2,finc(Ot2,v),It2);
+    close channel_inv(ch,v,M,M')(Wt2,finc(Ot2,v));
     close credit(ch);
     close creditor(ch)();
   }{
@@ -78,7 +78,7 @@ lemma void load(struct channel *ch)
 /*@
 predicate_ctor vtrn(int gid)() = tic(gid);
 
-predicate_ctor channel_inv(struct channel *b, struct condvar *v, predicate(pair<int,struct channel*> message) M, fixpoint(pair<int,struct channel*> message, list<void*>) M')(fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot, fixpoint(void*, unsigned int) It) =
+predicate_ctor channel_inv(struct channel *b, struct condvar *v, predicate(pair<int,struct channel*> message) M, fixpoint(pair<int,struct channel*> message, list<void*>) M')(fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot) =
   [_]b->q |-> ?q &*& 
   [_]b->v |-> v &*& 
   [_]b->m |-> ?m &*&   
@@ -123,7 +123,7 @@ struct channel *create_channel<T>()
 
   //@ close init_mutex_ghost_args(channel_inv(ch,v,M,M'));
   //@ neq_cond_mutex(v,m);
-  //@ close channel_inv(ch,v,M,M')(empb,empb,empb);
+  //@ close channel_inv(ch,v,M,M')(empb,empb);
   //@ init_mutex(m);
   //@ leak [_]mutex(m);  
   //@ close uchannel(ch, v, q,M,M');
@@ -144,7 +144,7 @@ void send(struct channel *ch, pair<int, struct channel*> message)
   // See Jacobs, Bart, Dragan Bosnacki, and Ruurd Kuiper. "Modular termination verification of single-threaded and multithreaded programs." 
   // ACM Transactions on Programming Languages and Systems (TOPLAS) 40.3 (2018): 12.)
   mutex_acquire(ch->m);
-  //@ open channel_inv(ch,v,M,M')(?Wt,_,_);
+  //@ open channel_inv(ch,v,M,M')(?Wt,_);
   //@ assert [_]ch->gid |-> ?gid;    
   /*@ if (Wt(gamma)>0){
         inc_ctr(gid);
@@ -154,8 +154,8 @@ void send(struct channel *ch, pair<int, struct channel*> message)
   condvar_signal(ch->v);
   enqueue(ch->q, message);
   //@ g_dischl(gamma);
-  //@ assert mutex_held(m,_,?Wt1,?Ot1,?It1);
-  //@ close channel_inv(ch,v,M,M')(Wt1,Ot1,It1);
+  //@ assert mutex_held(m,_,?Wt1,?Ot1);
+  //@ close channel_inv(ch,v,M,M')(Wt1,Ot1);
   //@ close mutex_inv(m,channel_inv(ch,v,M,M'));
   mutex_release(ch->m);
   //@ close [f]channel(ch,gamma,betta,M,M');
@@ -170,7 +170,7 @@ pair<int, struct channel*> receive(struct channel *ch)
   //@ close mutex_inv(m,channel_inv(ch,v,M,M'));
   //@ assume(object_lt_objects(ch->m,O));
   mutex_acquire(ch->m);
-  //@ open channel_inv(ch,v,M,M')(?Wt1,?Ot1,?It1);
+  //@ open channel_inv(ch,v,M,M')(?Wt1,?Ot1);
   //@ assert [_]ch->gid |-> ?gid;  
   //@ open credit(ch);
   while (size_of(ch->q)==0)
@@ -182,22 +182,22 @@ pair<int, struct channel*> receive(struct channel *ch)
                 queue< pair<int, struct channel*> >(q,?s,M,M') &*& 
                 ctr(gid,?Ct) &*&                
                 s >= 0 &*& 
-                mutex_held(m, _, ?Wt, ?Ot, ?It) &*& 
+                mutex_held(m, _, ?Wt, ?Ot) &*& 
                 Wt(v) + Ct <= Ot(v) + s &*&
                 Wt(v) <= Ot(v) &*&
                 obs(cons(m,O),R) &*&
                 tic(gid); @*/
   {
     //@ dec_ctr(gid);
-    //@ close channel_inv(ch,v,M,M')(finc(Wt,v),Ot,It);
+    //@ close channel_inv(ch,v,M,M')(finc(Wt,v),Ot);
     //@ close mutex_inv(m,channel_inv(ch,v,M,M'));
     condvar_wait(ch->v, ch->m);
-    //@ open channel_inv(ch,v,M,M')(_,_,_);
+    //@ open channel_inv(ch,v,M,M')(_,_);
     //@ open vtrn(gid)();
   }
   pair<int, struct channel*> msg = dequeue< pair<int, struct channel*> >(ch->q);
   //@ dec_ctr(gid);
-  //@ close channel_inv(ch,v,M,M')(Wt, Ot, It);
+  //@ close channel_inv(ch,v,M,M')(Wt, Ot);
   //@ close mutex_inv(m,channel_inv(ch,v,M,M'));
   mutex_release(ch->m);
   //@ leak [_]mutex(m);
