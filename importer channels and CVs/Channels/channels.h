@@ -12,9 +12,9 @@ fixpoint bool Ser<T>(void* o);
 
 
 predicate create_channel_ghost_args<T>(real gamma_wlevel, list<real> Mr, bool server) = true;  
-predicate init_channel_ghost_args<T>(predicate(T message) M, fixpoint(T message, list<void*>) M', fixpoint(T message, bool) sen) = true;  
+predicate init_channel_ghost_args<T>(predicate(T message) M, fixpoint(T message, list<void*>) M') = true;  
 predicate uchannel(struct channel *ch);
-predicate channel<T>(struct channel *ch, predicate(T message) M, fixpoint(T message, list<void*>) M', fixpoint(T message, bool) sen);
+predicate channel<T>(struct channel *ch, predicate(T message) M, fixpoint(T message, list<void*>) M');
 predicate credit(struct channel *ch);
 predicate trandit(struct channel *ch);
 
@@ -62,8 +62,8 @@ fixpoint bool mem'<t>(list<t> xs, t x){
 
 /*@
 lemma void init_channel<T>(channel ch);
-  requires init_channel_ghost_args<T>(?Mch, ?M'ch, ?sen) &*& uchannel(ch);
-  ensures channel(ch, Mch, M'ch, sen);
+  requires init_channel_ghost_args<T>(?Mch, ?M'ch) &*& uchannel(ch);
+  ensures channel(ch, Mch, M'ch);
 @*/
 
 
@@ -72,13 +72,13 @@ struct channel *create_channel<T>();
   //@ ensures uchannel(result) &*& level_of(result) == level &*& Mr(result) == Mrch &*& Ser(result) == server;
 
 void send<T>(struct channel *ch, T message);
-  /*@ requires obs(?O, ?R) &*& [?f]channel(ch,?Mch,?M'ch,?sen) &*& Mch(message) &*& (Mr(ch) == nil ? true : trandit(ch)) &*&
+  /*@ requires obs(?O, ?R) &*& [?f]channel(ch,?Mch,?M'ch) &*& Mch(message) &*& (Mr(ch) == nil ? true : trandit(ch)) &*&
         forall(map(level_of, M'ch(message)),(mem')(Mr(ch))) == true; @*/
-  //@ ensures obs(sen(message) ? remove(ch,minus(O,M'ch(message))) : minus(O,M'ch(message)), R) &*& [f]channel(ch,Mch,M'ch,sen);        
+  //@ ensures obs(remove(ch,minus(O,M'ch(message))), R) &*& [f]channel(ch,Mch,M'ch);        
 
 T receive<T>(struct channel *ch);
-  /*@ requires obs(?O, ?R) &*& [?f]channel<T>(ch,?Mch,?M'ch,?sen) &*& (Ser(ch) ? true : credit(ch)) &*& object_lt_objects(ch,O) == true &*& 
+  /*@ requires obs(?O, ?R) &*& [?f]channel<T>(ch,?Mch,?M'ch) &*& (Ser(ch) ? true : credit(ch)) &*& object_lt_objects(ch,O) == true &*& 
         object_lt_Mrs(ch,R) == true &*& Ser(ch) ? O == nil && count(R,(id)(ch)) == length(R) : true; @*/
-  //@ ensures obs(append(O,M'ch(result)), remove(ch,R)) &*& [f]channel(ch,Mch,M'ch,sen) &*& Mch(result) &*& Ser(ch) ? true : sen(result) ? true : credit(ch);
+  //@ ensures obs(append(O,M'ch(result)), remove(ch,R)) &*& [f]channel(ch,Mch,M'ch) &*& Mch(result);
 
 #endif  

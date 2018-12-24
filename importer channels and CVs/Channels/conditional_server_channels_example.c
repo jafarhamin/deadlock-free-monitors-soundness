@@ -3,26 +3,18 @@
 #include "threads.h"
 
 /*@
-fixpoint bool U<T>(T msg){
-  return true;
-}
-
-fixpoint bool C(pair<int, channel> msg){
-  return fst(msg) == 0;
-}
-
 predicate Mch'(pair<int, channel> message) = 
-  [_]channel(snd(message),Mch,(M'ch),C) &*&
+  [_]channel(snd(message),Mch,M'ch) &*&
   level_of(snd(message)) == 2r &*&     
   Mr(snd(message)) == cons(1r,nil) &*&   
   trandit(snd(message));  
 
 fixpoint list<void*> M'ch'(pair<int, channel> message){
-  return fst(message) == 1 ? cons(snd(message),nil) : nil;
+  return cons(snd(message),nil);
 }
 
 predicate Mch(pair<int, channel> message) = 
-  [_]channel(snd(message),Mch',M'ch',U) &*& //
+  [_]channel(snd(message),Mch',M'ch') &*&
   Mr(snd(message)) == cons(2r,nil) &*& 
   (fst(message) == 0 ? true : trandit(snd(message))) &*&
   Ser(snd(message)) == false;
@@ -32,7 +24,7 @@ fixpoint list<void*> M'ch(pair<int, channel> message){
 }
 
 predicate Ms(pair<int, channel> message) = 
-  [_]channel(snd(message),Mch',M'ch',U) &*&
+  [_]channel(snd(message),Mch',M'ch') &*&
   Mr(snd(message)) == cons(2r,nil) &*& 
   trandit(snd(message)) &*&
   Ser(snd(message)) == false;
@@ -42,14 +34,14 @@ fixpoint list<void*> M's(pair<int, channel> message){
 }
 
 predicate_family_instance thread_run_data(server_thread)(list<void*> tobs, list<void*> tims, struct channel *s) =
-  [_]channel(s,Ms,M's,U) &*&
+  [_]channel(s,Ms,M's) &*&
   Mr(s) == cons(1r,nil) &*&
   Ser(s) == true &*&
   tobs == nil &*&
   tims == cons(s,cons(s,nil));
   
 predicate_family_instance thread_run_data(cserver_thread)(list<void*> tobs, list<void*> tims, struct channel *ch) =
-  [_]channel(ch,Mch,M'ch,C) &*&
+  [_]channel(ch,Mch,M'ch) &*&
   credit(ch) &*&
   Mr(ch) == cons(1r,nil) &*&
   level_of(ch) == 2r &*&
@@ -58,7 +50,7 @@ predicate_family_instance thread_run_data(cserver_thread)(list<void*> tobs, list
   tims == cons(ch,nil);  
 
 predicate_family_instance thread_run_data(client_thread)(list<void*> tobs, list<void*> tims, struct channel *s) =
-  [_]channel(s,Ms,M's,U) &*& 
+  [_]channel(s,Ms,M's) &*& 
   trandit(s) &*& 
   Mr(s) == cons(1r,nil) &*& 
   Ser(s) == true &*&
@@ -88,7 +80,7 @@ int through()
 }
 
 void cserver(struct channel *ch)
-  //@ requires obs(nil, cons(ch,nil)) &*& [_]channel(ch,Mch,M'ch,C) &*& credit(ch) &*& Mr(ch) == cons(1r,nil) &*& level_of(ch) == 2r &*& Ser(ch) == false;
+  //@ requires obs(nil, cons(ch,nil)) &*& [_]channel(ch,Mch,M'ch) &*& credit(ch) &*& Mr(ch) == cons(1r,nil) &*& level_of(ch) == 2r &*& Ser(ch) == false;
   //@ ensures obs(nil, nil);
 {
   pair<int, channel> reqch';
@@ -97,15 +89,16 @@ void cserver(struct channel *ch)
   int done = done();
   while(fst(reqch') != done)
     /*@ invariant obs(fst(reqch') == 0 ? nil : cons(snd(reqch'),nil),nil) &*&
-          (fst(reqch') == 0 ? true : credit(ch) &*& trandit(snd(reqch'))) &*&
-          [_]channel(ch,Mch,M'ch,C) &*&
-          [_]channel(snd(reqch'),Mch',M'ch',U) &*&
+          (fst(reqch') == 0 ? true : trandit(snd(reqch'))) &*&
+          [_]channel(ch,Mch,M'ch) &*&
+          [_]channel(snd(reqch'),Mch',M'ch') &*&
           Mr(snd(reqch')) == cons(2r,nil); @*/
     {
     //@ g_trandit(ch);
     int res = process(fst(reqch'));
     //@ close Mch'(pair(res,ch));
-    //@ assert [_]channel(snd(reqch'),Mch',M'ch',U);  
+    //@ assert [_]channel(snd(reqch'),Mch',M'ch');  
+    //@ g_credit(ch);    
     send(snd(reqch'), pair(res,ch));
     reqch' = receive(ch);
     //@ open Mch(_);  
@@ -113,21 +106,21 @@ void cserver(struct channel *ch)
 }
 
 void server(struct channel *s)
-  //@ requires obs(nil, cons(s,cons(s,nil))) &*& [_]channel(s,Ms,M's,U) &*& Mr(s) == cons(1r,nil) &*& Ser(s) == true;
+  //@ requires obs(nil, cons(s,cons(s,nil))) &*& [_]channel(s,Ms,M's) &*& Mr(s) == cons(1r,nil) &*& Ser(s) == true;
   //@ ensures obs(nil, nil);
 {
   pair<int, channel> reqch';
   while(true)
-    //@ invariant obs(nil,cons(s,cons(s,nil))) &*& [_]channel(s,Ms,M's,U);
+    //@ invariant obs(nil,cons(s,cons(s,nil))) &*& [_]channel(s,Ms,M's);
     {
     reqch' = receive(s);
     //@ open Ms(_);
-    //@ assert [_]channel(snd(reqch'),Mch',M'ch',U);
+    //@ assert [_]channel(snd(reqch'),Mch',M'ch');
     //@ close create_channel_ghost_args(2r, cons(1r,nil),false);
     struct channel *ch = create_channel();
-    //@ close init_channel_ghost_args< pair<int, channel> >(Mch, M'ch,C);
+    //@ close init_channel_ghost_args< pair<int, channel> >(Mch, M'ch);
     //@ init_channel(ch);
-    //@ leak channel(ch,_,_,_);  
+    //@ leak channel(ch,_,_);  
     int through = through();
     //@ g_trandit(ch);
     //@ g_credit(ch);    
@@ -141,14 +134,14 @@ void server(struct channel *s)
 }
 
 void client(struct channel *s)
-  //@ requires obs(nil, nil) &*& [_]channel(s,Ms,M's,U) &*& trandit(s) &*& Mr(s) == cons(1r,nil) &*& Ser(s) == true;
+  //@ requires obs(nil, nil) &*& [_]channel(s,Ms,M's) &*& trandit(s) &*& Mr(s) == cons(1r,nil) &*& Ser(s) == true;
   //@ ensures obs(nil, nil);
 {
   //@ close create_channel_ghost_args(1r, cons(2r,nil), false);
   struct channel *ch' = create_channel();
-  //@ close init_channel_ghost_args< pair<int, channel> >(Mch', M'ch', U);
+  //@ close init_channel_ghost_args< pair<int, channel> >(Mch', M'ch');
   //@ init_channel(ch');  
-  //@ leak channel(ch',_,_,_);
+  //@ leak channel(ch',_,_);
   //@ g_credit(ch');
   //@ g_trandit(ch');
   int through = through();
@@ -202,9 +195,9 @@ void main()
 {
   //@ close create_channel_ghost_args(2r, cons(1r,nil),true);
   struct channel *s = create_channel();
-  //@ close init_channel_ghost_args< pair<int, channel> >(Ms,M's,U);
+  //@ close init_channel_ghost_args< pair<int, channel> >(Ms,M's);
   //@ init_channel(s);
-  //@ leak channel(s,_,_,_);  
+  //@ leak channel(s,_,_);  
   //@ g_trandit(s);  
   //@ g_trandit(s);  
 
