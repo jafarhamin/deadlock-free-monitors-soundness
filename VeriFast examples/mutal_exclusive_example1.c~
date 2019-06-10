@@ -1,0 +1,21 @@
+/*
+  A Simple Channel Program
+*/
+
+#include "stdlib.h"
+#include "mutal_exclusive.h"
+#include "threads.h"
+
+void main()
+  //@ requires obs(nil);
+  //@ ensures obs(nil);
+{
+  //@ assume(func_lt(exit_cs,main));
+  //@ close create_exclusive_ghost_args(pair({(main)}, 0r));
+  struct exclusive *ex = create_exclusive();
+  //@ leak [_]exclusive(ex,?v);
+
+  enter_cs(ex);
+  // Perform exclusively
+  exit_cs(ex);
+}

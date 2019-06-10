@@ -1,3 +1,5 @@
+Add LoadPath "proofs".
+
 Require Import List.
 Require Import ZArith.
 Require Import Coq.Init.Nat.
@@ -85,6 +87,7 @@ Proof.
   apply Permutation_in with O'; assumption.
 Qed.
 
+
 Lemma prc_P:
   forall R o o' O P X
          (PRC: prc o O R P X = true)
@@ -111,6 +114,7 @@ Proof.
   omega.
   assumption.
 Qed.
+
 
 Lemma prc_X:
   forall R o o' O P X
@@ -144,6 +148,7 @@ Proof.
   assumption.
 Qed.
 
+
 Lemma ole_X_count:
   forall O o o' R P X
          (EQR: Z.le (R o') (R o))
@@ -174,6 +179,7 @@ Proof.
   rewrite count_occ_In with (eq_dec := Z.eq_dec).
   omega.
 Qed.
+
 
 Lemma count_remove_list_Z:
   forall (G:list (list Z * Z)) r R t
@@ -247,6 +253,7 @@ Proof.
   omega.
 Qed.
 
+
 Lemma two_O:
   forall (G:list (list Z * Z)) r R t
          (UNQ: NoDup (map snd G))
@@ -298,6 +305,7 @@ Proof.
   assumption.
 Qed.
 
+
 Lemma two_O2:
   forall (G: list (Z * list Z * Z)) r r0 R t
          (UNQ: NoDup (map snd G))
@@ -333,6 +341,7 @@ Proof.
   assumption.
 Qed.
 
+
 Lemma remove_concat_map:
   forall (G: list (Z * list Z * Z)) O o o0 t0
          (IN: In o (concat (map (fun x => snd (fst x)) G)))
@@ -363,6 +372,7 @@ Proof.
   assumption.
   assumption.
 Qed. 
+
 
 Lemma count_remove_w_G_seq:
   forall G r R t
@@ -418,6 +428,7 @@ Proof.
   assumption.
 Qed.
 
+
 Lemma count_remove_o_G_seq:
   forall G r r0 R t
          (CNT1: count_occ node_dec G (r0, R, t) = S O)
@@ -463,6 +474,7 @@ Proof.
   assumption.
 Qed.
 
+
 Lemma count_remove_w_G_eq:
   forall G r r' R t
          (NEQ: r' <> r),
@@ -503,6 +515,7 @@ Proof.
   assumption.
 Qed.
 
+
 Lemma count_remove_o_G_eq:
   forall G r r0 R t
          (CNT: count_occ node_dec G (r0, R, t) = S O),
@@ -542,9 +555,11 @@ Proof.
   assumption.
 Qed.
 
+
 Definition spare_ob_inv (G: list (Z * list Z * Z)) (r:Z) :=
   eq (count_occ Z.eq_dec (map (fun x => fst (fst x)) G) r) 0 \/
   lt (count_occ Z.eq_dec (map (fun x => fst (fst x)) G) r) (count_occ Z.eq_dec (concat (map (fun x => snd (fst x)) G)) r).
+
 
 Lemma spare_ob_ind1:
   forall G r0 rmin r' R' R'' t2 t3
@@ -701,6 +716,7 @@ Proof.
   assumption. 
 Qed.
 
+
 Lemma length_filter_le A f f':
   forall (l: list A)
          (FIL: forall x (IN: In x l), f x = true -> f' x = true),
@@ -735,6 +751,7 @@ Proof.
   omega.
   assumption.
 Qed.
+
 
 Lemma own_ob_ind1:
   forall G r0 rmin r' R' R'' t2 t3
@@ -877,6 +894,7 @@ Proof.
   omega.
 Qed.
 
+
 Lemma prc_has_X:
   forall O o o' W P X
          (PRC: prc o' O W P X = true)
@@ -910,6 +928,7 @@ Proof.
   assumption.
 Qed.
 
+
 Lemma prc_le_X:
   forall O o o' xo xo' W P X
          (PRC: prc o' O W P X = true)
@@ -939,6 +958,7 @@ Proof.
   assumption.
   assumption.
 Qed.
+
 
 Lemma prc_ind1:
   forall rmin r' R' R'' W P X
@@ -1187,6 +1207,7 @@ Proof.
     assumption.
 Qed.
 
+
 Lemma in_in_count2 A B dec (f: A -> B):
   forall (l: list A) (a1 a2: A) fa1
          (NEQ: a1 <> a2) 
@@ -1258,6 +1279,7 @@ Proof.
   assumption.
   assumption.
 Qed.
+
 
 Lemma spare_ob_ind2:
   forall G r0 rmin r R R' t1 t2
@@ -1379,6 +1401,7 @@ Proof.
   assumption.
   assumption.
 Qed.
+
 
 Lemma own_ob_ind2:
   forall G r0 rmin r R R' t1 t2
@@ -1509,6 +1532,7 @@ Proof.
   rewrite tmp.
   omega.
 Qed.
+
 
 Lemma prc_ind2:
   forall rmin r R R' W P X
@@ -1695,6 +1719,7 @@ Proof.
     right.
     assumption.
 Qed.
+
 
 Theorem valid_graph_is_deadlock_free:
   forall n (G: list (Z * list Z * Z)) (R: Z -> Z) (P: Z -> bool) (X: Z -> option Z)
@@ -2489,4 +2514,3 @@ Proof.
   inversion IND.
 }}
 Qed.
-

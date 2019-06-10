@@ -1,10 +1,10 @@
 # Deadlock-Free Monitors and Channels
-A formalization and soundness proof in Coq
-as well as a number of examples verified in VeriFast
+* A Formalization and Soundness Proof in Coq
+* A Number of Examples Verified in VeriFast
 
-This repository contains a formalization and a soundness proof, carried out by [Coq proof assistant v8.6](https://coq.inria.fr), for deadlock-free monitors, a modular approach to verify deadlock-freedom of programs synchronized using condition variables.
+[This repository](https://github.com/jafarhamin/deadlock-free-monitors-soundness) contains a formalization and a soundness proof, carried out by [Coq proof assistant v8.6](https://coq.inria.fr), for deadlock-free monitors, a modular approach to verify deadlock-freedom of programs synchronized using condition variables.
 
-Additionally, this repository contains a number of programs, which are synchronized using condition variables or communicate through channels, verified by the [VeriFast program verifier](https://people.cs.kuleuven.be/~bart.jacobs/verifast/).
+Additionally, [this repository](https://github.com/jafarhamin/deadlock-free-monitors-soundness) contains a number of programs, which are synchronized using condition variables or communicate through channels, verified by the [VeriFast program verifier](https://people.cs.kuleuven.be/~bart.jacobs/verifast/).
 
 An HTML representation of this formalization can be found [here](https://www.hamin.be/dfm/html/dfm.html).
 

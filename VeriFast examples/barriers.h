@@ -1,0 +1,20 @@
+#include "stdlib.h"
+//#include "levels.h"
+#include "obligations.h"
+
+struct barrier;
+
+/*@
+predicate create_barrier_ghost_args(pair<list<void*>, real> v_level) = true;
+  
+predicate barrier(struct barrier *b; void* gamma);
+@*/
+
+void wait_barrier(struct barrier *b);
+  //@ requires [_]barrier(b,?v) &*& obs(cons(v,?O)) &*& w_level_below_all(v,O) == true &*& wait_level_below_obs(pair({(wait_barrier)}, 0r), cons(v,O)) == true;
+  //@ ensures [_]barrier(b,v) &*& obs(O);
+
+struct barrier *create_barrier(int r);
+  //@ requires obs(nil) &*& create_barrier_ghost_args(?v_level) &*& r >= 0;
+  //@ ensures barrier(result, ?v) &*& obs(ntimes_list(nat_of_int(r),v,nil)) &*& level(v) == v_level;
+  

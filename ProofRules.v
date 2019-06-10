@@ -1,3 +1,5 @@
+Add LoadPath "proofs".
+
 Require Import Qcanon.
 Require Import ZArith.
 Require Import List.
@@ -11,10 +13,29 @@ Require Import WeakestPrecondition.
 
 Set Implicit Arguments.
 
-Open Local Scope Z.
+Local Open Scope Z.
+
+Definition zero : Z := 0.
+Definition ND := (zero, nil:list (Z*Z)).
+
 
 Definition correct a c a' invs sp :=
- a |= weakest_pre sp c a' id invs.
+  forall n, a |= weakest_pre n sp c a' id invs.
+
+
+(** # <font size="5"><b> Value </b></font> # *)
+
+Theorem rule_Val invs sp e: correct
+  (Abool true)
+  (Val e)
+  (fun z => Abool (Z.eqb z ([[e]]))) invs sp.
+Proof.
+  unfold correct.
+  intros. destruct n. reflexivity.
+  simpl.
+  apply Z.eqb_eq.
+  reflexivity.
+Qed.
 
 
 (** # <font size="5"><b> Allocate Memory </b></font> # *)
@@ -22,9 +43,10 @@ Definition correct a c a' invs sp :=
 Theorem rule_Cons invs sp n: correct
   (Abool true)
   (Cons n)
-  (fun l => fold_left Astar (points_tos (seq 0 n)(Enum l, 0%Z, Enum l, None, false, (0%Z, nil), (0%Z, nil),nil)) (Abool true)) invs sp.
+  (fun l => fold_left Astar (points_tos (seq 0 n)(Enum l, zero, Enum l, None, false, ND, ND ,nil)) (Abool true)) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n0. reflexivity.
   simpl.
   intros.
   rewrite phplus_comm; repeat php_.
@@ -36,17 +58,20 @@ Qed.
 
 (** # <font size="5"><b> Lookup Memory </b></font> # *)
 
-Theorem rule_Lookup invs sp f l e e': correct
-  (Abool (Z.eqb ([[e]]) ([[Aof l]])) &* Apointsto f l e')
+Definition cell_loc (adrs: exp) : location exp := (adrs, zero, adrs, None, false, ND, ND,nil).
+
+Theorem rule_Lookup invs sp f e e': correct
+  (Apointsto f (cell_loc e) e')
   (Lookup e)
-  (fun r => Abool (Z.eqb r ([[e']])) &* Apointsto f l e') invs sp.
+  (fun r => Abool (Z.eqb r ([[e']])) &* Apointsto f (cell_loc e) e') invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
-  destruct SAT as (eq,(f',(lef',pl))).
-  exists l, ([[e']]), f.
-  split. assumption.
+  destruct SAT as (f',(lef',pl)).
+  exists (cell_loc e), ([[e']]), f.
+  split. apply Z.eqb_eq. reflexivity.
   exists p, (emp knowledge).
   exists. repeat php_.
   exists. repeat php_.
@@ -68,25 +93,23 @@ Proof.
   intros.
   split.
   apply Z.eqb_eq. reflexivity.
-  rewrite phplus_comm; repeat php_.
-  rewrite phplus_emp.
-  rewrite ghplus_emp.
-  split; reflexivity.
+  assumption.
+  split; repeat php_.
 Qed.
 
 
 (** # <font size="5"><b> Mutate Memory </b></font> # *)
 
-Theorem rule_Mutate invs sp l (e1 e2 e': exp): correct
-  (Abool (Z.eqb ([[e1]]) ([[Aof l]])) &* l |-> e')
+Theorem rule_Mutate invs sp (e1 e2 e': exp): correct
+  (cell_loc e1 |-> e')
   (Mutate e1 e2)
-  (fun r => l |-> e2) invs sp.
+  (fun r => cell_loc e1 |-> e2) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
-  destruct SAT as (eq,(f',(lef',pl))).
-  exists l, e'.
+  exists (cell_loc e1), e'.
   exists p, (emp knowledge).
   exists. repeat php_.
   exists. repeat php_.
@@ -103,14 +126,14 @@ Proof.
   apply Permutation_refl.
   apply None_op.
   split.
-  split. assumption.
-  exists f', lef'. assumption.
+  split.
+  apply Z.eqb_eq. reflexivity.
+  simpl in SAT.
+  assumption.
   split.
   intros.
   rewrite phplus_comm; repeat php_.
-  rewrite phplus_emp.
-  rewrite ghplus_emp.
-  split; reflexivity.
+  split; repeat php_.
 Qed.
 
 
@@ -121,6 +144,7 @@ Theorem rule_fork c o o' a invs sp:
     correct (Aobs (o ++ o') ** a ) (Fork c) (fun _ => Aobs o) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
@@ -198,7 +222,7 @@ Proof.
   reflexivity.
   }
   rewrite o2N in *.
-  assert (G: sat p (Some (map evalol o')) g (weakest_pre sp c (fun _ => Aobs nil) id invs)).
+  assert (G: sat p (Some (map evalol o')) g (weakest_pre n sp c (fun _ => Aobs nil) id invs)).
   apply C.
   assumption.
   assumption.
@@ -272,9 +296,10 @@ Theorem rule_Let a a' a'' c1 c2 x invs sp:
     correct a (Let x c1 c2) a'' invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
-  eapply sat_weak_imp.
+  eapply sat_weak_imp with (n:=n).
   assumption.
   assumption.
   apply C1.
@@ -285,11 +310,14 @@ Proof.
   unfold id.
   simpl.
   specialize C2 with (z:=z).
-  apply C2 in SAT0.
-  apply sat_pre_subs3 in SAT0;
+  eapply C2 in SAT0.
+  eapply sat_pre_subs3 with (n:=n) in SAT0;
   try tauto.
+  apply SAT0.
+  omega.
   assumption.
   assumption.
+  omega.
 Qed.
 
 
@@ -302,9 +330,10 @@ Theorem rule_If c c1 c2 a a' a'' invs sp:
     correct a (If c c1 c2) a'' invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
-  eapply sat_weak_imp; try assumption.
+  eapply sat_weak_imp with (n:=n); try assumption.
   apply C; try assumption.
   intros.
   destruct (0 <? z)%Z eqn:z0.
@@ -312,6 +341,47 @@ Proof.
   apply C1 with z; try assumption.
   apply Z_ltb_falseL in z0.
   apply C2 with z; try assumption.
+  omega.
+Qed.
+
+
+(** # <font size="5"><b> Loop Commands </b></font> # *)
+
+Theorem rule_While c1 c2 a a' invs sp:
+  forall (C: correct a c1 a' invs sp)
+         (C1: forall z (TRUE: Z.lt 0 z), correct (a' z) c2 (fun _ => a) invs sp)
+         (C2: forall z (TRUE: Z.le z 0), (a' z) |= a),
+    correct a (While c1 c2) (fun _ => EX z, a' z &* Abool (Z.leb z 0)) invs sp.
+(*
+while (1 - size(l))
+  wait(v,l);
+a' = fun z => 1 <= size(l) + z <= 1
+a = fun _ => 0 <= size(l)
+*)
+Proof.
+  unfold correct.
+  simpl.
+  induction n.
+  reflexivity.
+  simpl.
+  intros.
+  eapply sat_weak_imp with (n:=n); try assumption.
+  apply C; try assumption.
+  intros.
+  destruct (0 <? z)%Z eqn:z0.
+  apply Z.ltb_lt in z0.
+  eapply sat_weak_imp with (n:=n); try assumption.
+  eapply C1 with z; try assumption.
+  intros.
+  apply IHn; try assumption.
+  omega.
+  apply Z_ltb_falseL in z0.
+  simpl.
+  exists z.
+  split. assumption.
+  apply Z.leb_le.
+  assumption.
+  omega.
 Qed.
 
 
@@ -323,6 +393,7 @@ Theorem rule_Newlock invs sp r: correct
   (fun l => Aulock ((Enum l,r,Enum l,None,false),(0,nil),(0,nil),nil) empb empb) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   intros.
   simpl.
   intros.
@@ -339,21 +410,21 @@ Qed.
 
 (** # <font size="5"><b> Initialize Lock </b></font> # *)
 
-Theorem rule_g_initl invs sp e l wt ot O i params: correct 
-  (Abool (Z.eqb ([[e]]) ([[Aof l]])) &* Aulock l wt ot ** subsas params (invs i wt ot) ** Aobs O)
-  (g_initl e)
+Theorem rule_g_initl invs sp l wt ot O i params: correct 
+  (Aulock l wt ot ** subsas params (invs i wt ot) ** Aobs O)
+  nop
   (fun _ => Alock ((Aof l, Rof l, Lof l, Xof l, Pof l), (i,params), Mof l, M'of l) ** Aobs O) invs sp.
 Proof.
   unfold correct.
-  intros.
+  intros. destruct n. reflexivity.
+  left. left. left. left. left. left. left. left. left. right.
   simpl in *.
-  destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest)))))))))))))))).
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
   destruct rest as (tmp1,(tmp2,tmp3)).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp3p4,(o3,(o4,(c3,(c4,(ghpdefc3c4,(bc3,(bc4,(bc34,(opo3o4,rest1))))))))))))))).
-  exists l, O, wt, ot, i, params.
+  exists l, O, wt, ot, i, params, (Aof l).
   split.
-  unfold id.
-  tauto.
+  apply Z.eqb_eq. reflexivity.
   exists p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
   split.
   tauto.
@@ -418,6 +489,7 @@ Theorem rule_Acquire invs sp el l (O: list (olocation exp)): correct
   (fun _ => EX wt, (EX ot, (Aobs (Oof l::O) ** Alocked l wt ot ** (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot))))) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
   destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,(p12,c12))))))))))))))))))).
@@ -531,6 +603,7 @@ Theorem rule_Release invs sp e l O wt ot: correct
    (fun _ => Aobs O ** Alock l) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
   destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,tmp3)))))))))))))))))).
@@ -641,6 +714,7 @@ Theorem rule_Newcond invs sp r X P: correct
   (fun v => Aucond ((Enum v,r,Enum v,X,P),(0,nil),(0,nil),nil)) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
   exists r, P, X.
@@ -657,18 +731,19 @@ Qed.
 
 (** # <font size="5"><b> Initialize CV </b></font> # *)
 
-Theorem rule_g_initc invs sp m m' e v l wt ot: correct 
-  (Abool (Z.eqb ([[e]]) ([[Aof v]])) &* Aulock l wt ot ** Aucond v)
-  (g_initc e)
+Theorem rule_g_initc invs sp m m' v l wt ot: correct 
+  (Aulock l wt ot ** Aucond v)
+  nop
   (fun _ => Aulock l wt ot ** Aicond ((Aof v, Rof v, Aof l, Xof v, Pof v), Iof v, m, m')) invs sp.
 Proof.
   unfold correct.
-  simpl.
-  intros.
-  destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest)))))))))))))))).
-  exists v, l, m, m', wt, ot.
+  intros. destruct n. reflexivity.
+  left. left. left. left. left. left. left. left. right.
+  simpl in *.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
+  exists v, l, m, m', wt, ot, (Aof v).
   split.
-  assumption.
+  apply Z.eqb_eq. reflexivity.
   exists p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
   split.
   tauto.
@@ -712,17 +787,23 @@ Qed.
 
 (** # <font size="5"><b> Finalize CV </b></font> # *)
 
-Theorem rule_g_finlc invs sp e v l: correct 
-  ((Abool (andb (Z.eqb ([[e]]) ([[Aof v]])) (Z.eqb ([[Lof v]]) ([[Aof l]]))) &* Aprop (spurious_ok sp (evall l) (evall v) invs)) &* Alock l ** Aicond v)
-  (g_finlc e)
+Theorem rule_g_finlc invs sp v l: correct 
+  ((Abool (Z.eqb ([[Lof v]]) ([[Aof l]])) &* Aprop (spurious_ok sp (evall l) (evall v) invs)) &* Alock l ** Aicond v)
+  nop
   (fun _ => Alock l ** Acond v) invs sp.
 Proof.
   unfold correct.
-  simpl.
-  intros.
+  intros. destruct n. reflexivity.
+  left. left. left. left. left. left. left. right.
+  simpl in *.
   destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest)))))))))))))))).
-  exists v, l.
-  split. tauto.
+  exists v, l, (Aof v).
+  split. split.
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Z.eqb_eq. reflexivity.
+  destruct EQ. assumption.
+  destruct EQ. assumption.
   exists p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
   split. tauto.
   split.
@@ -780,6 +861,7 @@ Theorem rule_Wait invs sp l v el ev O wt ot: correct
     (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb))))) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
   destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,tmp3)))))))))))))))))).
@@ -848,12 +930,13 @@ Qed.
 
 Theorem rule_Notify invs sp ev v l O wt ot: correct
   (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[ev]]) ([[Aof v]]))) &* 
-    (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) ** Acond v ** Alocked l wt ot ** Aobs ((if Nat.ltb 0 (wt ([[Aof v]])) then (M'of v) else nil) ++ O))
+    ((subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) |* Abool (Nat.leb (wt ([[Aof v]])) 0)) **
+    Acond v ** Alocked l wt ot ** Aobs ((if Nat.ltb 0 (wt ([[Aof v]])) then (M'of v) else nil) ++ O))
   (Notify ev)
-  (fun _ => Acond v ** Alocked l (upd Z.eq_dec wt ([[Aof v]]) (wt ([[Aof v]]) - 1)%nat) ot **
-    (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb) |* Abool (Nat.ltb 0 (wt ([[Aof v]])))) ** Aobs (O)) invs sp.
+  (fun _ => Acond v ** Alocked l (upd Z.eq_dec wt ([[Aof v]]) (wt ([[Aof v]]) - 1)%nat) ot ** Aobs (O)) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
   destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,tmp3)))))))))))))))))).
@@ -929,6 +1012,7 @@ Theorem rule_NotifyAll invs sp ev v l wt ot: correct
   (fun _ => Acond v ** Alocked l (upd Z.eq_dec wt ([[Aof v]]) 0%nat) ot) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n. reflexivity.
   simpl.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,(p12,c12)))))))))))))))))).
@@ -976,14 +1060,15 @@ Qed.
 
 (** # <font size="5"><b> Charge Obligation </b></font> # *)
 
-Theorem rule_g_chrg invs sp ev v l wt ot O: correct
-  (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[ev]]) ([[Aof v]]))) &* Acond v ** Aobs O ** Alocked l wt ot) 
-  (g_chrg ev)
-  (fun _ => Acond v ** Aobs (Oof v::O) ** Alocked l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) + 1)%nat)) invs sp.
+Theorem rule_g_chrg invs sp v l wt ot O: correct
+  (Abool (Z.eqb ([[Lof v]]) ([[Aof l]])) &* Acond v ** Aobs O ** Alocked l wt ot) 
+  nop
+  (fun _ => Acond v ** Aobs (Oof v::O) ** Alocked l wt (upd Z.eq_dec ot ([[Aof v]]) (ot ([[Aof v]]) + 1)%nat)) invs sp.
 Proof.
   unfold correct.
-  simpl.
-  intros.
+  intros. destruct n. reflexivity.
+  left. right.
+  simpl in *.
   destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,(p12,c12))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(BC3,(BC4,(ghpdefC3C4,(bc34,(opO3O4,(tmp2,(tmp4,(p34,c34)))))))))))))))))).
   subst.
@@ -997,9 +1082,13 @@ Proof.
   }
   rewrite o4n in *.
 
-  exists O, wt, ot, l, v.
+  exists O, wt, ot, l, v, (Aof v).
+  split.
+  apply Coq.Bool.Bool.andb_true_iff.
   split.
   assumption.
+  apply Z.eqb_eq.
+  reflexivity.
   exists p1, (phplus p3 p4).
   exists. repeat php_.
   exists. repeat php_.
@@ -1064,14 +1153,15 @@ Proof.
   split; reflexivity.
 Qed.
 
-Theorem rule_g_chrgu invs sp ev v l wt ot O:
-  correct (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[ev]]) ([[Aof v]]))) &* Aicond v ** Aobs O ** Aulock l wt ot)
-  (g_chrgu ev)
-  (fun _ => Aicond v ** Aobs (Oof v::O) ** Aulock l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) + 1)%nat)) invs sp.
+Theorem rule_g_chrgu invs sp v l wt ot O:
+  correct (Abool (Z.eqb ([[Lof v]]) ([[Aof l]])) &* Aicond v ** Aobs O ** Aulock l wt ot)
+  nop
+  (fun _ => Aicond v ** Aobs (Oof v::O) ** Aulock l wt (upd Z.eq_dec ot ([[Aof v]]) (ot ([[Aof v]]) + 1)%nat)) invs sp.
 Proof.
   unfold correct.
-  simpl.
-  intros.
+  intros. destruct n. reflexivity.
+  right.
+  simpl in *.
   destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,(p12,c12))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(BC3,(BC4,(ghpdefC3C4,(bc34,(opO3O4,(tmp2,(tmp4,(p34,c34)))))))))))))))))).
   subst.
@@ -1085,9 +1175,13 @@ Proof.
   }
   rewrite o4n in *.
 
-  exists O, wt, ot, l, v.
+  exists O, wt, ot, l, v, (Aof v).
+  split.
+  apply Coq.Bool.Bool.andb_true_iff.
   split.
   assumption.
+  apply Z.eqb_eq.
+  reflexivity.
   exists p1, (phplus p3 p4).
   exists. repeat php_.
   exists. repeat php_.
@@ -1155,16 +1249,16 @@ Qed.
 
 (** # <font size="5"><b> Discharge Obligation </b></font> # *)
 
-Theorem rule_g_disch invs sp ev v l wt ot O: correct
-  (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[ev]]) ([[Aof v]])) 
-    (andb (safe_obs (evall v) (wt ([[ev]])) ((ot ([[ev]]) - 1))) (Nat.ltb 0 (ot ([[ev]])))))) &*
+Theorem rule_g_disch invs sp v l wt ot O: correct
+  (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (safe_obs (evall v) (wt ([[Aof v]])) ((ot ([[Aof v]]) - 1)))) &*
     Acond v ** Aobs (Oof v::O) ** Alocked l wt ot)
-  (g_disch ev)
-  (fun _ => Acond v ** Aobs O ** Alocked l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) - 1)%nat)) invs sp.
+  nop
+  (fun _ => Acond v ** Aobs O ** Alocked l wt (upd Z.eq_dec ot ([[Aof v]]) (ot ([[Aof v]]) - 1)%nat)) invs sp.
 Proof.
   unfold correct.
-  simpl.
-  intros.
+  intros. destruct n. reflexivity.
+  left. left. left. right.
+  simpl in *.
   destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,(p12,c12))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(BC3,(BC4,(ghpdefC3C4,(bc34,(opO3O4,(tmp2,(tmp4,(p34,c34)))))))))))))))))).
   subst.
@@ -1178,8 +1272,17 @@ Proof.
   }
   rewrite o4n in *.
 
-  exists O, wt, ot, l, v.
+  exists O, wt, ot, l, v, (Aof v).
   split.
+  apply Coq.Bool.Bool.andb_true_iff in EQ.
+  destruct EQ as (EQ1,EQ2).
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  assumption.
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Z.eqb_eq.
+  reflexivity.
   assumption.
   exists p1, (phplus p3 p4).
   exists. repeat php_.
@@ -1245,16 +1348,16 @@ Proof.
   split; reflexivity.
 Qed.
 
-Theorem rule_g_dischu invs sp ev v l wt ot O: correct
-  (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[ev]]) ([[Aof v]]))
-    (andb (safe_obs (evall v) (wt ([[ev]])) ((ot ([[ev]]) - 1))) (Nat.ltb 0 (ot ([[ev]])))))) &*
+Theorem rule_g_dischu invs sp v l wt ot O: correct
+  (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (safe_obs (evall v) (wt ([[Aof v]])) ((ot ([[Aof v]]) - 1)))) &*
     Aicond v ** Aobs (Oof v::O) ** Aulock l wt ot)
-  (g_dischu ev)
-  (fun _ => Aicond v ** Aobs O ** Aulock l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) - 1)%nat)) invs sp.
+  nop
+  (fun _ => Aicond v ** Aobs O ** Aulock l wt (upd Z.eq_dec ot ([[Aof v]]) (ot ([[Aof v]]) - 1)%nat)) invs sp.
 Proof.
   unfold correct.
-  simpl.
-  intros.
+  intros. destruct n. reflexivity.
+  left. left. right.
+  simpl in *.
   destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,(p12,c12))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(BC3,(BC4,(ghpdefC3C4,(bc34,(opO3O4,(tmp2,(tmp4,(p34,c34)))))))))))))))))).
   subst.
@@ -1268,10 +1371,18 @@ Proof.
   }
   rewrite o4n in *.
 
-  exists O, wt, ot, l, v.
+  exists O, wt, ot, l, v, (Aof v).
+  split.
+  apply Coq.Bool.Bool.andb_true_iff in EQ.
+  destruct EQ as (EQ1,EQ2).
+  apply Coq.Bool.Bool.andb_true_iff.
   split.
   assumption.
-  exists p1, (phplus p3 p4).
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Z.eqb_eq.
+  reflexivity.
+  assumption.  exists p1, (phplus p3 p4).
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
@@ -1340,13 +1451,15 @@ Qed.
 
 Theorem rule_g_newctr invs sp: correct 
   (Abool true) 
-  g_newctr
+  nop
   (fun _ => EX gc, Actr (Enum gc) 0) sp invs.
 Proof.
   unfold correct.
-  simpl.
+  intros. destruct n. reflexivity.
+  left. left. left. left. left. left. right.
+  simpl in *.
   intros.
-  destruct SAT0 as (n,EQ).
+  destruct SAT0 as (n0,EQ).
   exists v.
   unfold ghplus.
   unfold ghplusdef in GHPDEF.
@@ -1356,142 +1469,50 @@ Proof.
   destruct p0.
   destruct o0.
   contradiction.
-  exists (plus n0 n).
+  exists (plus n1 n0).
   unfold lift'.
   reflexivity.
-  exists n.
+  exists n0.
   exists.
 Qed.
 
 
 (** # <font size="5"><b> Increment Goust Counter </b></font> # *)
 
-Theorem rule_g_ctrinc invs sp gc n: correct 
+Theorem rule_g_ctrinc invs sp gc n: correct
   (Actr gc n) 
-  (g_ctrinc gc)
+  nop
   (fun _ => Actr gc (S n)%nat ** Atic gc) invs sp.
 Proof.
   unfold correct.
+  intros. destruct n0. reflexivity.
+  left. left. left. left. right.
+  simpl in SAT.
+  destruct SAT as (m,ggc).
   simpl.
-  intros.
-  destruct SAT as (n0,ggc).
-  exists n, (emp knowledge), p.
+  exists n,gc.
+  exists p, (emp knowledge).
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
-  exists None, o.
-  exists (upd Z.eq_dec g ([[gc]]) (Some (Some n, n0))).
-  exists (upd Z.eq_dec (emp (option nat*nat)) ([[gc]]) (Some (None, O))).
-  exists.
-  unfold ghplusdef.
-  unfold upd.
-  intros.
-  destruct (Z.eq_dec x ([[gc]])).
-  trivial.
-  unfold emp.
-  destruct (g x); trivial.
-  destruct p0.
-  destruct o0; trivial.
-  exists.
-  unfold boundgh.
-  unfold upd.
-  intros.
-  destruct (Z.eq_dec x ([[gc]])).
-  symmetry in H.
-  inversion H.
-  apply bg with ([[gc]]).
-  assumption.
-  apply bg with x.
-  assumption.
-  exists.
-  unfold boundgh.
-  unfold upd.
-  unfold emp.
-  intros.
-  destruct (Z.eq_dec x ([[gc]])).
-  inversion H.
-  inversion H.
-  exists.
-  unfold boundgh.
-  unfold upd.
-  unfold emp.
-  unfold ghplus.
-  intros.
-  destruct (Z.eq_dec x ([[gc]])).
-  symmetry in H.
-  inversion H.
-  apply bg with ([[gc]]).
-  replace (n0 + 0)%nat with n0.
-  assumption.
-  omega.
-  destruct (g x) eqn:gx.
-  destruct p0.
-  apply bg with x.
-  symmetry in H.
-  inversion H.
-  rewrite H1.
-  assumption.
-  inversion H.
-  exists.
-  destruct o.
-  apply sn_op.
-  apply Permutation_refl.
-  apply None_op.
-  exists.
-  exists n0.
-  unfold upd.
-  rewrite eqz.
-  reflexivity.
-  exists.
-  intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
-  exists p, p', PHPDEF, bp, BP',BPP', o, O'.
-  exists c1, c2, ghpdefc1c2, bc1, bc2, bc12.
-  exists OPLUS.
-  cnj_.
-  exists. assumption.
-  exists. assumption.
-  exists. reflexivity.
-  rewrite rest_2_2_2.
-  unfold ghplus.
-  unfold upd.
-  apply functional_extensionality.
-  intros.
-  destruct (Z.eq_dec x ([[gc]])).
-  rewrite e.
-  destruct (g' ([[gc]])) eqn:g'gc.
-  destruct p0.
-  reflexivity.
-  rewrite <- rest_2_2_2 in g'gc.
-  unfold ghplus in g'gc.
-  destruct rest_1 as (n1,c1gc).
-  unfold id in *.
-  rewrite c1gc in g'gc.
-  destruct (c2 ([[gc]])).
-  destruct p0.
-  inversion g'gc.
-  inversion g'gc.
-  unfold emp.
-  reflexivity.
-  rewrite phplus_comm; repeat php_.
+  exists o, None.
+  exists g, (emp (option nat * nat)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply fs_oplus.
   split.
-  reflexivity.
-  unfold emp.
-  unfold ghplus.
-  unfold upd.
-  apply functional_extensionality.
+  exists m. assumption.
+  split.
   intros.
-  destruct (Z.eq_dec x ([[gc]])).
-  rewrite e.
-  rewrite ggc.
-  replace (n0 + 0)%nat with n0.
-  reflexivity.
-  omega.
-  destruct (g x).
-  destruct p0.
-  reflexivity.
-  reflexivity.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))).
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12.
+  exists. inversion OPLUS. rewrite H0. assumption. apply oplus_trans with o0; try assumption. rewrite H0. assumption.
+  split; try assumption.
+  split; try assumption.
+  split; repeat php_.
 Qed.
 
 
@@ -1499,15 +1520,15 @@ Qed.
 
 Theorem rule_g_ctrdec invs sp c n: correct
   (Actr c n ** Atic c) 
-  (g_ctrdec c) 
+  nop
   (fun _ => Actr c (n-1)%nat &* Abool (Nat.ltb 0 n)) invs sp.
 Proof.
   unfold correct.
-  simpl.
-  intros.
+  intros. destruct n0. reflexivity.
+  left. left. left. left. left. right.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
   destruct rest as (tmp1,(tmp2,tmp3)).
-  exists n, p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
+  exists n, c, p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
   split.
   tauto.
   split.
@@ -1535,12 +1556,12 @@ Proof.
   rewrite ghplus_comm.
   rewrite ghplus_emp.
   unfold id in *.
-  destruct SAT as (n0,rest).
-  exists n0.
+  destruct SAT as (n1,rest).
+  exists n1.
   assumption.
   repeat php_.
-  destruct tmp1 as (n0,c1c).
-  destruct tmp2 as (n1,c2c).
+  destruct tmp1 as (n1,c1c).
+  destruct tmp2 as (n2,c2c).
   unfold boundgh in bc12.
   unfold ghplus in bc12.
   specialize bc12 with (x:=([[c]])).
@@ -1548,7 +1569,7 @@ Proof.
   destruct c2c as (o',c2c).
   rewrite c2c in bc12.
   apply Nat.ltb_lt.
-  apply le_trans with (n0 + S n1)%nat.
+  apply le_trans with (n1 + S n2)%nat.
   omega.
   apply bc12.
   reflexivity.
@@ -1568,15 +1589,17 @@ Theorem rule_frame a a' c invs sp:
     correct (a ** f) c (fun z => a' z ** f) invs sp.
 Proof.
   unfold correct.
-  simpl.
+  intros. destruct n. reflexivity.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
   assert (sata:=tmp1).
-  apply RULE in sata.
+  eapply RULE in sata.
   rewrite <- p1p2.
   rewrite <- c1c2.
-  apply sat_frame.
-  apply sat_plus with o1 o2; assumption.
+  eapply sat_frame with (S n).
+  apply sat_plus with o1 o2; try assumption.
+  apply sata.
+  omega.
   assumption.
   assumption.
 Qed.
@@ -1709,6 +1732,61 @@ Proof.
 Qed.
 
 
+(** # <font size="5"><b> Rule Exists </b></font> # *)
+
+Theorem rule_exists1 invs sp A c P Q :
+  (forall (x:A), correct (P x) c Q invs sp) ->
+  correct (EX x, P x) c Q invs sp.
+Proof.
+  unfold correct.
+  simpl.
+  intros.
+  destruct SAT as (v,SAT).
+  eapply sat_weak_imp with (n:=n); try assumption.
+  eapply H; try assumption.
+  apply SAT.
+  simpl.
+  intros.
+  assumption.
+  omega.
+Qed.
+
+Theorem rule_exists invs sp A c P Q :
+  (forall (x:A), correct (P x) c (fun z => (Q z) x) invs sp) ->
+  correct (EX x, P x) c (fun z => EX x, (Q z) x) invs sp.
+Proof.
+  unfold correct.
+  simpl.
+  intros.
+  destruct SAT as (v,SAT).
+  eapply sat_weak_imp with (n:=n); try assumption.
+  apply H; try assumption.
+  apply SAT.
+  simpl.
+  intros.
+  exists v.
+  assumption.
+  omega.
+Qed.
+
+Theorem rule_exists2 invs sp A c P Q :
+  (exists (x:A), correct P c (fun z => (Q z) x) invs sp) ->
+  correct P c (fun z => EX x, (Q z) x) invs sp.
+Proof.
+  unfold correct.
+  simpl.
+  intros.
+  destruct H as (x,SAT1).
+  eapply sat_weak_imp with (n:=n); try assumption.
+  apply SAT1; try assumption.
+  simpl.
+  intros.
+  exists x.
+  assumption.
+  omega.
+Qed.
+
+
 (** # <font size="5"><b> Rule Consequence </b></font> # *)
 
 Theorem rule_conseq a1 a2 a1' a2' c invs sp:
@@ -1719,7 +1797,7 @@ Theorem rule_conseq a1 a2 a1' a2' c invs sp:
 Proof.
   unfold correct.
   intros.
-  apply sat_weak_imp with a2. 
+  eapply sat_weak_imp with (n:=n)(a:=a2). 
   assumption.
   assumption.
   apply C.
@@ -1734,6 +1812,47 @@ Proof.
   assumption.
   assumption.
   assumption.
+  omega.
+Qed.
+
+Theorem rule_conseq1 a1 a2 a1' c invs sp:
+  forall (C: correct a1 c a2 invs sp)
+         (IMP1: a1' |= a1),
+    correct a1' c a2 invs sp.
+Proof.
+  unfold correct.
+  intros.
+  eapply sat_weak_imp with (n:=n)(a:=a2). 
+  assumption.
+  assumption.
+  apply C.
+  assumption.
+  assumption.
+  apply IMP1.
+  assumption.
+  assumption.
+  assumption.
+  intros.
+  assumption.
+  omega.
+Qed.
+
+Theorem rule_conseq2 a1 a2 a2' c invs sp:
+  forall (C: correct a1 c a2 invs sp)
+         (IMP2: forall z, a2 z |= a2' z),
+    correct a1 c a2' invs sp.
+Proof.
+  unfold correct.
+  intros.
+  eapply sat_weak_imp with (n:=n)(a:=a2). 
+  assumption.
+  assumption.
+  apply C.
+  assumption.
+  assumption.
+  assumption.
+  assumption.
+  omega.
 Qed.
 
 Theorem rule_comm a a':
@@ -1748,9 +1867,385 @@ Proof.
   intros. apply sat_assoc; try assumption.
 Qed.
 
+
+Theorem rule_assoc_pure b a a':
+  (Abool b &* a) ** a' |= (Abool b) &* (a ** a').
+Proof.
+  simpl.
+  intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
+  destruct rest as ((tmp0,tmp1),(tmp2,tmp3)).
+  split. assumption.
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
+  split. assumption. split; assumption.
+Qed.
+
+Theorem rule_assoc_pure' b a a':
+  (Abool b) &* (a ** a') |= (Abool b &* a) ** a'.
+Proof.
+  simpl.
+  intros.
+  destruct SAT as (bt,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest)))))))))))))))).
+  destruct rest.
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
+  split. split; assumption. assumption.
+Qed.
+
+Theorem rule_assoc_pureP' b a a':
+  (Aprop b) &* (a ** a') |= (Aprop b &* a) ** a'.
+Proof.
+  simpl.
+  intros.
+  destruct SAT as (bt,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest)))))))))))))))).
+  destruct rest.
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
+  split. split; assumption. assumption.
+Qed.
+
 Theorem rule_assoc' a a' a'':
   a ** (a' ** a'') |= (a ** a') ** a''.
 Proof.
   intros. apply sat_assoc; try assumption.
 Qed.
 
+Theorem rule_trans a a' a'':
+  (a |= a') /\ (a' |= a'') -> a |= a''.
+Proof.
+  intros. apply H; try assumption. apply H; try assumption.
+Qed.
+
+
+Theorem rule_exists_dist A (a: A -> assn) a':
+  (EX x, a x) ** a' |=  EX x, (a x ** a').
+Proof.
+  simpl.
+  intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
+  destruct rest as (tmp1,(tmp2,tmp3)).
+  destruct tmp1 as (v,satv).
+  exists v, p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
+  split; try assumption.
+  split; try assumption.
+Qed.
+
+Theorem rule_exists_dist1 A a (a': A -> assn):
+  a ** (EX x, a' x) |=  EX x, (a ** (a' x)).
+Proof.
+  simpl.
+  intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
+  destruct rest as (tmp1,(tmp2,tmp3)).
+  destruct tmp2 as (v,satv).
+  exists v, p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
+  split; try assumption.
+  split; try assumption.
+Qed.
+
+Theorem rule_exists_dist2 A a (a': A -> assn):
+  EX x, (a ** (a' x)) |= a ** (EX x, a' x).
+Proof.
+  simpl.
+  intros.
+  destruct SAT as (v,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest)))))))))))))))).
+  destruct rest as (tmp1,(tmp2,tmp3)).
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
+  split; try assumption.
+  split; try assumption.
+  exists v. assumption.
+Qed.
+
+
+Theorem rule_exists_dist' A (a: A -> assn) a':
+  EX x, (a x ** a') |= (EX x, a x) ** a'.
+Proof.
+  simpl.
+  intros.
+  destruct SAT as (v,SAT).
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
+  destruct rest as (tmp1,tmp2).
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
+  split.
+  exists v. assumption.
+  assumption.
+Qed.
+
+(*
+Lemma sat_exists_swap A B (a: A -> B -> assn):
+  (forall x x', a x x' = a x' x) -> 
+  (EX x, (EX x', a x x')) |= (EX x', (EX x, a x x')).
+Proof.
+  simpl.
+  intros.
+  assumption.
+
+Admitted.
+*)
+
+Theorem rule_star_pure a a':
+  a ** a' |= a &* a'.
+Proof.
+  simpl. intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
+  destruct rest as (tmp1,(tmp2,(p1p2,c1c2))).
+  subst.
+  split.
+  {
+  inversion opo1o2.
+  {
+  rewrite <- H in *.
+  apply sat_mon with None None; try assumption.
+  apply None_op.
+  }
+  {
+  rewrite <- H in *.
+  apply sat_mon with (Some o0) None; try assumption.
+  apply fs_op; assumption.
+  }
+  {
+  rewrite <- H in *.
+  apply sat_mon with None (Some o0); try assumption.
+  apply sn_op; assumption.
+  }
+  }
+  {
+  rewrite phplus_comm; repeat php_.
+  rewrite ghplus_comm; repeat php_.
+  inversion opo1o2.
+  {
+  rewrite <- H0 in *.
+  apply sat_mon with None None; repeat php_.
+  apply None_op.
+  }
+  {
+  rewrite <- H0 in *.
+  apply sat_mon with None (Some o0); repeat php_.
+  apply sn_op; assumption.
+  }
+  {
+  rewrite <- H0 in *.
+  apply sat_mon with (Some o0) None; repeat php_.
+  apply fs_op; assumption.
+  }
+  }
+Qed.
+
+Theorem rule_pure_star a b:
+  a &* (Abool b) |= a ** (Abool b).
+Proof.
+  simpl. intros.
+  destruct SAT as (SAT,btrue).
+  exists p, (emp knowledge).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists o, None.
+  exists g, (emp (option nat * nat)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply fs_oplus.
+  split. assumption.
+  split. assumption.
+  split; repeat php_.
+Qed.
+
+Theorem rule_pure_star' a b:
+  (Abool b) &* a |= (Abool b) ** a.
+Proof.
+  simpl. intros.
+  destruct SAT as (SAT,btrue).
+  exists (emp knowledge), p.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists None, o.
+  exists (emp (option nat * nat)), g.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply sn_oplus.
+  split. assumption.
+  split. assumption.
+  split; repeat php_.
+Qed.
+
+Theorem rule_comm_pure a a':
+  a &* a' |= a' &* a.
+Proof.
+  simpl. intros.
+  destruct SAT as (SAT1, SAT2).
+  split; assumption.
+Qed.
+
+Theorem rule_sat_mon_pure a a':
+  a &* a' |= a.
+Proof.
+  simpl. intros. destruct SAT. assumption.
+Qed.
+
+Theorem rule_sat_mon a a':
+  a ** a' |= a.
+Proof.
+  simpl. intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
+  destruct rest as (tmp1,(tmp2,(p1p2,c1c2))).
+  subst.
+  inversion opo1o2.
+  {
+  rewrite <- H in *.
+  apply sat_mon with None None; repeat php_.
+  apply None_op.
+  }
+  {
+  rewrite <- H in *.
+  apply sat_mon with (Some o0) None; repeat php_.
+  apply fs_op; assumption.
+  }
+  {
+  rewrite <- H in *.
+  apply sat_mon with None (Some o0); repeat php_.
+  apply sn_op; assumption.
+  }
+Qed.
+
+Lemma sat_star_imps:
+  forall a a' b b' p o C
+         (SAT: sat p o C (a ** b))
+         (IMP1: a |= a')
+         (IMP2: b |= b'),
+    sat p o C (a' ** b').
+Proof.
+  simpl.
+  intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
+  destruct rest as (tmp1,(tmp2,(p1p2,c1c2))).
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
+  split. apply IMP1; assumption.
+  split. apply IMP2; assumption.
+  split; assumption.
+Qed.
+
+Lemma sat_exists_imps A (a a': A -> assn):
+  forall (IMP1: forall x, a x |= a' x),
+    (EX x, a x) |= (EX x, a' x).
+Proof.
+  simpl.
+  intros.
+  destruct SAT as (v,SAT).
+  exists v.
+  apply IMP1; try assumption.
+Qed.
+
+Theorem sat_array:
+  forall v1 v2,
+    (array (cell_loc v1) 0 |-> v2) |= (cell_loc v1 |-> v2).
+Proof.
+  unfold array. unfold cell_loc.
+  simpl.
+  unfold evall, evalol.
+  simpl.
+  unfold Aofo, Rofo, Lofo, Xofo, Pofo, Iof, Mof, Aof, Rof, Lof, Xof, Pof, Aofo, Rofo, Lofo, Xofo, Pofo.
+  simpl.
+  intros.
+  destruct SAT as (v',(lev,pv)).
+  exists v', lev.
+  replace (([[v1]]) + 0) with ([[v1]]) in pv; try omega.
+  assumption.
+Qed.
+
+Definition next_loc (l: location exp) : location exp := cell_loc (Eplus (Aof l) (Enum 1)).
+
+Theorem sat_array1:
+  forall v1 v2,
+    (array (cell_loc v1) 1 |-> v2) |= (next_loc (cell_loc v1) |-> v2).
+Proof.
+  intros.
+  destruct SAT as (v',(lev,pv)).
+  exists v', lev. assumption.
+Qed.
+
+Lemma cell_loc_eval:
+  forall v v' value (EQ: ([[v]]) = ([[v']])),
+  (cell_loc v) |-> Enum value |=
+  (cell_loc v') |-> Enum value.
+Proof.
+  simpl.
+  unfold evall, evalol.
+  simpl.
+  unfold Aofo, Rofo, Lofo, Xofo, Pofo, Iof, Mof, Aof, Rof, Lof, Xof, Pof, Aofo, Rofo, Lofo, Xofo, Pofo.
+  simpl.
+  intros.
+  rewrite EQ in *.
+  assumption.
+Qed.
+
+Lemma cell_loc_eval1:
+  forall v v' value (EQ: ([[v]]) = ([[v']])),
+  (next_loc (cell_loc v) |-> Enum value) |=
+(next_loc (cell_loc v') |-> Enum value).
+Proof.
+  simpl.
+  unfold evall, evalol.
+  simpl.
+  unfold Aofo, Rofo, Lofo, Xofo, Pofo, Iof, Mof, Aof, Rof, Lof, Xof, Pof, Aofo, Rofo, Lofo, Xofo, Pofo.
+  simpl.
+  intros.
+  rewrite EQ in *.
+  assumption.
+Qed.
+
+Theorem rule_plus_evall:
+  forall l z z',
+    (cell_loc l |-> Eplus (Enum z) (Enum z')) |=  (cell_loc l |-> Enum (z + z')).
+Proof.
+  simpl.
+  unfold evall, evalol.
+  simpl.
+  unfold Aofo, Rofo, Lofo, Xofo, Pofo, Iof, Mof, Aof, Rof, Lof, Xof, Pof, Aofo, Rofo, Lofo, Xofo, Pofo.
+  simpl.
+  intros.
+  destruct SAT as (v',(lev,pv)).
+  exists v', lev. assumption.
+Qed.
+
+Lemma Qc_Le_le_mon1:
+  forall (q1 q2: Qc)
+         (LE: (q1 + q2 <= 1)%Qc)
+         (LT: (0 <= q2)%Qc),
+    (q1 <= 1)%Qc.
+Admitted.
+
+Theorem rule_disjont:
+  forall l l' v v' (EQ: ([[l]]) = ([[l']])),
+    cell_loc l |-> v ** cell_loc l' |-> v' |= Abool false.
+Proof.
+  simpl.
+  intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))).
+  destruct tmp1 as (f1,(le1,p1l)).
+  destruct tmp2 as (f2,(le2,p2l)).
+  replace (evall (cell_loc l')) with (evall (cell_loc l)) in p2l.
+  unfold boundph in bp12.
+  assert (CO: (0<(1 + f1 + (1 + f2)))%Qc /\ ((1 + f1 + (1 + f2))<=1)%Qc).
+  {
+  apply bp12 with (evall (cell_loc l)) ([[v]]).
+  unfold phplus.
+  rewrite p1l, p2l. reflexivity.
+  }
+  destruct CO as (C,CO).
+  rewrite Qcplus_assoc in CO.
+  apply Qc_Le_le_mon1 in CO; try assumption.
+  rewrite Qcplus_comm in CO.
+  rewrite Qcplus_assoc in CO.
+  apply Qc_Le_le_mon1 in CO; try assumption.
+  exfalso.
+  apply qcpluslelt with 1%Qc; try assumption.
+  unfold Qclt. simpl. unfold QArith_base.Qlt. simpl. omega.
+  unfold evall, evalol. simpl.
+  unfold Aofo, Rofo, Lofo, Xofo, Pofo, Iof, Mof, Aof, Rof, Lof, Xof, Pof, Aofo, Rofo, Lofo, Xofo, Pofo.
+  simpl. rewrite EQ. reflexivity.
+Qed.

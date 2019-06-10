@@ -1,3 +1,6 @@
+Add LoadPath "proofs".
+
+Require Import Coq.Init.Nat.
 Require Import Coq.Bool.Bool.
 Require Import ZArith.
 Require Import Qcanon.
@@ -102,43 +105,44 @@ Inductive assn :=
   | Afa A (pp: A -> assn).
 
 
-Definition subsol (x:Z) (z:Z) (l:olocation exp): olocation exp :=
+Definition subsol (l:olocation exp) (se: exp -> exp): olocation exp :=
   match l with
-    | (A,R,L,X,P) => (subse x z A,R,subse x z L,X,P)
+    | (A,R,L,X,P) => (se A,R,se L,X,P)
   end.
 
-Definition subsl (x:Z) (z:Z) (l:location exp): location exp :=
+Definition subsl (l:location exp) (se: exp -> exp): location exp :=
   match l with
-    | (ol,i,M,M') => (subsol x z ol,i,M, map (subsol x z) M')
+    | (ol,i,M,M') => (subsol ol se,i,M, map (fun y => subsol y se) M')
   end.
 
-Fixpoint subsa (x:Z) (z:Z) (a:assn): assn :=
+Fixpoint subsa (a:assn) (se: exp -> exp): assn :=
   match a with 
     | Aprop p => Aprop p
     | Abool b => Abool b
-    | Aconj P Q => Aconj (subsa x z P) (subsa x z Q)
-    | Adisj P Q => Adisj (subsa x z P) (subsa x z Q)
-    | Astar P Q => Astar (subsa x z P) (subsa x z Q)
-    | Asepimp P Q => Asepimp (subsa x z P) (subsa x z Q)
-    | Apointsto f a v => Apointsto f (subsl x z a) (subse x z v)
-    | Aulock l Wt Ot => Aulock (subsl x z l) Wt Ot
-    | Alock l => Alock (subsl x z l)
-    | Alocked l Wt Ot => Alocked (subsl x z l) Wt Ot
-    | Acond v => Acond (subsl x z v)
-    | Aucond v => Aucond (subsl x z v)
-    | Aicond v => Aicond (subsl x z v)
-    | Aobs O1 => Aobs (map (subsol x z) O1)
-    | Atic v => Atic (subse x z v)
-    | Actr v n => Actr (subse x z v) n
-    | Aex pp => Aex (fun y => subsa x z (pp y))
-    | Afa pp => Afa (fun y => subsa x z (pp y))
+    | Aconj P Q => Aconj (subsa P se) (subsa Q se)
+    | Adisj P Q => Adisj (subsa P se) (subsa Q se)
+    | Astar P Q => Astar (subsa P se) (subsa Q se)
+    | Asepimp P Q => Asepimp (subsa P se) (subsa Q se)
+    | Apointsto f a v => Apointsto f (subsl a se) (se v)
+    | Aulock l Wt Ot => Aulock (subsl l se) Wt Ot
+    | Alock l => Alock (subsl l se)
+    | Alocked l Wt Ot => Alocked (subsl l se) Wt Ot
+    | Acond v => Acond (subsl v se)
+    | Aucond v => Aucond (subsl v se)
+    | Aicond v => Aicond (subsl v se)
+    | Aobs O1 => Aobs (map (fun y => subsol y se) O1)
+    | Atic v => Atic (se v)
+    | Actr v n => Actr (se v) n
+    | Aex pp => Aex (fun y => subsa (pp y) se)
+    | Afa pp => Afa (fun y => subsa (pp y) se)
   end.
 
 Fixpoint subsas (xz: list (Z * Z)) (a:assn) : assn :=
   match xz with
     | nil => a
-    | xz::xzs => subsas xzs (subsa (fst xz) (snd xz) a)
+    | xz::xzs => subsas xzs (subsa a (subse (fst xz) (snd xz)))
   end.
+
 
 (** # <font size="5"><b> Permission Heaps </b></font> # *)
 
@@ -153,7 +157,7 @@ Inductive knowledge :=
 
 Definition pheap := location Z -> option knowledge.
 
-Open Local Scope Qc.
+Local Open Scope Qc.
 
 Definition phplusdef (p1 p2 : pheap) :=
   forall x,
@@ -343,6 +347,248 @@ Notation "P '**' Q" :=
 
 Notation "P '|->' Q" := 
   (Apointsto 1 P Q)(at level 90).
+
+
+(** # <font size="5"><b> Precedence Relation </b></font> # *)
+
+Definition prcl (o:olocation Z) (O: list (olocation Z)) : bool :=
+  match (Xofo o) with
+    | None => forallb (fun x => Z.ltb (Rofo o) (Rofo x)) O
+    | Some xo => andb (leb (length (filter (fun x => Z.leb (Rofo x) (Z.max (Rofo o) xo)) O)) 1)
+                (andb (forallb (fun x => orb (Z.ltb (Z.max (Rofo o) xo) (Rofo x)) 
+                                             (leb_o (Z.max (Rofo o) xo) (Xofo x))) O)
+                (orb (forallb (fun x => Z.ltb (Rofo o) (Rofo x)) O)
+                (Pofo o)))
+  end.
+
+Lemma prcl_perm:
+  forall O O' o
+         (PRC: prcl o O = true)
+         (PERM: Permutation O' O),
+    prcl o O' = true.
+Proof.
+  unfold prcl.
+  intros.
+  destruct (Xofo o).
+  apply Coq.Bool.Bool.andb_true_iff in PRC.
+  destruct PRC as (PRC1,PRC2).
+  apply Nat.leb_le in PRC1.
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Nat.leb_le.
+  rewrite prem_length_eq with (l':=O).
+  assumption.
+  assumption.
+  apply Coq.Bool.Bool.andb_true_iff in PRC2.
+  destruct PRC2 as (PRC2,PRC3).
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply forallb_forall.
+  intros.
+  apply forallb_forall with (x:=x) in PRC2.
+  apply PRC2.
+  apply Permutation_in with O'.
+  assumption.
+  assumption.
+  apply Coq.Bool.Bool.orb_true_iff.
+  apply Coq.Bool.Bool.orb_true_iff in PRC3.
+  destruct PRC3 as [PRC3|PRC3].
+  left.
+  apply forallb_forall.
+  intros.
+  apply forallb_forall with (x:=x) in PRC3.
+  assumption.
+  apply Permutation_in with O'.
+  assumption.
+  assumption.
+  right.
+  assumption.
+  apply forallb_forall.
+  intros.
+  apply forallb_forall with (x:=x) in PRC.
+  assumption.
+  apply Permutation_in with O'.
+  assumption.
+  assumption.
+Qed.
+
+Lemma prcl_mono:
+  forall l O1 O2
+         (PRCL: prcl l (O1 ++ O2) = true),
+    prcl l O2 = true.
+Proof.
+  unfold prcl.
+  intros.
+  destruct (Xofo l).
+  apply Coq.Bool.Bool.andb_true_iff in PRCL.
+  destruct PRCL as (P1,P2).
+  apply Nat.leb_le in P1.
+  rewrite length_filter_app in P1.
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Nat.leb_le.
+  omega.
+  apply Coq.Bool.Bool.andb_true_iff in P2.
+  destruct P2 as (P2,P3).
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply forallb_forall.
+  intros.
+  rewrite forallb_forall in P2.
+  apply P2.
+  apply in_app_iff.
+  right.
+  assumption.
+  apply Coq.Bool.Bool.orb_true_iff in P3.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct P3 as [P3|P3].
+  left.
+  apply forallb_forall.
+  intros.
+  rewrite forallb_forall in P3.
+  apply P3.
+  apply in_app_iff.
+  right.
+  assumption.
+  right.
+  assumption.
+  apply forallb_forall.
+  intros.
+  rewrite forallb_forall in PRCL.
+  apply PRCL.
+  apply in_app_iff.
+  right.
+  assumption.
+Qed.
+
+
+(** # <font size="5"><b> Safe Number of Obligations </b></font> # *)
+
+Definition safe_obs (o:location Z) (Wt Ot: nat) := 
+  andb (orb (Nat.eqb Wt 0) (ltb 0 Ot))
+       (andb (orb (negb (Pof o))(orb (Nat.eqb Wt 0) (ltb Wt Ot)))
+             (orb (ifb (opZ_eq_dec (Xof o) None)) (leb Wt Ot))).
+
+
+Lemma safe_obs_wt_weak:
+  forall v wt ot wt'
+         (LE: le wt' wt)
+         (SAFE_OBS: safe_obs v wt ot = true),
+  safe_obs v wt' ot = true.
+Proof.
+  unfold safe_obs.
+  intros.
+  apply Coq.Bool.Bool.andb_true_iff in SAFE_OBS.
+  destruct SAFE_OBS as (ONE,SAFE_OBS).
+  apply Coq.Bool.Bool.andb_true_iff in SAFE_OBS.
+  destruct SAFE_OBS as (SPR,OWN).
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Coq.Bool.Bool.orb_true_iff in ONE.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct ONE as [ONE|ONE].
+  left.
+  apply Nat.eqb_eq in ONE.
+  apply Nat.eqb_eq.
+  omega.
+  right.
+  assumption.
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Coq.Bool.Bool.orb_true_iff in SPR.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct SPR as [SPR|SPR].
+  left.
+  assumption.
+  right.
+  apply Coq.Bool.Bool.orb_true_iff in SPR.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct SPR as [SPR|SPR].
+  left.
+  apply Nat.eqb_eq in SPR.
+  apply Nat.eqb_eq.
+  omega.
+  right.
+  apply Nat.ltb_lt in SPR.
+  apply Nat.ltb_lt.
+  omega.
+  apply Coq.Bool.Bool.orb_true_iff in OWN.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct OWN as [OWN|OWN].
+  left.
+  assumption.
+  right.
+  apply Nat.leb_le in OWN.
+  apply Nat.leb_le.
+  omega.
+Qed.
+
+Lemma safe_obs_ot_weak:
+  forall v wt ot ot'
+         (LE: le ot ot')
+         (SAFE_OBS: safe_obs v wt ot = true),
+  safe_obs v wt ot' = true.
+Proof.
+  unfold safe_obs.
+  intros.
+  apply Coq.Bool.Bool.andb_true_iff in SAFE_OBS.
+  destruct SAFE_OBS as (ONE,SAFE_OBS).
+  apply Coq.Bool.Bool.andb_true_iff in SAFE_OBS.
+  destruct SAFE_OBS as (SPR,OWN).
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Coq.Bool.Bool.orb_true_iff in ONE.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct ONE as [ONE|ONE].
+  left.
+  assumption.
+  apply Nat.ltb_lt in ONE.
+  right.
+  apply Nat.ltb_lt.
+  omega.
+  apply Coq.Bool.Bool.andb_true_iff.
+  split.
+  apply Coq.Bool.Bool.orb_true_iff in SPR.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct SPR as [SPR|SPR].
+  left.
+  assumption.
+  right.
+  apply Coq.Bool.Bool.orb_true_iff in SPR.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct SPR as [SPR|SPR].
+  left.
+  apply Nat.eqb_eq in SPR.
+  apply Nat.eqb_eq.
+  omega.
+  right.
+  apply Nat.ltb_lt in SPR.
+  apply Nat.ltb_lt.
+  omega.
+  apply Coq.Bool.Bool.orb_true_iff in OWN.
+  apply Coq.Bool.Bool.orb_true_iff.
+  destruct OWN as [OWN|OWN].
+  left.
+  assumption.
+  right.
+  apply Nat.leb_le in OWN.
+  apply Nat.leb_le.
+  omega.
+Qed.
+
+
+(** # <font size="5"><b> Spurious Wakeups </b></font> # *)
+
+Definition inv := bag -> bag -> assn.
+
+Definition spurious_ok (sp: bool) (l v: location Z) (invs: Z -> inv) :=
+  sp = false \/
+  (M'of v = nil /\
+  forall wt ot,
+    Abool (andb (ltb O (wt (Aof v))) ((ifb (list_eq_dec (olocation_eq_dec Z_eq_dec) (M'of v) nil)))) &* subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot) |= 
+    subsas (snd (Iof l)) (invs (fst (Iof l)) (upd Z.eq_dec wt (Aof v) (wt (Aof v) - 1)%nat) ot) **
+    subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)).
+
 
 (** # <font size="5"><b> Injectivity of Locations </b></font> # *)
 
@@ -1386,6 +1632,7 @@ Proof.
   unfold phplusdef; intros; specialize PHPDL with x;
   repeat dstr_.
 Qed.
+
 Lemma phplus_none:
   forall p1 p2 z
          (P1z: p1 z = None)
@@ -1445,7 +1692,6 @@ Proof.
   repeat dstr_;
   inversion p1p2z.
 Qed.
-
 
 Lemma phplus_some:
   forall p1 p2 z
@@ -6470,8 +6716,8 @@ Proof.
   assumption.
   right. assumption.
   }
+  {
   unfold phplus at 1.
-  rewrite foldlz.
   erewrite NONE with (id:=snd a); repeat php_.
   unfold not.
   intros.
@@ -6484,6 +6730,7 @@ Proof.
   exists x1.
   inversion EQ1. auto.
   left. reflexivity.
+  }
   apply can_phpdef.
   repeat php_.
 Qed.

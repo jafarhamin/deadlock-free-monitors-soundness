@@ -1,3 +1,5 @@
+Add LoadPath "proofs".
+
 Require Import List.
 Require Import ZArith.
 Require Import Coq.Init.Nat.
@@ -1490,36 +1492,6 @@ Proof.
   assumption.
 Qed.
 
-(*
-Lemma filterb_filterb_eq A B (m: (A * Z) -> B) (f1 f2: Z -> B -> bool):
-  forall (l: keyval A) L lk
-    (EQF: forall x v (IN: L v = lk)(NEQ: v <> lk) (IN: In x l), (f1 v) (m x) = (f2 v) (m x)),
-    filterb L lk (fun v => length (filter (f1 v) (map m l))) = filterb L lk (fun v => length (filter (f2 v) (map m l))).
-Proof.
-  unfold filterb.
-  intros.
-  apply functional_extensionality.
-  intros.
-  destruct (Z.eq_dec x lk).
-  reflexivity.
-  destruct (Z.eq_dec (L x) lk).
-  Focus 2.
-  reflexivity.
-
-  rewrite filter_filter_eq with (f2:=f2 x).
-  reflexivity.
-  intros.
-  apply in_map_iff in IN.
-  destruct IN as (x1,(EQ,IN)).
-  specialize EQF with (x:=x1).
-  rewrite EQ in EQF.
-  apply EQF.
-  assumption.
-  assumption.
-  assumption.
-Qed.
-*)
-
 Lemma in_perm A:
   forall (l l': list A)
          (PERM: Permutation l' l) l1 l2
@@ -2990,55 +2962,6 @@ Definition defl A (def: A -> A -> Prop) (P: list (A * Z)) :=
          (IN2: In (p2,id2) P),
     def p1 p2. 
 
-(*
-Lemma fold_left_f A f def (CAN: can def f):
-  forall (l: list A) a b 
-         (DEFab: def a b)
-         (DEFLab: forall x (IN: In x l), def x a /\ def x b),
-    fold_left f l (f a b) = f a (fold_left f l b).
-Proof.
-  induction l.
-  simpl.
-  intros.
-  reflexivity.
-  simpl.
-  intros.
-  assert (CAN1:=CAN).
-  unfold can in CAN1.
-  destruct CAN1 as (COMM,(ASSOC,(DASSOC,(DDIST,(DCOMM,NUT))))).
-  replace (f (f a0 b) a) with (f a0 (f b a)).
-  apply IHl.
-  assert (G: def a a0 /\ def a b).
-  {
-  apply DEFLab.
-  left.
-  reflexivity.
-  }
-  apply DASSOC;
-  try tauto.
-  apply DCOMM.
-  tauto.
-  apply DCOMM.
-  tauto.
-  intros.
-  split.
-  apply DEFLab.
-  right.
-  assumption.
-  apply DASSOC.
-  apply DEFLab.
-  right.
-  assumption.
-  apply DEFLab.
-  assumpt
-  rewrite ASSOC.
-  reflexivity.
-  apply DEF.
-  apply DEF.
-  apply DEF.
-Qed.
-*)
-
 Lemma fold_left_f_def A f def (CAN: can def f):
   forall (l: list (A * Z)) a b
          (NODUP: NoDup (map snd l))
@@ -3804,52 +3727,6 @@ Proof.
   assumption.
 Qed.
 
-(*
-Lemma fold_left_g A B def (f: A -> A -> A) (g: A -> B) (CAN: can def f) (DEF: forall a b, def a b):
-  forall (l: list A) a b,
-    g (fold_left f l (f a b)) = g (f b (fold_left f l a)).
-Proof.
-  induction l.
-  simpl.
-  intros.
-  assert (CAN1:=CAN).
-  unfold can in CAN1.
-  destruct CAN1 as (COMM,(ASSOC,(DASSOC,(DASSOCF,(DCOMM,(DREF,NUT)))))).
-  rewrite COMM.
-  reflexivity.
-  apply DEF.
-  simpl.
-  intros.
-  replace (f (f a0 b) a) with (f b (f a0 a)).
-  rewrite fold_left_f with (def:=def).
-  reflexivity.
-  assumption.
-  assumption.
-  assert (CAN1:=CAN).
-  unfold can in CAN1.
-  destruct CAN1 as (COMM,(ASSOC,(DASSOC,(DASSOCF,(DCOMM,(DREF,NUT)))))).
-  replace (f a0 a) with (f a a0).
-  rewrite ASSOC.
-  rewrite <- ASSOC.
-  apply COMM.
-  apply DEF.
-  apply DEF.
-  apply DEF.
-  apply DEF.
-  apply DEF.
-  apply DEF.
-  apply DEF.
-  apply COMM.
-  apply DEF.
-Qed.
-*)
-
-(*Class cang A B (f: A -> A -> A) (g: A -> B) :=
-{
-  fg_comm : forall x y, g (f x y) = g (f y x);
-  fg_perm: forall l l' b (Perm: Permutation l l'), g (fold_left f l b) = g (fold_left f l' b)
-}.*)
-
 Definition cang A (f: A -> A -> A) (g: A -> Prop) :=
   (forall x y, g (f x y) -> g (f y x)) /\
   forall l l' b (Perm: Coq.Sorting.Permutation.Permutation l l'), g (fold_left f l b) -> g (fold_left f l' b).
@@ -4078,4 +3955,3 @@ Proof.
   right.
   assumption.
 Qed.
-

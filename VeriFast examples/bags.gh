@@ -1,0 +1,48 @@
+#ifndef BAGS_H
+#define BAGS_H
+
+fixpoint int inc(fixpoint(void*, int) f, void* x, void* y){
+    return x==y ? f(x)+1 : f(y);
+}
+
+fixpoint fixpoint(void*, unsigned int) finc(fixpoint(void*, unsigned int) f, void* x){
+    return (inc)(f)(x);
+}
+
+fixpoint int inc'(int i, fixpoint(void*, int) f, void* x, void* y){
+    return x==y ? f(x) + i : f(y);
+}
+
+fixpoint fixpoint(void*, unsigned int) finc'(int i, fixpoint(void*, unsigned int) f, void* x){
+    return (inc')(i,f)(x);
+}
+
+fixpoint int dec1(int x){
+  return x > 0 ? x-1 : x;
+}
+
+fixpoint int dec(fixpoint(void*, unsigned int) f, void* x, void* y){
+    return x==y ? dec1(f(x)) : f(y);
+}
+
+fixpoint fixpoint(void*, int) fdec(fixpoint(void*, unsigned int) f, void* x){
+    return (dec)(f)(x);
+}
+
+fixpoint int empb(void* x){
+    return 0;
+}
+
+fixpoint int rma(fixpoint(void*, unsigned int) f, void* x, void* y){
+    return x==y ? 0 : f(y);
+}
+
+fixpoint fixpoint(void*, int) removeAll<t>(fixpoint(void*, unsigned int) f, void* x) {
+    return (rma)(f)(x); 
+}
+
+fixpoint fixpoint(void*, int) finc_bool(bool b, fixpoint(void*, int) Ot, void* v){
+  return b ? finc(Ot,v) : Ot;
+}
+
+#endif    

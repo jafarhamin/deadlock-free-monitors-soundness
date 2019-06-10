@@ -1,3 +1,5 @@
+Add LoadPath "proofs".
+
 Require Import Qcanon.
 Require Import ZArith.
 Require Import Coq.ZArith.BinInt.
@@ -13,6 +15,7 @@ Require Import Assertions.
 Require Import WeakestPrecondition.
 Require Import ProofRules.
 Require Import ValidityOfConfigurations.
+Require Import ValidityOfGhostCommands.
 Require Import RelaxedPrecedenceRelation.
 
 Set Implicit Arguments.
@@ -20,9 +23,10 @@ Set Implicit Arguments.
 (** # <font size="5"><b> Validity of Configurations </b></font> # *)
 
 Theorem valid_configuration_does_not_abort:
-  forall sp t h (VALIDK: validk sp t h),
+  forall n sp t h (VALIDK: validk (S n) sp t h),
     ~ aborts t h.
 Proof.
+  intros.
   intros.
   unfold not.
   intros ABORT.
@@ -65,7 +69,7 @@ Proof.
   apply SOBS in tmp.
   destruct tmp as (WF,(SAT,rest)).
   assert (G1: exists l1 (EQl: Aof l1 = z) (pl: exists v, p l1 = Some (Cell full v)),
-    sat (upd (location_eq_dec Z.eq_dec) p l1 (Some (Cell full ([[e2]])))) (Some O) C (weakest_pre_ct sp (tt, tx) invs)).
+    sat (upd (location_eq_dec Z.eq_dec) p l1 (Some (Cell full ([[e2]])))) (Some O) C (weakest_pre_ct (S n) sp (tt, tx) invs)).
   {
   rewrite <- H2.
   eapply sat_mutate.
@@ -82,7 +86,7 @@ Proof.
   inversion EQW.
   assert (G1': exists v0 ll (EQ: ([[e]]) = ([[Aof ll]]))
     (pv: exists f' (f'le : 0 < f'), p' (evall ll) = Some (Cell f' v0)),
-    sat p' (Some O') C' (weakest_pre_ct sp (Val (Enum v0), tx') invs)).
+    sat p' (Some O') C' (weakest_pre_ct (S n) sp (Val (Enum v0), tx') invs)).
   {
   apply sat_lookup.
   apply SAT'.
@@ -92,7 +96,7 @@ Proof.
   exists (evall ll), v0, f', lef'.
   exists. symmetry. assumption. assumption.
   assert (G2': exists l1 (EQl: Aof l1 = z) (pl: exists v, p' l1 = Some (Cell full v)),
-    sat (upd (location_eq_dec Z.eq_dec) p' l1 (Some (Cell full ([[e3]])))) (Some O') C' (weakest_pre_ct sp (tt, tx') invs)).
+    sat (upd (location_eq_dec Z.eq_dec) p' l1 (Some (Cell full ([[e3]])))) (Some O') C' (weakest_pre_ct (S n) sp (tt, tx') invs)).
   {
   rewrite H3.
   eapply sat_mutate.
@@ -191,7 +195,7 @@ Proof.
   destruct tmp as (WF,(SAT,rest)).
   assert (G1': exists v0 ll (EQ: ([[e]]) = ([[Aof ll]]))
     (pv: exists f' (f'le : 0 < f'), p (evall ll) = Some (Cell f' v0)),
-    sat p (Some O) C (weakest_pre_ct sp (Val (Enum v0), tx) invs)).
+    sat p (Some O) C (weakest_pre_ct (S n) sp (Val (Enum v0), tx) invs)).
   {
   apply sat_lookup. assumption.
   }
@@ -230,7 +234,7 @@ Proof.
   apply SOBS in tmp.
   destruct tmp as (WF,(SAT,rest)).
   assert (G2': exists l1 (EQl: Aof l1 = ([[e1]])) (pl: exists v, p l1 = Some (Cell full v)),
-    sat (upd (location_eq_dec Z.eq_dec) p l1 (Some (Cell full ([[e2]])))) (Some O) C (weakest_pre_ct sp (tt, tx) invs)).
+    sat (upd (location_eq_dec Z.eq_dec) p l1 (Some (Cell full ([[e2]])))) (Some O) C (weakest_pre_ct (S n) sp (tt, tx) invs)).
   {
   eapply sat_mutate. assumption.
   }
@@ -559,8 +563,9 @@ Proof.
   }
 Qed.
 
+
 Theorem valid_configuration_is_not_deadlock:
-  forall sp t h (VALIDK: validk sp t h) (HAS_THREAD: exists id, t id <> None),
+  forall n sp t h (VALIDK: validk (S n) sp t h) (HAS_THREAD: exists id, t id <> None),
     exists id c (TID: t id = Some c), waiting_for h (fst c) = None.
 Proof.
   unfold validk.
@@ -659,6 +664,7 @@ Proof.
   assert (VT:=INx).
   apply SOBS in VT.
   destruct VT as (WF,(WP,VOS)).
+
   apply sat_wait4lock in WP.
   destruct WP as (ll, (EQll, (pll,prcll))).
   assert (LOCKED: fold_left phplus (map pof T) (phplus Pinv Pleak) ll = Some Lock \/
@@ -1425,9 +1431,10 @@ Proof.
   inversion GOAL.
 Qed.
 
+
 Theorem valid_configuration_reduces:
-  forall sp t h 
-         (VALIDK: validk sp t h)
+  forall m sp t h 
+         (VALIDK: validk (S m) sp t h)
          (NOT_TERMINATED: exists id, t id <> None),
     ~ data_race t /\ exists t' h', red sp t h t' h'.
 Proof.
@@ -1448,7 +1455,7 @@ Proof.
   }
   assert (NOWAITING: exists id c (TID: t id = Some c), waiting_for h (fst c) = None).
   {
-  apply valid_configuration_is_not_deadlock with sp;
+  apply valid_configuration_is_not_deadlock with m sp;
   try assumption.
   exists id0.
   rewrite TID0.
@@ -1518,8 +1525,7 @@ Proof.
   assumption.
   destruct (h ([[e1]])) eqn:he1.
   exists (upd Z.eq_dec t id (Some (tt,tx))), (upd Z.eq_dec h ([[e1]]) (Some ([[e2]]))).
-  apply red_Mutate with z.
-  assumption.
+  apply red_Mutate.
   assumption.
   apply valid_configuration_does_not_abort in VALIDK.
   exfalso.
@@ -1540,6 +1546,15 @@ Proof.
   exists (upd Z.eq_dec t id (Some (c1,If' c2 c3 tx))), h.
   apply red_If.
   assumption.
+
+  assert (exx: exists x, is_free (While c1 c2) x = false).
+  {
+  apply inf_var.
+  }
+  destruct exx as (x,isfree).
+  exists (upd Z.eq_dec t id (Some (If c1 (Let x c2 (While c1 c2)) tt, tx))), h.
+  apply red_While; assumption.
+
   unfold inf_capacity in INF2.
   destruct INF2 as (a,INF).
   exists (upd Z.eq_dec t id (Some (Val (Enum a),tx))), (upd Z.eq_dec h a (Some 1%Z)).
@@ -1598,8 +1613,6 @@ Proof.
   }
   apply red_Release.
   assumption.
-  tauto.
-  tauto.
   destruct (h ([[l]])) eqn:hl.
   destruct (Z.eq_dec z 1%Z).
   rewrite e in *.
@@ -1684,15 +1697,6 @@ Proof.
   exists (upd Z.eq_dec (upd Z.eq_dec t id (Some (tt,tx))) id' (Some (Waiting4lock l',tx'))), h.
   apply red_Notify with x v';
   try tauto.
-  destruct (h ([[x]])) eqn:hx.
-  unfold not.
-  intros.
-  inversion H.
-  exfalso.
-  apply VALIDK.
-  apply aborts_Notify with x id tx.
-  assumption.
-  assumption.
   }
 
   assert (G': (exists idvltx, ([[x]]) = ([[(snd (fst (fst idvltx)))]]) /\ t (fst (fst (fst idvltx))) = Some (WasWaiting4cond (snd (fst (fst idvltx))) (snd (fst idvltx)), snd idvltx)) \/
@@ -1704,18 +1708,10 @@ Proof.
   {
   destruct G' as (idvltx,(eqx,tidv)).
 
+
   exists (upd Z.eq_dec (upd Z.eq_dec t id (Some (tt,tx))) (fst (fst (fst idvltx))) (Some (Waiting4lock (snd (fst idvltx)),snd idvltx))), h.
   apply red_Notify01 with x;
   try tauto.
-  destruct (h ([[x]])) eqn:hx.
-  unfold not.
-  intros.
-  inversion H.
-  exfalso.
-  apply VALIDK.
-  apply aborts_Notify with x id tx.
-  assumption.
-  assumption.
   unfold not.
   intros.
   apply G.
@@ -1732,15 +1728,6 @@ Proof.
   exists (upd Z.eq_dec t id (Some (tt,tx))), h.
   apply red_Notify0 with x;
   try tauto.
-  destruct (h ([[x]])) eqn:hx.
-  unfold not.
-  intros.
-  inversion H.
-  exfalso.
-  apply VALIDK.
-  apply aborts_Notify with x id tx.
-  assumption.
-  assumption.
   unfold not.
   intros.
   apply G.
@@ -1760,16 +1747,6 @@ Proof.
 
   exists (upd Z.eq_dec (wakeupthrds ([[x]]) t) id (Some (tt,tx))), h.
   apply red_NotifyAll.
-  assumption.
-  destruct (h ([[x]])) eqn:hx.
-  unfold not.
-  intros.
-  inversion H.
-  exfalso.
-  apply valid_configuration_does_not_abort in VALIDK.
-  apply VALIDK.
-  apply aborts_NotifyAll with x id tx.
-  assumption.
   assumption.
   inversion NOWAITING.
 
@@ -1795,42 +1772,16 @@ Proof.
   assumption.
   assumption.
   exists (upd Z.eq_dec t id (Some (tt,tx))), h.
-  apply red_g_initl with x.
-  assumption.
-  exists (upd Z.eq_dec t id (Some (tt,tx))), h.
-  apply red_g_initc with x.
-  assumption.
-  exists (upd Z.eq_dec t id (Some (tt,tx))), h.
-  apply red_g_finlc with x.
-  assumption.
-  exists (upd Z.eq_dec t id (Some (tt,tx))), h.
-  apply red_g_chrg with x.
-  assumption.
-  exists (upd Z.eq_dec t id (Some (tt,tx))), h.
-  apply red_g_chrgu with x.
-  assumption.
-  exists (upd Z.eq_dec t id (Some (tt,tx))), h.
-  apply red_g_disch with x.
-  assumption.
-  exists (upd Z.eq_dec t id (Some (tt,tx))), h.
-  apply red_g_dischu with x.
-  assumption.
-  exists (upd Z.eq_dec t id (Some (tt,tx))), h.
-  apply red_g_newctr.
-  assumption.
-  exists (upd Z.eq_dec t id (Some (tt,tx))), h.
-  apply red_g_ctrinc with x.
-  assumption.
-  exists (upd Z.eq_dec t id (Some (tt,tx))), h.
-  apply red_g_ctrdec with x.
+  apply red_nop.
   assumption.
 Qed.
 
+
 Theorem initial_configuration_is_valid:
-  forall c id invs sp
+  forall c invs sp
          (WELLFORMED: wellformed_cmd c)
          (VERIFIED: correct (Aobs nil) c (fun _ => Aobs nil) invs sp),
-    validk sp (upd Z.eq_dec (emp (cmd * context)) id (Some (c,done))) (emp Z).
+    forall n id, validk (S n) sp (upd Z.eq_dec (emp (cmd * context)) id (Some (c,done))) (emp Z).
 Proof.
   unfold correct.
   unfold validk.
@@ -1839,15 +1790,19 @@ Proof.
   unfold locations_ok.
   unfold invs_ok.
   unfold locks_ok.
+  simpl.
 
   intros.
-  assert (SAT: sat (emp knowledge) (Some nil) (emp (option nat * nat)) (weakest_pre sp c (fun _ : Z => Aobs nil) Datatypes.id invs)). 
+  assert (SAT: sat (emp knowledge) (Some nil) (emp (option nat * nat)) (weakest_pre (S n) sp c (fun _ : Z => Aobs nil) Datatypes.id invs)). 
+  {
   apply VERIFIED.
   apply boundph_emp.
   apply boundgh_emp.
   simpl.
   apply fs_op.
   apply perm_nil.
+  }
+
   exists ((c,done,emp knowledge,nil,emp (option nat * nat),id)::nil).
   exists invs, nil, (emp knowledge), (emp knowledge), nil, (emp (option nat * nat)), (emp (option nat * nat)).
   simpl.
@@ -1885,6 +1840,7 @@ Proof.
   rewrite <- EQ in WASW.
   rewrite WASW in *.
   simpl in SAT.
+
   destruct SAT as (v0,(v1,(v2,(eql,rest)))).
   apply Coq.Bool.Bool.andb_true_iff in eql.
   destruct eql.
@@ -2122,6 +2078,7 @@ Proof.
   contradiction.
 Qed.
 
+
 Hint Resolve Let_preserves_validity.
 Hint Resolve Val_preserves_validity.
 Hint Resolve Val_done_preserves_validity.
@@ -2139,27 +2096,20 @@ Hint Resolve Notify0_preserves_validity.
 Hint Resolve Notify01_preserves_validity1.
 Hint Resolve NotifyAll_preserves_validity.
 Hint Resolve SpuriousWakeup_preserves_validity.
-Hint Resolve g_initl_preserves_validity.
-Hint Resolve g_initc_preserves_validity.
-Hint Resolve g_finlc_preserves_validity.
-Hint Resolve g_chrg_preserves_validity.
-Hint Resolve g_chrgu_preserves_validity.
-Hint Resolve g_disch_preserves_validity.
-Hint Resolve g_dischu_preserves_validity.
-Hint Resolve g_newctr_preserves_validity.
-Hint Resolve g_ctrinc_preserves_validity.
-Hint Resolve g_ctrdec_preserves_validity.
+Hint Resolve nop_preserves_validity.
 Hint Resolve Cons_preserves_validity.
 Hint Resolve Lookup_preserves_validity.
 Hint Resolve Mutate_preserves_validity.
 Hint Resolve If_preserves_validity.
 Hint Resolve If1_preserves_validity.
 Hint Resolve If2_preserves_validity.
+Hint Resolve While_preserves_validity.
+
 
 Theorem steps_preserve_validity:
-  forall sp t h t' h' 
-         (VALIDK: validk sp t h) (STEP: red sp t h t' h'),
-    validk sp t' h'.
+  forall n sp t h t' h' 
+         (VALIDK: validk (S n) sp t h) (STEP: red sp t h t' h'),
+    validk n sp t' h'.
 Proof.
   intros.
   destruct STEP; try eauto.
@@ -2171,13 +2121,13 @@ Qed.
 Inductive safe: nat -> thrds -> heap -> Prop :=
   | Base: forall t h, safe O t h
   | Terminated: forall n t h (TER: forall id, t id = None), safe n t h
-  | Running: forall n sp t h (NO_RACE: ~ data_race t)
+  | Running: forall sp n t h (NO_RACE: ~ data_race t)
                     (REDUCES: exists t' h', red sp t h t' h')
                     (SAFE: forall t' h' (RED: red sp t h t' h'), safe n t' h'),
                safe (S n) t h.
 
 Theorem valid_configuration_is_safe:
-  forall n sp t h (VALIDK: validk sp t h),
+  forall n sp t h (VALIDK: validk n sp t h),
     safe n t h.
 Proof.
   induction n.
@@ -2204,27 +2154,28 @@ Proof.
   reflexivity.
   assert (G: ~ data_race t /\ exists t' h', red sp t h t' h').
   {
-  apply valid_configuration_reduces;
-  try tauto.
+  apply valid_configuration_reduces with n; try assumption.
   }
-  destruct G as (norace,(t',(h',red))).
-  apply Running with sp.
-  tauto.
+  destruct G as (norace,(t',(h',reduces))).
+  apply Running with sp; try assumption.
   exists t', h'.
-  tauto.
+  assumption.
   intros.
   apply IHn with sp;
   try tauto.
   apply steps_preserve_validity with t h; assumption.
 Qed.
 
+
 Theorem verified_program_is_safe:
-  forall n c id invs sp
+  forall c invs sp
          (WELLFORMED: wellformed_cmd c)
          (VERIFIED: correct (Aobs nil) c (fun _ => Aobs nil) invs sp),
-    safe n (upd Z.eq_dec (emp (cmd * context)) id (Some (c,done))) (emp Z).
+    forall n id, safe n (upd Z.eq_dec (emp (cmd * context)) id (Some (c,done))) (emp Z).
 Proof.
   intros.
+  destruct n.
+  apply Base.
   apply valid_configuration_is_safe with sp.
   apply initial_configuration_is_valid with invs; assumption.
 Qed.

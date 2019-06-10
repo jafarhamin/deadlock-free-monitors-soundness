@@ -1,3 +1,5 @@
+Add LoadPath "proofs".
+
 Require Import Coq.Bool.Bool.
 Require Import ZArith.
 Require Import Coq.Init.Nat.
@@ -12,260 +14,24 @@ Require Import Assertions.
 
 Set Implicit Arguments.
 
-Open Local Scope Z.
+Local Open Scope Z.
 
-(** # <font size="5"><b> Safe Number of Obligations </b></font> # *)
-
-Definition safe_obs (o:location Z) (Wt Ot: nat) := 
-  andb (orb (eqb Wt 0) (ltb 0 Ot))
-       (andb (orb (negb (Pof o))(orb (eqb Wt 0) (ltb Wt Ot)))
-             (orb (ifb (opZ_eq_dec (Xof o) None)) (leb Wt Ot))).
-
-Lemma safe_obs_wt_weak:
-  forall v wt ot wt'
-         (LE: le wt' wt)
-         (SAFE_OBS: safe_obs v wt ot = true),
-  safe_obs v wt' ot = true.
-Proof.
-  unfold safe_obs.
-  intros.
-  apply Coq.Bool.Bool.andb_true_iff in SAFE_OBS.
-  destruct SAFE_OBS as (ONE,SAFE_OBS).
-  apply Coq.Bool.Bool.andb_true_iff in SAFE_OBS.
-  destruct SAFE_OBS as (SPR,OWN).
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
-  apply Coq.Bool.Bool.orb_true_iff in ONE.
-  apply Coq.Bool.Bool.orb_true_iff.
-  destruct ONE as [ONE|ONE].
-  left.
-  apply Nat.eqb_eq in ONE.
-  apply Nat.eqb_eq.
-  omega.
-  right.
-  assumption.
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
-  apply Coq.Bool.Bool.orb_true_iff in SPR.
-  apply Coq.Bool.Bool.orb_true_iff.
-  destruct SPR as [SPR|SPR].
-  left.
-  assumption.
-  right.
-  apply Coq.Bool.Bool.orb_true_iff in SPR.
-  apply Coq.Bool.Bool.orb_true_iff.
-  destruct SPR as [SPR|SPR].
-  left.
-  apply Nat.eqb_eq in SPR.
-  apply Nat.eqb_eq.
-  omega.
-  right.
-  apply Nat.ltb_lt in SPR.
-  apply Nat.ltb_lt.
-  omega.
-  apply Coq.Bool.Bool.orb_true_iff in OWN.
-  apply Coq.Bool.Bool.orb_true_iff.
-  destruct OWN as [OWN|OWN].
-  left.
-  assumption.
-  right.
-  apply Nat.leb_le in OWN.
-  apply Nat.leb_le.
-  omega.
-Qed.
-
-Lemma safe_obs_ot_weak:
-  forall v wt ot ot'
-         (LE: le ot ot')
-         (SAFE_OBS: safe_obs v wt ot = true),
-  safe_obs v wt ot' = true.
-Proof.
-  unfold safe_obs.
-  intros.
-  apply Coq.Bool.Bool.andb_true_iff in SAFE_OBS.
-  destruct SAFE_OBS as (ONE,SAFE_OBS).
-  apply Coq.Bool.Bool.andb_true_iff in SAFE_OBS.
-  destruct SAFE_OBS as (SPR,OWN).
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
-  apply Coq.Bool.Bool.orb_true_iff in ONE.
-  apply Coq.Bool.Bool.orb_true_iff.
-  destruct ONE as [ONE|ONE].
-  left.
-  assumption.
-  apply Nat.ltb_lt in ONE.
-  right.
-  apply Nat.ltb_lt.
-  omega.
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
-  apply Coq.Bool.Bool.orb_true_iff in SPR.
-  apply Coq.Bool.Bool.orb_true_iff.
-  destruct SPR as [SPR|SPR].
-  left.
-  assumption.
-  right.
-  apply Coq.Bool.Bool.orb_true_iff in SPR.
-  apply Coq.Bool.Bool.orb_true_iff.
-  destruct SPR as [SPR|SPR].
-  left.
-  apply Nat.eqb_eq in SPR.
-  apply Nat.eqb_eq.
-  omega.
-  right.
-  apply Nat.ltb_lt in SPR.
-  apply Nat.ltb_lt.
-  omega.
-  apply Coq.Bool.Bool.orb_true_iff in OWN.
-  apply Coq.Bool.Bool.orb_true_iff.
-  destruct OWN as [OWN|OWN].
-  left.
-  assumption.
-  right.
-  apply Nat.leb_le in OWN.
-  apply Nat.leb_le.
-  omega.
-Qed.
-
-(** # <font size="5"><b> Precedence Relation </b></font> # *)
-
-Definition prcl (o:olocation Z) (O: list (olocation Z)) : bool :=
-  match (Xofo o) with
-    | None => forallb (fun x => Z.ltb (Rofo o) (Rofo x)) O
-    | Some xo => andb (leb (length (filter (fun x => Z.leb (Rofo x) (Z.max (Rofo o) xo)) O)) 1)
-                (andb (forallb (fun x => orb (Z.ltb (Z.max (Rofo o) xo) (Rofo x)) 
-                                             (leb_o (Z.max (Rofo o) xo) (Xofo x))) O)
-                (orb (forallb (fun x => Z.ltb (Rofo o) (Rofo x)) O)
-                (Pofo o)))
-  end.
-
-Lemma prcl_perm:
-  forall O O' o
-         (PRC: prcl o O = true)
-         (PERM: Permutation O' O),
-    prcl o O' = true.
-Proof.
-  unfold prcl.
-  intros.
-  destruct (Xofo o).
-  apply Coq.Bool.Bool.andb_true_iff in PRC.
-  destruct PRC as (PRC1,PRC2).
-  apply Nat.leb_le in PRC1.
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
-  apply Nat.leb_le.
-  rewrite prem_length_eq with (l':=O).
-  assumption.
-  assumption.
-  apply Coq.Bool.Bool.andb_true_iff in PRC2.
-  destruct PRC2 as (PRC2,PRC3).
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
-  apply forallb_forall.
-  intros.
-  apply forallb_forall with (x:=x) in PRC2.
-  apply PRC2.
-  apply Permutation_in with O'.
-  assumption.
-  assumption.
-  apply Coq.Bool.Bool.orb_true_iff.
-  apply Coq.Bool.Bool.orb_true_iff in PRC3.
-  destruct PRC3 as [PRC3|PRC3].
-  left.
-  apply forallb_forall.
-  intros.
-  apply forallb_forall with (x:=x) in PRC3.
-  assumption.
-  apply Permutation_in with O'.
-  assumption.
-  assumption.
-  right.
-  assumption.
-  apply forallb_forall.
-  intros.
-  apply forallb_forall with (x:=x) in PRC.
-  assumption.
-  apply Permutation_in with O'.
-  assumption.
-  assumption.
-Qed.
-
-Lemma prcl_mono:
-  forall l O1 O2
-         (PRCL: prcl l (O1 ++ O2) = true),
-    prcl l O2 = true.
-Proof.
-  unfold prcl.
-  intros.
-  destruct (Xofo l).
-  apply Coq.Bool.Bool.andb_true_iff in PRCL.
-  destruct PRCL as (P1,P2).
-  apply Nat.leb_le in P1.
-  rewrite length_filter_app in P1.
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
-  apply Nat.leb_le.
-  omega.
-  apply Coq.Bool.Bool.andb_true_iff in P2.
-  destruct P2 as (P2,P3).
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
-  apply forallb_forall.
-  intros.
-  rewrite forallb_forall in P2.
-  apply P2.
-  apply in_app_iff.
-  right.
-  assumption.
-  apply Coq.Bool.Bool.orb_true_iff in P3.
-  apply Coq.Bool.Bool.orb_true_iff.
-  destruct P3 as [P3|P3].
-  left.
-  apply forallb_forall.
-  intros.
-  rewrite forallb_forall in P3.
-  apply P3.
-  apply in_app_iff.
-  right.
-  assumption.
-  right.
-  assumption.
-  apply forallb_forall.
-  intros.
-  rewrite forallb_forall in PRCL.
-  apply PRCL.
-  apply in_app_iff.
-  right.
-  assumption.
-Qed.
-
-Definition inv := bag -> bag -> assn.
-
-Definition spurious_ok (sp: bool) (l v: location Z) (invs: Z -> inv) :=
-  sp = false \/
-  (M'of v = nil /\
-  forall wt ot,
-    Abool (andb (ltb O (wt (Aof v))) ((ifb (list_eq_dec (olocation_eq_dec Z_eq_dec) (M'of v) nil)))) &* subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot) |= 
-    subsas (snd (Iof l)) (invs (fst (Iof l)) (upd Z.eq_dec wt (Aof v) (wt (Aof v) - 1)%nat) ot) **
-    subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)).
 
 (** # <font size="5"><b> Weakest Precondition </b></font> # *)
-Definition aa (a:nat) :=
-if ltb a a then a else a.
 
-Fixpoint weakest_pre (sp: bool) (c:cmd) (Q: Z -> assn) (se: exp -> exp) (invs: Z -> inv) : assn :=
+Fixpoint weakest_pre (n': nat) (sp: bool) (c:cmd) (Q: Z -> assn) (se: exp -> exp) (invs: Z -> inv) {struct n'} : assn :=
+  match n' with
+    | O => Abool true
+    | S n =>
   match c with
     | Val e => Q ([[se e]])
     | Cons n => FA l, (fold_left Astar (points_tos (seq O n) ((Enum l, 0, Enum l, None, false), (0,nil), (0,nil), nil)) (Abool true) --* (Q l))
     | Lookup e => EX l, (EX z, (EX f, (Abool (Z.eqb ([[se e]]) ([[Aof l]])) &* Apointsto f l (Enum z) ** (Apointsto f l (Enum z) --* Q z))))
     | Mutate e1 e2 => EX l, (EX z, (Abool (Z.eqb ([[se e1]]) ([[Aof l]])) &* l |-> z) ** (l |-> (se e2) --* Q 0))
-    | Let x c1 c2 => weakest_pre sp c1 (fun z => weakest_pre sp c2 Q (fun e => subse x z (se e)) invs) se invs
-    | Fork c => EX O, (EX O', ((Aobs(O ++ O') ** (Aobs(O) --* Q 0)) ** (Aobs(O') --* weakest_pre sp c (fun _ => Aobs(nil)) se invs)))
+    | Let x c1 c2 => weakest_pre n sp c1 (fun z => weakest_pre n sp c2 Q (fun e => subse x z (se e)) invs) se invs
+    | Fork c => EX O, (EX O', ((Aobs(O ++ O') ** (Aobs(O) --* Q 0)) ** (Aobs(O') --* weakest_pre n sp c (fun _ => Aobs(nil)) se invs)))
     | Newlock => FA l, (EX r, 
         (Aulock ((Enum l,r,Enum l, None, false), (0,nil), (0,nil), nil) empb empb --* Q l))
-    | g_initl e => EX l, (EX O, (EX wt, (EX ot, (EX i, (EX params, ((Abool (Z.eqb ([[se e]]) ([[Aof l]]))
-        &* Aulock l wt ot ** subsas params (invs i wt ot) ** Aobs O ** 
-        ((Alock ((Aof l, Rof l, Lof l, Xof l, Pof l), (i,params), Mof l, M'of l) ** Aobs O) --* Q 0))))))))
     | Acquire e => EX O, (EX l, ((Abool (andb (Z.eqb ([[se e]]) ([[Aof l]])) (prcl (evalol (Oof l)) (map evalol O))) &* Alock l ** Aobs O) **
         (FA wt, (FA ot, ((Aobs ((Oof l)::O) ** Alocked l wt ot ** 
         (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)))) --* Q 0))))
@@ -274,11 +40,6 @@ Fixpoint weakest_pre (sp: bool) (c:cmd) (Q: Z -> assn) (se: exp -> exp) (invs: Z
         (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)))) ** ((Aobs O ** Alock l --* Q 0)))))
     | Newcond => FA v, (EX R, (EX P, (EX X,
         (Aucond ((Enum v,R,Enum v,X,P),(0,nil),(0,nil),nil) --* Q v))))
-    | g_initc e => EX v, (EX l, (EX M, (EX M', (EX wt, (EX ot, (Abool (Z.eqb ([[se e]]) ([[Aof v]])) &*
-         Aulock l wt ot ** Aucond v ** (Aulock l wt ot ** Aicond ((Aof v, Rof v, Aof l, Xof v, Pof v), Iof v, M, M') --* Q 0)))))))
-    | g_finlc e => EX v, (EX l, ((Abool (andb (Z.eqb ([[se e]]) ([[Aof v]])) (Z.eqb ([[Lof v]]) ([[Aof l]]))) &*
-         Aprop (spurious_ok sp (evall l) (evall v) invs)) &*
-         Alock l ** Aicond v ** (Alock l ** Acond v --* Q 0)))
     | Waiting4lock e => EX O, (EX l, ((Abool (andb (Z.eqb ([[se e]]) ([[Aof l]])) (prcl (evalol (Oof l)) (map evalol O))) &* Alock l ** Aobs O) **
         (FA wt, (FA ot, ((Aobs ((Oof l)::O) ** Alocked l wt ot ** 
         (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)))) --* Q 0))))
@@ -312,76 +73,92 @@ Fixpoint weakest_pre (sp: bool) (c:cmd) (Q: Z -> assn) (se: exp -> exp) (invs: Z
         (FA wt, (FA ot, ((Aobs (Oof l:: M'of v ++ O) ** Alocked l wt ot ** (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)) **
         (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) --* Q 0))))))
     | Notify ev => EX O, (EX wt, (EX ot, (EX l, (EX v, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[se ev]]) ([[Aof v]]))) &*
-       (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) ** Acond v ** Alocked l wt ot ** 
+       ((subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) |* Abool (leb (wt ([[Aof v]])) 0)) ** Acond v ** Alocked l wt ot ** 
        Aobs ((if ltb 0 (wt ([[Aof v]])) then (M'of v) else nil) ++ O) **
-       ((Acond v ** Alocked l (upd Z.eq_dec wt ([[Aof v]]) (wt ([[Aof v]]) - 1)%nat) ot **
-       (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb) |* Abool (ltb 0 (wt ([[Aof v]])))) ** Aobs (O)) --* Q 0))))))
-
-
+       ((Acond v ** Alocked l (upd Z.eq_dec wt ([[Aof v]]) (wt ([[Aof v]]) - 1)%nat) ot ** Aobs (O)) --* Q 0))))))
     | NotifyAll ev => EX wt, (EX ot, (EX l, (EX v, ((Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[se ev]]) ([[Aof v]])) 
       (ifb ((list_eq_dec (olocation_eq_dec exp_eq_dec) (M'of v) nil)))))
        &* Aprop (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb) = Abool true)) ** Acond v ** Alocked l wt ot ** 
        ((Acond v ** Alocked l (upd Z.eq_dec wt ([[Aof v]]) 0%nat) ot) --* Q 0)))))
-    | g_newctr => FA gc, Actr (Enum gc) 0 --* Q 0
-    | g_ctrdec ev => EX n, (Actr (se ev) n ** Atic (se ev) ** (Actr (se ev) (n-1)%nat --* Q 0))
-    | g_ctrinc ev => EX n, (Actr (se ev) n ** (Actr (se ev) (S n)%nat ** Atic (se ev) --* Q 0))
-    | g_disch ev => EX O, (EX wt, (EX ot, (EX l, (EX v, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[se ev]]) ([[Aof v]]))
-        (andb (safe_obs (evall v) (wt ([[se ev]])) ((ot ([[se ev]]) - 1))) (ltb 0 (ot ([[se ev]]))))))
-        &* Acond v ** Aobs (Oof v::O) ** Alocked l wt ot 
-        ** ((Acond v ** Aobs O ** Alocked l wt (upd Z.eq_dec ot ([[se ev]]) (ot ([[se ev]]) - 1)%nat)) --* Q 0))))))
-    | g_dischu ev => EX O, (EX wt, (EX ot, (EX l, (EX v, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[se ev]]) ([[Aof v]]))
-        (andb (safe_obs (evall v) (wt ([[se ev]])) ((ot ([[se ev]]) - 1))) (ltb 0 (ot ([[se ev]]))))))
-        &* Aicond v ** Aobs (Oof v::O) ** Aulock l wt ot 
-        ** ((Aicond v ** Aobs O ** Aulock l wt (upd Z.eq_dec ot ([[se ev]]) (ot ([[se ev]]) - 1)%nat)) --* Q 0))))))
-    | g_chrg ev => EX O, (EX wt, (EX ot, (EX l, (EX v, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[se ev]]) ([[Aof v]])))
-        &* Acond v ** Aobs O ** Alocked l wt ot 
-        ** ((Acond v ** Aobs (Oof v::O) ** Alocked l wt (upd Z.eq_dec ot ([[se ev]]) (ot ([[se ev]]) + 1)%nat)) --* Q 0))))))
-    | g_chrgu ev => EX O, (EX wt, (EX ot, (EX l, (EX v, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[se ev]]) ([[Aof v]])))
-        &* Aicond v ** Aobs O ** Aulock l wt ot 
-        ** ((Aicond v ** Aobs (Oof v::O) ** Aulock l wt (upd Z.eq_dec ot ([[se ev]]) (ot ([[se ev]]) + 1)%nat)) --* Q 0))))))
-    | If c c1 c2 => weakest_pre sp c (fun z => if Z.ltb 0%Z z then (weakest_pre sp c1 Q se invs) else (weakest_pre sp c2 Q se invs)) se invs
+    | If c c1 c2 => weakest_pre n sp c (fun z => if Z.ltb 0%Z z then (weakest_pre n sp c1 Q se invs) else (weakest_pre n sp c2 Q se invs)) se invs
+    | While c1 c2 => weakest_pre n sp c1 (fun z => if Z.ltb 0%Z z then
+       (weakest_pre n sp c2 (fun _ => weakest_pre n sp (While c1 c2) Q se invs) se invs) else Q 0) se invs
+    | nop => 
+        (* nop *)
+        (FA z, Q z) |*
+        (* g_initl *)
+        (EX l, (EX O, (EX wt, (EX ot, (EX i, (EX params, (EX e, ((Abool (Z.eqb ([[e]]) ([[Aof l]]))
+        &* Aulock l wt ot ** subsas params (invs i wt ot) ** Aobs O ** 
+        ((Alock ((Aof l, Rof l, Lof l, Xof l, Pof l), (i,params), Mof l, M'of l) ** Aobs O) --* Q 0)))))))))) |*
+        (* g_initc *)
+        (EX v, (EX l, (EX M, (EX M', (EX wt, (EX ot, (EX e, (Abool (Z.eqb ([[e]]) ([[Aof v]])) &*
+        Aulock l wt ot ** Aucond v ** (Aulock l wt ot ** Aicond ((Aof v, Rof v, Aof l, Xof v, Pof v), Iof v, M, M') --* Q 0))))))))) |*
+        (* g_finlc *)
+        (EX v, (EX l, (EX e, ((Abool (andb (Z.eqb ([[e]]) ([[Aof v]])) (Z.eqb ([[Lof v]]) ([[Aof l]]))) &*
+        Aprop (spurious_ok sp (evall l) (evall v) invs)) &* Alock l ** Aicond v ** (Alock l ** Acond v --* Q 0))))) |*
+        (* g_newctr *)
+        (FA gc, Actr (Enum gc) 0 --* Q 0) |*
+        (* g_ctrdec *)
+        (EX n, (EX ev, (Actr ev n ** Atic ev ** (Actr ev (n-1)%nat --* Q 0)))) |*
+        (* g_ctrinc *)
+        (EX n, (EX gv, (Actr gv n ** (Actr gv (S n)%nat ** Atic gv --* Q 0)))) |*
+        (* g_disch *)
+        (EX O, (EX wt, (EX ot, (EX l, (EX v, (EX ev, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[ev]]) ([[Aof v]]))
+        (safe_obs (evall v) (wt ([[ev]])) ((ot ([[ev]]) - 1))))) &* Acond v ** Aobs (Oof v::O) ** Alocked l wt ot 
+        ** ((Acond v ** Aobs O ** Alocked l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) - 1)%nat)) --* Q 0)))))))) |*
+        (* g_dischu *)
+        (EX O, (EX wt, (EX ot, (EX l, (EX v, (EX ev, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[ev]]) ([[Aof v]]))
+        (safe_obs (evall v) (wt ([[ev]])) ((ot ([[ev]]) - 1))))) &* Aicond v ** Aobs (Oof v::O) ** Aulock l wt ot **
+        ((Aicond v ** Aobs O ** Aulock l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) - 1)%nat)) --* Q 0)))))))) |*
+        (* g_chrg *)
+        (EX O, (EX wt, (EX ot, (EX l, (EX v, (EX ev, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[ev]]) ([[Aof v]]))) &* Acond v **
+        Aobs O ** Alocked l wt ot ** ((Acond v ** Aobs (Oof v::O) ** Alocked l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) + 1)%nat)) --* Q 0)))))))) |*
+        (* g_chrgu *)
+        (EX O, (EX wt, (EX ot, (EX l, (EX v, (EX ev, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[ev]]) ([[Aof v]]))) &* Aicond v **
+        Aobs O ** Aulock l wt ot ** ((Aicond v ** Aobs (Oof v::O) ** Aulock l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) + 1)%nat)) --* Q 0))))))))
+  end
   end.
 
-Fixpoint weakest_pre_tx (sp: bool) (tx:context) invs : (Z -> assn) :=
+
+Fixpoint weakest_pre_tx (n: nat) (sp: bool) (tx:context) invs : (Z -> assn) :=
   match tx with
     | done => fun _ => Aobs nil
-    | Let' x c tx => fun z => weakest_pre sp (subs c (subse x z)) (weakest_pre_tx sp tx invs) id invs
+    | Let' x c tx => fun z => weakest_pre n sp (subs c (subse x z)) (weakest_pre_tx n sp tx invs) id invs
     | If' c1 c2 tx => fun z => if Z.ltb 0 z then 
-        weakest_pre sp c1 (weakest_pre_tx sp tx invs) id invs else
-        weakest_pre sp c2 (weakest_pre_tx sp tx invs) id invs
+        weakest_pre n sp c1 (weakest_pre_tx n sp tx invs) id invs else
+        weakest_pre n sp c2 (weakest_pre_tx n sp tx invs) id invs
   end.
 
-Definition weakest_pre_ct (sp: bool) (ct: (cmd * context)) invs : assn :=
-  weakest_pre sp (fst ct) (weakest_pre_tx sp (snd ct) invs) id invs.
+Definition weakest_pre_ct (n: nat) (sp: bool) (ct: (cmd * context)) invs : assn :=
+  weakest_pre n sp (fst ct) (weakest_pre_tx n sp (snd ct) invs) id invs.
+
 
 Lemma sat_weak_imp:
-  forall c p o d se a a' invs sp (BP: boundph p) (BG: boundgh d)
-         (SAT: sat p o d (weakest_pre sp c a se invs))
+  forall n c p o d se a a' invs sp (BP: boundph p) (BG: boundgh d)
+         (SAT: sat p o d (weakest_pre n sp c a se invs))
          (IMP: forall z, a z |= a' z),
-    sat p o d (weakest_pre sp c a' se invs).
+    forall n' (LE: le n' n), sat p o d (weakest_pre n' sp c a' se invs).
 Proof.
-  induction c;
-  try reflexivity.
+  induction n.
+  intros.
+  destruct n'.
+  reflexivity.
+  inversion LE.
+  destruct c.
   simpl.
   intros.
-  apply IMP.
-  assumption.
-  assumption.
-  assumption.
+  destruct n'; try reflexivity.
+  apply IMP; try assumption.
   simpl.
   intros.
-  apply IMP.
-  assumption.
-  assumption.
-  apply SAT with O'.
-  assumption.
-  assumption.
-  assumption.
-  assumption.
-  assumption.
-  assumption.
-  assumption.
-  assumption.
+  destruct n'; try reflexivity.
+  simpl.
+  intros.
+  apply IMP; try assumption.
+  apply SAT with O'; try assumption.
+  simpl.
+  intros.
+  destruct n'; try reflexivity.
   {
   simpl.
   intros.
@@ -403,6 +180,7 @@ Proof.
   assumption.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
   destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC12,(opO1O2,(tmp1,tmp2)))))))))))))))))).
@@ -420,6 +198,8 @@ Proof.
   assumption.
   }
   {
+  simpl.
+  destruct n'; try reflexivity.
   simpl.
   intros.
   destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(BC1,(BC2,(ghpdefC1C2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))).
@@ -440,64 +220,86 @@ Proof.
   apply tmp3 with (O':=O');
   try tauto.
   assumption.
-  tauto.
+  split.
+  intros.
+  eapply IHn; try assumption.
+  apply tmp2 with O'; try assumption.
+  intros.
+  assumption.
+  omega.
+  assumption.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
-  eapply IHc1.
-  assumption.
-  assumption.
+  simpl in SAT.
+  eapply IHn; try assumption.
   apply SAT.
   intros.
-  eapply IHc2.
-  assumption.
-  assumption.
-  simpl in *.
+  eapply IHn; try assumption.
   apply SAT0.
   intros.
-  apply IMP.
-  assumption.
-  assumption.
-  assumption.
+  apply IMP; try assumption.
+  omega.
+  omega.
   }
   {
   simpl.
   intros.
-  eapply IHc1.
-  assumption.
-  assumption.
+  destruct n'; try reflexivity.
+  simpl.
+  eapply IHn; try assumption.
   apply SAT.
   intros.
-  simpl in *.
+  simpl in SAT0.
   destruct (0 <? z) eqn:z0.
   {
-  eapply IHc2.
-  assumption.
-  assumption.
+  eapply IHn; try assumption.
   apply SAT0.
   intros.
-  apply IMP.
-  assumption.
-  assumption.
-  assumption.
+  apply IMP; try assumption.
+  omega.
   }
   {
-  eapply IHc3.
-  assumption.
-  assumption.
+  eapply IHn; try assumption.
   apply SAT0.
   intros.
-  apply IMP.
-  assumption.
-  assumption.
-  assumption.
+  apply IMP; try assumption.
+  omega.
   }
+  omega.
   }
-
   {
+  intros.
+  destruct n'; try reflexivity.
+  simpl.
+  simpl in SAT.
+  eapply IHn; try assumption.
+  apply SAT.
+  intros.
+  simpl in SAT0.
+  destruct (0 <? z) eqn:z0.
+  {
+  eapply IHn; try assumption.
+  apply SAT0.
+  inversion z0.
+  intros.
+  eapply IHn; try assumption.
+  apply SAT1.
+  intros.
+  apply IMP; assumption.
+  omega.
+  omega.
+  }
+  apply IMP; try assumption.
+  omega.
+  }
+  {
+  destruct n'; try reflexivity.
   simpl.
   intros.
+  simpl in SAT.
   specialize SAT with v.
   destruct SAT as (v0,SAT).
   exists v0.
@@ -509,6 +311,7 @@ Proof.
   try tauto.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
   destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(BC1,(BC2,(ghpdefC1C2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))).
@@ -526,6 +329,7 @@ Proof.
   assumption.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
   destruct SAT as (v,(v0,(v1,(v2,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(BC1,(BC2,(ghpdefC1C2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))))).
@@ -549,6 +353,7 @@ Proof.
   assumption.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
   destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(BC1,(BC2,(ghpdefC1C2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))).
@@ -573,8 +378,10 @@ Proof.
   assumption.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
+  simpl in SAT.
   specialize SAT with v.
   destruct SAT as (v0,(v1,(v2,tmp1))).
   exists v0,v1,v2.
@@ -583,6 +390,7 @@ Proof.
   apply tmp1 with O'; repeat php_.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
   destruct SAT as (v,(v0,(v1,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(BC1,(BC2,(ghpdefC1C2,(bc12,(opO1O2,(tmp1,tmp2))))))))))))))))))).
@@ -597,6 +405,7 @@ Proof.
   tauto.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
   destruct SAT as (v,(v0,(v1,(v2,(v3,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc1c2,(opO1O2,(tmp1,tmp2)))))))))))))))))))))).
@@ -635,6 +444,7 @@ Proof.
   tauto.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
   destruct SAT as (v,(v0,(v1,(v2,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc1c2,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))))).
@@ -662,6 +472,7 @@ Proof.
   tauto.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
   destruct SAT as (v0,(v1,(v2,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))))).
@@ -682,6 +493,7 @@ Proof.
   tauto.
   }
   {
+  destruct n'; try reflexivity.
   simpl.
   intros.
   destruct SAT as (v0,(v1,(v2,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))))).
@@ -698,10 +510,32 @@ Proof.
   tauto.
   }
   {
+  destruct n'; try reflexivity.
+  destruct SAT as [SAT|g_chrgu].
+  destruct SAT as [SAT|g_chrg].
+  destruct SAT as [SAT|g_dischu].
+  destruct SAT as [SAT|g_disch].
+  destruct SAT as [SAT|g_ctrinc].
+  destruct SAT as [SAT|g_ctrdec].
+  destruct SAT as [SAT|g_newctr].
+  destruct SAT as [SAT|g_finlc].
+  destruct SAT as [SAT|g_initc].
+  destruct SAT as [nop|g_initl].
+  {
+  intros.
+  left. left. left. left. left. left. left. left. left. left.
   simpl.
   intros.
-  destruct SAT as (v,(v0,(v1,(v2,(v3,(v4,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3)))))))))))))))))))))))).
-  exists v, v0, v1, v2, v3, v4.
+  apply IMP; try assumption.
+  apply nop.
+  }
+  {
+  intros.
+  left. left. left. left. left. left. left. left. left. right.
+  simpl.
+  intros.
+  destruct g_initl as (v,(v0,(v1,(v2,(v3,(v4,(v5,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))))))))).
+  exists v, v0, v1, v2, v3, v4, v5.
   exists.
   tauto.
   exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
@@ -728,11 +562,12 @@ Proof.
   tauto.
   }
   {
+  intros.
+  left. left. left. left. left. left. left. left. right.
   simpl.
   intros.
-  destruct SAT as (v,(v0,(v1,(v2,(v3,(v4,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(tmp3,tmp4))))))))))))))))))))))))).
-  exists v, v0, v1, v2, v3, v4.
-
+  destruct g_initc as (v,(v0,(v1,(v2,(v3,(v4,(v5,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(tmp3,tmp4)))))))))))))))))))))))))).
+  exists v, v0, v1, v2, v3, v4, v5.
   split.
   assumption.
   exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
@@ -753,10 +588,12 @@ Proof.
   tauto.
   }
   {
+  intros.
+  left. left. left. left. left. left. left. right.
   simpl.
   intros.
-  destruct SAT as (v,(v0,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2))))))))))))))))))).
-  exists v, v0.
+  destruct g_finlc as (v,(v0,(v1,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))))).
+  exists v, v0, v1.
   exists.
   assumption.
   exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
@@ -778,153 +615,21 @@ Proof.
   tauto.
   }
   {
+  intros.
+  left. left. left. left. left. left. right.
   simpl.
   intros.
-  destruct SAT as (v,(v0,(v1,(v2,(v3,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))))))).
-  exists v, v0, v1, v2, v3.
-  exists.
-  assumption.
-  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
-  split.
-  assumption.
-  split.
-  destruct tmp2 as (tmp2, tmp3).
-  destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
-  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
-  exists.
-  assumption.
-  split.
-  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp5,(tmp6,p5p6))))))))))))))))).
-  exists p5, p6, phpdefp5p6, bp5, bp6, bp56, O5, O6, C5, C6, ghpdefC5C6, BC5, BC6, bc56, opO5O6.
-  split.
-  assumption.
-  split.
-  intros.
-  apply IMP.
-  assumption.
-  assumption.
-  apply tmp6 with O'; repeat php_.
-  tauto.
-  tauto.
-  tauto.
-  }
-  {
-  simpl.
-  intros.
-  destruct SAT as (v,(v0,(v1,(v2,(v3,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))))))).
-  exists v, v0, v1, v2, v3.
-  exists.
-  assumption.
-  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
-  split.
-  assumption.
-  split.
-  destruct tmp2 as (tmp2, tmp3).
-  destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
-  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
-  exists.
-  assumption.
-  split.
-  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp5,(tmp6,p5p6))))))))))))))))).
-  exists p5, p6, phpdefp5p6, bp5, bp6, bp56, O5, O6, C5, C6, ghpdefC5C6, BC5, BC6, bc56, opO5O6.
-  split.
-  assumption.
-  split.
-  intros.
-  apply IMP.
-  assumption.
-  assumption.
-  apply tmp6 with O'; repeat php_.
-  tauto.
-  tauto.
-  tauto.
-  }
-  {
-  simpl.
-  intros.
-  destruct SAT as (v,(v0,(v1,(v2,(v3,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))))))).
-  exists v, v0, v1, v2, v3.
-  exists.
-  assumption.
-  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
-  split.
-  assumption.
-  split.
-  destruct tmp2 as (tmp2, tmp3).
-  destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
-  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
-  exists.
-  assumption.
-  split.
-  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp5,(tmp6,p5p6))))))))))))))))).
-  exists p5, p6, phpdefp5p6, bp5, bp6, bp56, O5, O6, C5, C6, ghpdefC5C6, BC5, BC6, bc56, opO5O6.
-  split.
-  assumption.
-  split.
-  intros.
-  apply IMP.
-  assumption.
-  assumption.
-  apply tmp6 with O'; repeat php_.
-  tauto.
-  tauto.
-  tauto.
-  }
-  {
-  simpl.
-  intros.
-  destruct SAT as (v,(v0,(v1,(v2,(v3,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))))))).
-  exists v, v0, v1, v2, v3.
-  exists.
-  assumption.
-  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
-  split.
-  assumption.
-  split.
-  destruct tmp2 as (tmp2, tmp3).
-  destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
-  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
-  exists.
-  assumption.
-  split.
-  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp5,(tmp6,p5p6))))))))))))))))).
-  exists p5, p6, phpdefp5p6, bp5, bp6, bp56, O5, O6, C5, C6, ghpdefC5C6, BC5, BC6, bc56, opO5O6.
-  split.
-  assumption.
-  split.
-  intros.
-  apply IMP.
-  assumption.
-  assumption.
-  apply tmp6 with O'; repeat php_.
-  tauto.
-  tauto.
-  tauto.
-  }
-  {
-  simpl.
-  intros.
+  simpl in g_newctr.
   apply IMP; try assumption.
-  apply SAT with v O'; try assumption.
+  apply g_newctr with v O'; try assumption.
   }
   {
+  intros.
+  left. left. left. left. left. right.
   simpl.
   intros.
-  destruct SAT as (v,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3)))))))))))))))))).
-  exists v, p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
-  split.
-  assumption.
-  split.
-  intros.
-  apply IMP; try assumption.
-  apply tmp2 with O'; try assumption.
-  auto.
-  }
-  {
-  simpl.
-  intros.
-  destruct SAT as (v,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3)))))))))))))))))).
-  exists v, p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  destruct g_ctrdec as (v,(v1,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))).
+  exists v, v1, p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
   split.
   assumption.
   split.
@@ -939,21 +644,501 @@ Proof.
   auto.
   auto.
   }
+  {
+  intros.
+  left. left. left. left. right.
+  simpl.
+  intros.
+  destruct g_ctrinc as (v,(gv,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))).
+  exists v, gv, p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  split.
+  assumption.
+  split.
+  intros.
+  apply IMP; try assumption.
+  apply tmp2 with O'; try assumption.
+  auto.
+  }
+  {
+  intros.
+  left. left. left. right.
+  simpl.
+  intros.
+  destruct g_disch as (v,(v0,(v1,(v2,(v3,(v4,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2))))))))))))))))))))))).
+  exists v, v0, v1, v2, v3, v4.
+  exists.
+  assumption.
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  split.
+  assumption.
+  split.
+  destruct tmp2 as (tmp2, tmp3).
+  destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
+  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
+  exists.
+  assumption.
+  split.
+  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp5,(tmp6,p5p6))))))))))))))))).
+  exists p5, p6, phpdefp5p6, bp5, bp6, bp56, O5, O6, C5, C6, ghpdefC5C6, BC5, BC6, bc56, opO5O6.
+  split.
+  assumption.
+  split.
+  intros.
+  apply IMP.
+  assumption.
+  assumption.
+  apply tmp6 with O'; repeat php_.
+  tauto.
+  tauto.
+  tauto.
+  }
+  {
+  intros.
+  left. left. right.
+  simpl.
+  intros.
+  destruct g_dischu as (v,(v0,(v1,(v2,(v3,(v4,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2))))))))))))))))))))))).
+  exists v, v0, v1, v2, v3, v4.
+  exists.
+  assumption.
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  split.
+  assumption.
+  split.
+  destruct tmp2 as (tmp2, tmp3).
+  destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
+  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
+  exists.
+  assumption.
+  split.
+  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp5,(tmp6,p5p6))))))))))))))))).
+  exists p5, p6, phpdefp5p6, bp5, bp6, bp56, O5, O6, C5, C6, ghpdefC5C6, BC5, BC6, bc56, opO5O6.
+  split.
+  assumption.
+  split.
+  intros.
+  apply IMP.
+  assumption.
+  assumption.
+  apply tmp6 with O'; repeat php_.
+  tauto.
+  tauto.
+  tauto.
+  }
+  {
+  intros.
+  left. right.
+  destruct g_chrg as (v,(v0,(v1,(v2,(v3,(v4,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2))))))))))))))))))))))).
+  exists v, v0, v1, v2, v3, v4.
+  simpl.
+  split. assumption.
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  split.
+  assumption.
+  split.
+  destruct tmp2 as (tmp2, tmp3).
+  destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
+  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
+  exists.
+  assumption.
+  split.
+  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp5,(tmp6,p5p6))))))))))))))))).
+  exists p5, p6, phpdefp5p6, bp5, bp6, bp56, O5, O6, C5, C6, ghpdefC5C6, BC5, BC6, bc56, opO5O6.
+  split.
+  assumption.
+  split.
+  intros.
+  apply IMP.
+  assumption.
+  assumption.
+  apply tmp6 with O'; repeat php_.
+  tauto.
+  tauto.
+  tauto.
+  }
+  {
+  intros.
+  right.
+  simpl.
+  intros.
+  destruct g_chrgu as (v,(v0,(v1,(v2,(v3,(v4,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2))))))))))))))))))))))).
+  exists v, v0, v1, v2, v3, v4.
+  simpl.
+  split. assumption.
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  split.
+  assumption.
+  split.
+  destruct tmp2 as (tmp2, tmp3).
+  destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
+  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
+  exists.
+  assumption.
+  split.
+  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp5,(tmp6,p5p6))))))))))))))))).
+  exists p5, p6, phpdefp5p6, bp5, bp6, bp56, O5, O6, C5, C6, ghpdefC5C6, BC5, BC6, bc56, opO5O6.
+  split.
+  assumption.
+  split.
+  intros.
+  apply IMP.
+  assumption.
+  assumption.
+  apply tmp6 with O'; repeat php_.
+  tauto.
+  tauto.
+  tauto.
+  }
+  }
+Qed.
+
+
+Lemma sat_tx_weak_imp:
+  forall n tx p o d z invs sp (BP: boundph p) (BG: boundgh d)
+         (SAT: sat p o d (weakest_pre_tx n sp tx invs z)),
+    forall n' (LE: le n' n), sat p o d (weakest_pre_tx n' sp tx invs z).
+Proof.
+  induction tx.
+  simpl.
+  intros.
+  assumption.
+  {
+  intros.
+  unfold weakest_pre_tx in *.
+  destruct ((0 <? z)%Z) eqn:zz.
+  eapply sat_weak_imp; try assumption.
+  apply SAT.
+  simpl.
+  intros.
+  apply IHtx; try assumption.
+  omega.
+  eapply sat_weak_imp; try assumption.
+  apply SAT.
+  intros.
+  apply IHtx; try assumption.
+  omega.
+  }
+  {
+  intros.
+  unfold weakest_pre_tx in *.
+  eapply sat_weak_imp; try assumption.
+  apply SAT.
+  simpl.
+  intros.
+  apply IHtx; try assumption.
+  omega.
+  }
+Qed.
+
+
+Lemma sat_ct_weak_imp:
+  forall n ct p o d invs sp (BP: boundph p) (BG: boundgh d)
+         (SAT: sat p o d (weakest_pre_ct n sp ct invs)),
+    forall n' (LE: le n' n), sat p o d (weakest_pre_ct n' sp ct invs).
+Proof.
+  intros.
+  eapply sat_weak_imp; try assumption.
+  apply SAT.
+  intros.
+  eapply sat_tx_weak_imp; try assumption.
+  apply SAT0; assumption.
+  assumption.
+  omega.
+Qed.
+
+
+Lemma sat_weak_imp1:
+  forall n c p o d se a a' invs sp (BP: boundph p) (BG: boundgh d)
+         (SAT: sat p o d (weakest_pre (S n) sp c a se invs))
+         (IMP: forall z, a z |= a' z),
+    sat p o d (weakest_pre n sp c a' se invs).
+Proof.
+  intros.
+  eapply sat_weak_imp with (S n) a; try assumption.
+  omega.
+Qed.
+
+
+Lemma sat_tx_weak_imp1:
+  forall n tx p o d z invs sp (BP: boundph p) (BG: boundgh d)
+         (SAT: sat p o d (weakest_pre_tx (S n) sp tx invs z)),
+    sat p o d (weakest_pre_tx n sp tx invs z).
+Proof.
+  intros.
+  apply sat_tx_weak_imp with (S n); try assumption.
+  omega.
 Qed.
 
 
 (** # <font size="5"><b> Substitution </b></font> # *)
 
-Lemma sat_pre_subs1:
-  forall c se a p o d x z invs sp (BP: boundph p) (BG: boundgh d)
-        (SAT: sat p o d (weakest_pre sp (subs c (subse x z)) a se invs)),
-    sat p o d (weakest_pre sp c a (fun e : exp => se (subse x z e)) invs).
+Lemma wp_subst_free:
+  forall n c se sp a x z invs
+    (NOTFREE: is_free (subs c se) x = false),
+    (weakest_pre n sp c a se invs |=
+    weakest_pre n sp c a (fun e => subse x z (se e)) invs) /\
+    (weakest_pre n sp c a (fun e => subse x z (se e)) invs |=
+    weakest_pre n sp c a se invs).
 Proof.
-  induction c;
-  intros;
+  induction n.
+  split; reflexivity.
+  destruct c.
+  {
+  split. simpl. intros. rewrite subse_free; try assumption.
+  simpl. intros. rewrite subse_free in SAT; try assumption.
+  }
+  {
+  simpl. split; intros. apply SAT with O'; try assumption.
+  apply SAT with O'; try assumption.
+  }
+  {
+  split; simpl; intros. rewrite subse_free.
+  destruct SAT as (v,(v0,(v1,(eq,rest)))).
+  exists v, v0, v1. split. assumption. assumption. assumption.
+  rewrite subse_free in SAT; assumption.
+  }
+  {
+  simpl. split. intros.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE.
+  destruct NOTFREE.
+  destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))).
+  exists v, v0, p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2, C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  split. rewrite subse_free; try assumption.
+  split; intros. apply tmp2 with O'; try assumption.
+  rewrite subse_free in SAT; try assumption. assumption.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE.
+  destruct NOTFREE.
+  simpl. intros.
+  destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))).
+  exists v, v0, p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2, C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  split. rewrite subse_free in tmp1; try assumption.
+  split. intros. apply tmp2 with O'; try assumption.
+  rewrite subse_free; try assumption. assumption.
+  }
+  {
+  split; simpl.
+  intros.
+  destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))).
+  exists v, v0, p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2, C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  destruct tmp1 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,tmp1))))))))))))))).
+  split.
+  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
+  assumption.
+  split.
+  intros.
+  destruct IHn with c se sp (fun _ : Z => Aobs nil) x z invs as (IHc1,IHc2); try assumption.
+  apply IHc1; try assumption.
+  apply tmp2 with O'; try assumption.
+  assumption.
+  intros.
+  destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))).
+  exists v, v0, p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2, C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  destruct tmp1 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,tmp1))))))))))))))).
+  split.
+  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
+  assumption.
+  split.
+  intros.
+  destruct IHn with c se sp (fun _ : Z => Aobs nil) x z invs as (IHc1,IHc2); try assumption.
+  apply IHc2; try assumption.
+  apply tmp2 with O'; try assumption.
+  assumption.
+  }
+  {
+  simpl. split; intros.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE.
+  destruct NOTFREE.
+
+  destruct IHn with c1 se sp (fun z0 : Z =>
+    weakest_pre n sp c2 a (fun e : exp => subse x z0 (subse x0 z (se e))) invs)
+    x0 z invs as (IHc11,IHc12); try assumption.
+  apply IHc11; try assumption.
+  eapply sat_weak_imp; repeat php_.
+  apply SAT.
+  simpl. intros.
+  destruct (Z.eq_dec x x0).
+  rewrite e in *.
+  replace (fun e0 => subse x0 z0 (subse x0 z (se e0))) with
+    (fun e0 => subse x0 z (se e0)).
+  destruct IHn with c2 se sp a x0 z invs as (IHc21,IHc22); try assumption.
+  apply IHc21; try assumption.
+  destruct IHn with c2 se sp a x0 z0 invs as (IHc21',IHc22'); try assumption.
+  apply IHc22'; try assumption.
+  apply functional_extensionality.
+  intros.
+  apply subse_subse; try assumption.
+  replace (fun e : exp => subse x z0 (subse x0 z (se e))) with
+    (fun e : exp => subse x0 z (subse x z0 (se e))).
+  destruct IHn with c2 (fun e => subse x z0 (se e)) sp a x0 z invs as (IHc21,IHc22); try assumption.
+  simpl.
+  apply is_free_subs; assumption.
+  apply IHc21; try assumption.
+  apply functional_extensionality.
+  intros.
+  apply subse_subse_neq; try assumption.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE.
+  destruct NOTFREE.
+  destruct IHn with c1 se sp (fun z0 : Z => weakest_pre n sp c2 a
+   (fun e : exp => subse x z0 (subse x0 z (se e))) invs)
+    x0 z invs as (IHc11,IHc12); try assumption.
+  apply IHc12 in SAT; try assumption.
+  eapply sat_weak_imp; try assumption.
+  apply SAT.
+  simpl. intros.
+  destruct (Z.eq_dec x x0).
+  rewrite e in *.
+  replace (fun e0 => subse x0 z0 (subse x0 z (se e0))) with
+    (fun e0 => subse x0 z (se e0)) in SAT0.
+  destruct IHn with c2 se sp a x0 z0 invs as (IHc21,IHc22); try assumption.
+  apply IHc21; try assumption.
+  destruct IHn with c2 se sp a x0 z invs as (IHc21',IHc22'); try assumption.
+  apply IHc22' in SAT0; try assumption.
+  apply functional_extensionality.
+  intros.
+  apply subse_subse; try assumption.
+  replace (fun e : exp => subse x z0 (subse x0 z (se e))) with
+    (fun e : exp => subse x0 z (subse x z0 (se e))) in SAT0.
+  destruct IHn with c2 (fun e => subse x z0 (se e)) sp a x0 z invs as (IHc21,IHc22); try assumption.
+  apply is_free_subs; assumption.
+  apply IHc22 in SAT0; try assumption.
+  apply functional_extensionality.
+  intros.
+  apply subse_subse_neq; try assumption.
+  omega.
+  }
+  {
+  simpl. split; intros.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE.
+  destruct NOTFREE as (NF1,NF2).
+  apply Coq.Bool.Bool.orb_false_iff in NF1.
+  destruct NF1 as (NF0,NF1).
+  eapply sat_weak_imp; repeat php_.
+  apply IHn; try assumption.
+  apply SAT.
+  simpl. intros.
+  destruct (0 <? z0).
+  apply IHn; try assumption.
+  apply IHn; try assumption.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE.
+  destruct NOTFREE as (NF1,NF2).
+  apply Coq.Bool.Bool.orb_false_iff in NF1.
+  destruct NF1 as (NF0,NF1).
+  eapply sat_weak_imp; repeat php_.
+  apply IHn in SAT; try assumption.
+  apply SAT.
+  simpl. intros.
+  destruct (0 <? z0).
+  apply IHn in SAT0; try assumption.
+  apply IHn in SAT0; try assumption.
+  }
+  {
+  simpl. split; intros.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE.
+  destruct NOTFREE as (NF1,NF2).
+  eapply sat_weak_imp; repeat php_.
+  apply IHn; try assumption.
+  apply SAT.
+  simpl. intros.
+  destruct (0 <? z0).
+  apply IHn; try assumption.
+  eapply sat_weak_imp; repeat php_.
+  apply SAT0; try assumption.
+  simpl. intros.
+  apply IHn; try assumption.
+  apply Coq.Bool.Bool.orb_false_iff; split; assumption.
+  assumption.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE.
+  destruct NOTFREE as (NF1,NF2).
+  eapply sat_weak_imp; repeat php_.
+  destruct IHn with c1 se sp (fun z0 : Z => if 0 <? z0
+    then weakest_pre n sp c2 (fun _ : Z =>
+    weakest_pre n sp (While c1 c2) a
+    (fun e : exp => subse x z (se e)) invs)
+    (fun e : exp => subse x z (se e)) invs
+     else a 0) x z invs as (IHn1,IHn2); try assumption.
+  apply IHn2; try assumption.
+  simpl. intros.
+  destruct (0 <? z0).
+  destruct IHn with c2 se sp (fun _:Z => weakest_pre n sp (While c1 c2) a
+    (fun e : exp => subse x z (se e)) invs) x z invs as (IHn1,IHn2); try assumption.
+  apply IHn2 in SAT0; try assumption.
+  eapply sat_weak_imp; repeat php_.
+  apply SAT0.
+  simpl. intros.
+  destruct IHn with (While c1 c2) se sp a x z invs as (IHn1',IHn2'); try assumption.
+  apply Coq.Bool.Bool.orb_false_iff; split; assumption.
+  apply IHn2' in SAT1; try assumption. assumption.
+  }
+  {
+  split; simpl; intros. specialize SAT with v. assumption.
+  specialize SAT with v. assumption.
+  }
+  {
+  simpl. split; intros. rewrite subse_free; assumption.
+  rewrite subse_free in SAT; assumption.
+  }
+  {
+  simpl. split; intros. rewrite subse_free; assumption.
+  rewrite subse_free in SAT; assumption.
+  }
+  {
+  simpl. split; intros. rewrite subse_free; assumption.
+  rewrite subse_free in SAT; assumption.
+  }
+  {
+  simpl. split; intros. specialize SAT with v. assumption.
+  specialize SAT with v. assumption.
+  }
+  {
+  simpl. split; intros.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE. destruct NOTFREE as (NF1,NF2).
+  rewrite subse_free; try assumption. rewrite subse_free; try assumption.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE. destruct NOTFREE as (NF1,NF2).
+  rewrite subse_free in SAT; try assumption. rewrite subse_free in SAT; try assumption.
+  }
+  {
+  simpl. split; intros. rewrite subse_free; assumption.
+  rewrite subse_free in SAT; assumption.
+  }
+  {
+  simpl. split; intros. rewrite subse_free; assumption.
+  rewrite subse_free in SAT; assumption.
+  }
+  {
+  simpl. split; intros.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE. destruct NOTFREE as (NF1,NF2).
+  rewrite subse_free; try assumption. rewrite subse_free; try assumption.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE. destruct NOTFREE as (NF1,NF2).
+  rewrite subse_free in SAT; try assumption. rewrite subse_free in SAT; try assumption.
+  }
+  {
+  simpl. split; intros.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE. destruct NOTFREE as (NF1,NF2).
+  rewrite subse_free; try assumption. rewrite subse_free; try assumption.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE. destruct NOTFREE as (NF1,NF2).
+  rewrite subse_free in SAT; try assumption. rewrite subse_free in SAT; try assumption.
+  }
+  simpl. split; intros. assumption. assumption.
+Qed.
+
+
+Lemma sat_pre_subs1:
+  forall n c se a p o d x z invs sp (BP: boundph p) (BG: boundgh d)
+        (SAT: sat p o d (weakest_pre n sp (subs c (subse x z)) a se invs)),
+    forall n' (LE: le n' n), sat p o d (weakest_pre n' sp c a (fun e : exp => se (subse x z e)) invs).
+Proof.
+  induction n.
+  simpl.
+  intros.
+  destruct n'.
+  reflexivity.
+  inversion LE.
+  destruct c; intros;
+  try destruct n';
+  try reflexivity;
   try assumption.
   {
-  simpl in *.
+  simpl.
   destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))).
   destruct tmp1 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,tmp1))))))))))))))).
   destruct tmp1 as (tmp1, tmp3).
@@ -966,54 +1151,83 @@ Proof.
   assumption.
   split.
   intros.
-  apply IHc.
-  assumption.
-  assumption.
-  apply tmp2 with (O':=O');
-  try tauto.
-  assumption.
+  apply IHn; try assumption.
+  apply tmp2 with (O':=O'); try assumption.
+  omega. assumption.
   }
   {
-  simpl in *.
-  apply IHc1.
-  assumption.
-  assumption.
-  eapply sat_weak_imp.
-  assumption.
-  assumption.
-  apply SAT.
-  intros.
-  apply IHc2 in SAT0.
-  assumption.
-  assumption.
-  assumption.
-  }
-  {
-  simpl in *.
-  apply IHc1.
-  assumption.
-  assumption.
-  simpl in *.
-  eapply sat_weak_imp; try assumption.
-  apply SAT.
   simpl.
+  simpl in SAT.
+  eapply sat_weak_imp; try assumption.
+  apply IHn with (n':=n); try assumption.
+  apply SAT.
+  omega.
   intros.
+  simpl in SAT0.
+  simpl.
+  eapply IHn in SAT0; try assumption.
+  apply SAT0.
+  omega.
+  omega.
+  }
+  {
+  simpl.
+  simpl in SAT.
+  eapply sat_weak_imp; try assumption.
+  apply IHn with (n':=n); try assumption.
+  apply SAT.
+  omega.
+  intros.
+  simpl in SAT0.
   destruct (0 <? z0).
-  apply IHc2; assumption.
-  apply IHc3; assumption.
+  apply IHn; try assumption.
+  omega.
+  apply IHn; try assumption.
+  omega.
+  omega.
+  }
+  {
+  simpl.
+  simpl in SAT.
+  eapply sat_weak_imp; try assumption.
+  apply IHn with (n':=n); try assumption.
+  apply SAT.
+  omega.
+  intros.
+  simpl in SAT0.
+  destruct (0 <? z0).
+  simpl.
+  apply IHn; try assumption.
+  eapply sat_weak_imp; try assumption.
+  apply SAT0.
+  intros.
+  simpl in SAT1.
+  apply IHn; try assumption.
+  omega.
+  omega.
+  omega.
+  assumption.
+  omega.
   }
 Qed.
+
 
 Lemma sat_pre_subs2:
-  forall c se a p o d x z invs sp (BP: boundph p) (BG: boundgh d)
-        (SAT: sat p o d (weakest_pre sp c a (fun e : exp => se (subse x z e)) invs)),
-    sat p o d (weakest_pre sp (subs c (subse x z)) a se invs).
+  forall n c se a p o d x z invs sp (BP: boundph p) (BG: boundgh d)
+        (SAT: sat p o d (weakest_pre n sp c a (fun e : exp => se (subse x z e)) invs)),
+    forall n' (LE: le n' n), sat p o d (weakest_pre n' sp (subs c (subse x z)) a se invs).
 Proof.
-  induction c;
-  intros;
+  induction n.
+  simpl.
+  intros.
+  destruct n'.
+  reflexivity.
+  inversion LE.
+  destruct c; intros;
+  try destruct n';
+  try reflexivity;
   try assumption.
   {
-  simpl in *.
   destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,tmp2)))))))))))))))))).
   destruct tmp1 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,tmp1))))))))))))))).
   destruct tmp1 as (tmp1, tmp3).
@@ -1026,128 +1240,194 @@ Proof.
   assumption.
   split.
   intros.
-  apply IHc.
-  assumption.
-  assumption.
-  apply tmp2 with (O':=O');
-  try tauto.
-  assumption.
-  }
-  {
-  simpl in *.
-  apply IHc1.
-  assumption.
-  assumption.
-  apply sat_weak_imp with (a:= fun z0 : Z => weakest_pre sp c2 a
-    (fun e : exp => subse x z0 (se (subse x0 z e))) invs).
-  assumption.
-  assumption.
   simpl.
-  assumption.
   intros.
-  apply IHc2.
-  assumption.
-  assumption.
+  apply IHn; try assumption.
+  apply tmp2 with (O':=O'); try assumption.
+  omega.
   assumption.
   }
   {
-  simpl in *.
-  apply IHc1.
-  assumption.
-  assumption.
-  simpl in *.
+  simpl.
   eapply sat_weak_imp; try assumption.
+  apply IHn with (n':=n); try assumption.
+  simpl in SAT.
   apply SAT.
+  omega.
+  simpl.
+  intros.
+  eapply IHn; try assumption.
+  omega.
+  omega.
+  }
+  {
+  simpl.
+  eapply sat_weak_imp; try assumption.
+  eapply IHn with (n':=n); try assumption.
+  apply SAT.
+  omega.
   simpl.
   intros.
   destruct (0 <? z0).
-  apply IHc2; assumption.
-  apply IHc3; assumption.
+  simpl.
+  apply IHn; try assumption.
+  omega.
+  apply IHn; try assumption.
+  omega.
+  omega.
+  }
+  {
+  simpl.
+  eapply sat_weak_imp; try assumption.
+  eapply IHn with (n':=n); try assumption. 
+  simpl in SAT.
+  apply SAT.
+  omega.
+  simpl.
+  intros.
+  destruct (0 <? z0).
+  simpl.
+  apply IHn; try assumption.
+  eapply sat_weak_imp; try assumption.
+  apply SAT0.
+  intros.
+  simpl in SAT1.
+  simpl.
+  eapply sat_weak_imp; try assumption.
+  simpl.
+  simpl in SAT1.
+  eapply IHn with (n':=n) in SAT1; try assumption.
+  apply SAT1.
+  omega.
+  intros.
+  assumption.
+  omega.
+  omega.
+  omega.
+  assumption.
+  omega.
   }
 Qed.
 
+
 Lemma sat_pre_subs3:
-  forall c p o C a se1 se2 invs sp (bp: boundph p) (bg: boundgh C)
-         (SAT: sat p o C (weakest_pre sp (subs c se1) a se2 invs)),
-    sat p o C (weakest_pre sp c a (fun e => se2 (se1 e)) invs).
+  forall n c p o C a se1 se2 invs sp (bp: boundph p) (bg: boundgh C)
+         (SAT: sat p o C (weakest_pre n sp (subs c se1) a se2 invs)),
+    forall n' (LE: le n' n), sat p o C (weakest_pre n' sp c a (fun e => se2 (se1 e)) invs).
 Proof.
-  induction c;
-  intros;
-  try assumption;
-  try apply SAT.
+  induction n.
+  simpl.
+  intros.
+  destruct n'.
+  reflexivity.
+  inversion LE.
+  destruct c; intros;
+  try destruct n';
+  try reflexivity;
+  try assumption.
   {
-  simpl in *.
+  simpl.
   destruct SAT as (v,(v0,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(sat1,(sat2,(p1p2,C1C2)))))))))))))))))))).
   exists v, v0, p1, p2, phpdefp1p2, bp1, bp2, bp12, o1, o2, C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
   exists.
   assumption.
   exists.
   intros.
-  apply IHc.
-  assumption.
-  assumption.
-  apply sat2 with O';
-  try tauto.
-  tauto.
+  apply IHn; try assumption.
+  apply sat2 with O'; try assumption.
+  omega.
+  split; assumption.
   }
   {
-  apply IHc1.
-  assumption.
-  assumption.
-  eapply sat_weak_imp.
-  assumption.
-  assumption.
+  simpl.
+  eapply IHn; try assumption.
+  eapply sat_weak_imp; try assumption.
+  simpl in SAT.
+  simpl.
   apply SAT.
   simpl.
   intros.
-  apply IHc2 in SAT0.
-  assumption.
-  assumption.
-  assumption.
+  eapply IHn in SAT0; try assumption.
+  apply SAT0.
+  omega.
+  omega.
+  omega.
   }
   {
-  simpl in *.
-  apply IHc1.
-  assumption.
-  assumption.
-  simpl in *.
+  simpl.
+  simpl in SAT.
+  eapply IHn; try assumption.
   eapply sat_weak_imp; try assumption.
   apply SAT.
   simpl.
   intros.
   destruct (0 <? z).
-  apply IHc2; assumption.
-  apply IHc3; assumption.
+  simpl.
+  eapply IHn; try assumption.
+  omega.
+  eapply IHn; try assumption.
+  omega.
+  omega.
+  omega.
+  }
+  {
+  simpl.
+  eapply sat_weak_imp; try assumption.
+  eapply IHn with (n':=n); try assumption. 
+  simpl in SAT.
+  apply SAT.
+  omega.
+  simpl.
+  intros.
+  destruct (0 <? z).
+  simpl.
+  apply IHn; try assumption.
+  eapply sat_weak_imp; try assumption.
+  apply SAT0.
+  intros.
+  simpl in SAT1.
+  simpl.
+  eapply sat_weak_imp; try assumption.
+  simpl.
+  simpl in SAT1.
+  eapply IHn with (n':=n); try assumption.
+  apply SAT1.
+  omega.
+  intros.
+  assumption.
+  omega.
+  omega.
+  omega.
+  assumption.
+  omega.
   }
 Qed.
 
+
 Lemma sat_pre_subs:
-  forall c se a p o d x z invs sp (BP: boundph p) (BG: boundgh d),
-    sat p o d (weakest_pre sp (subs c (subse x z)) a se invs) <->
-    sat p o d (weakest_pre sp c a (fun e : exp => se (subse x z e)) invs).
+  forall n c se a p o d x z invs sp (BP: boundph p) (BG: boundgh d),
+    sat p o d (weakest_pre n sp (subs c (subse x z)) a se invs) <->
+    sat p o d (weakest_pre n sp c a (fun e : exp => se (subse x z e)) invs).
 Proof.
   split.
-  apply sat_pre_subs1.
-  assumption.
-  assumption.
-  apply sat_pre_subs2.
-  assumption.
-  assumption.
+  intros. apply sat_pre_subs1 with n; try assumption. omega.
+  intros. apply sat_pre_subs2 with n; try assumption. omega.
 Qed.
+
 
 (** # <font size="5"><b> Weakest Precondition - Satisfaction Relation </b></font> # *)
 
 Lemma sat_Cons:
-  forall p O C sp n tx invs a
+  forall m p O C sp n tx invs a
          (BP: boundph p)
          (BG: boundgh C)
          (NONE: forall z (IN: In z (map (fun x0 => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
                   (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))), p z = None)
-         (SAT: sat p O C (weakest_pre_ct sp (Cons n, tx) invs)),
+         (SAT: sat p O C (weakest_pre_ct (S m) sp (Cons n, tx) invs)),
     sat (dstr_cells' p (map (fun x0 : nat =>
       ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
       (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0)))
-      O C (weakest_pre_ct sp (Val (Enum a), tx) invs).
+      O C (weakest_pre_ct (S m) sp (Val (Enum a), tx) invs).
 Proof.
   intros.
   unfold weakest_pre_ct.
@@ -1227,13 +1507,14 @@ Proof.
   apply sat_dstr.
 Qed.
 
+
 Lemma sat_lookup:
-  forall p O C sp tx invs e
-         (SAT: sat p O C (weakest_pre_ct sp (Lookup e, tx) invs)),
+  forall m p O C sp tx invs e
+         (SAT: sat p O C (weakest_pre_ct (S m) sp (Lookup e, tx) invs)),
     exists v0 ll
            (EQ: ([[e]]) = ([[Aof ll]]))
            (pv: exists f' (f'le : Qclt 0 f'), p (evall ll) = Some (Cell f' v0)),
-      sat p O C (weakest_pre_ct sp (Val (Enum v0), tx) invs).
+      sat p O C (weakest_pre_ct (S m) sp (Val (Enum v0), tx) invs).
 Proof.
   simpl.
   intros.
@@ -1288,13 +1569,14 @@ Proof.
   apply oplus_comm; assumption.
 Qed.
 
+
 Lemma sat_mutate:
-  forall p O C sp e1 e2 tx invs
-         (SAT: sat p O C (weakest_pre_ct sp (Mutate e1 e2, tx) invs)),
+  forall m p O C sp e1 e2 tx invs
+         (SAT: sat p O C (weakest_pre_ct (S m) sp (Mutate e1 e2, tx) invs)),
     exists l
          (EQl: Aof l = ([[e1]]))
          (pl: exists v, p l = Some (Cell full v)),
-      sat (upd (location_eq_dec Z.eq_dec) p l (Some (Cell full ([[e2]])))) O C (weakest_pre_ct sp (tt, tx) invs).
+      sat (upd (location_eq_dec Z.eq_dec) p l (Some (Cell full ([[e2]])))) O C (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   simpl.
   intros.
@@ -1428,13 +1710,14 @@ Proof.
   contradiction.
 Qed.
 
+
 Lemma sat_fork:
-  forall p O C c tx invs sp
-         (SAT: sat p (Some O) C (weakest_pre_ct sp (Fork c, tx) invs)),
+  forall m p O C c tx invs sp
+         (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (Fork c, tx) invs)),
     exists p1 p2 O1 O2 C1 C2 (GHPD: ghplusdef C1 C2) (BP1: boundph p1) (BP2: boundph p2) (PHPD: phplusdef p1 p2) (BP12: boundph (phplus p1 p2))
           (p1p2: p = phplus p1 p2) (O1O2: Permutation.Permutation (O1++O2) O) (C1C2: C = ghplus C1 C2)
-     (SAT1: sat p1 (Some O1) C1 (weakest_pre_tx sp tx invs 0))
-     (SAT2: sat p2 (Some O2) C2 (weakest_pre sp c (fun _ : Z => Aobs nil) id invs)), True.
+     (SAT1: sat p1 (Some O1) C1 (weakest_pre_tx (S m) sp tx invs 0))
+     (SAT2: sat p2 (Some O2) C2 (weakest_pre m sp c (fun _ : Z => Aobs nil) id invs)), True.
 Proof.
   intros.
   simpl in SAT.
@@ -1489,12 +1772,13 @@ Proof.
   trivial.
 Qed.
 
+
 Lemma sat_newlock:
-  forall p O C tx invs sp l (BP: boundph p) (BC: boundgh C)
+  forall m p O C tx invs sp l (BP: boundph p) (BC: boundgh C)
         (Pl: forall ll (EQA: Aof ll = l), p ll = None)
-        (SAT: sat p O C (weakest_pre_ct sp (Newlock, tx) invs)),
+        (SAT: sat p O C (weakest_pre_ct (S m) sp (Newlock, tx) invs)),
     exists r,
-      sat (upd (location_eq_dec Z.eq_dec) p ((l, r, l, None, false), (0%Z,nil), (0%Z,nil), nil) (Some (Ulock empb empb))) O C (weakest_pre_ct sp (Val (Enum l), tx) invs).
+      sat (upd (location_eq_dec Z.eq_dec) p ((l, r, l, None, false), (0%Z,nil), (0%Z,nil), nil) (Some (Ulock empb empb))) O C (weakest_pre_ct (S m) sp (Val (Enum l), tx) invs).
 Proof.
   simpl.
   intros.
@@ -1549,11 +1833,15 @@ Proof.
   inversion H.
 Qed.
 
+
 Lemma sat_initl:
-  forall p O C e tx invs sp
+  forall m p O C tx invs sp
         (INJ: injph p)
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (g_initl e, tx) invs)),
-    exists (l: location Z) p1 p2 wt ot C1 C2 i
+        (SAT: sat p (Some O) C (EX l, (EX O, (EX wt, (EX ot, (EX i, (EX params, (EX e, ((Abool (Z.eqb ([[e]]) ([[Aof l]]))
+        &* Aulock l wt ot ** subsas params (invs i wt ot) ** Aobs O ** 
+        ((Alock ((Aof l, Rof l, Lof l, Xof l, Pof l), (i,params), Mof l, M'of l) ** Aobs O) --*
+        (weakest_pre_tx (S m) sp tx invs 0)))))))))))),
+    exists (l: location Z) p1 p2 wt ot C1 C2 i e
            (GHPD: ghplusdef C1 C2)
            (EQl: Aof l = ([[e]]))
            (BP1: boundph p1)
@@ -1564,11 +1852,11 @@ Lemma sat_initl:
            (P1l: p1 l = Some (Ulock wt ot))
            (p2inv: sat p2 None C2 (subsas (snd i) (invs (fst i) wt ot))),
     sat (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p1 l None) 
-(Oof l, i, Mof l, M'of l) (Some Lock)) (Some O) C1 (weakest_pre_ct sp (tt, tx) invs).
+(Oof l, i, Mof l, M'of l) (Some Lock)) (Some O) C1 (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   intros.
   simpl in SAT.
-  destruct SAT as (v,(v0,(v1,(v2,(v3,(v4,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(sat1,(sat2,(p1p2,C1C2))))))))))))))))))))))))).
+  destruct SAT as (v,(v0,(v1,(v2,(v3,(v4,(v5,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(sat1,(sat2,(p1p2,C1C2)))))))))))))))))))))))))).
   destruct sat2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(SAT,(tmp1,(p3p4,C3C4)))))))))))))))))).
   destruct tmp1 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(ops,(tmp1,(p56,C56)))))))))))))))))).
   unfold id in *.
@@ -1891,7 +2179,7 @@ Proof.
 
   exists (phplus p1 p4), p3, v1, v2.
   exists (ghplus C1 C4) ,C3.
-  exists (v3,v4).
+  exists (v3,v4), v5.
   exists ghpdefc14c3.
   exists.
   apply Z.eqb_eq in EQ.
@@ -2213,14 +2501,15 @@ Proof.
   reflexivity.
 Qed.
 
+
 Lemma sat_acquire0:
-  forall p O C l tx invs sp
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (Acquire l, tx) invs)),
+  forall m p O C l tx invs sp
+        (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (Acquire l, tx) invs)),
   exists ll
          (EQL: Aof ll = ([[l]]))
          (Pl: p ll = Some Lock \/ exists Wt Ot, p ll = Some (Locked Wt Ot))
          (PRCl: prcl (Oof ll) O = true),
-    sat p (Some O) C (weakest_pre_ct sp (Waiting4lock l, tx) invs).
+    sat p (Some O) C (weakest_pre_ct (S m) sp (Waiting4lock l, tx) invs).
 Proof.
   simpl.
   intros.
@@ -2306,9 +2595,10 @@ Proof.
   split; reflexivity.
 Qed.
 
+
 Lemma sat_acquire:
-  forall p O C l tx invs sp
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (Acquire l, tx) invs)),
+  forall m p O C l tx invs sp
+        (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (Acquire l, tx) invs)),
   exists ll
          (EQL: Aof ll = ([[l]]))
          (Pl: p ll = Some Lock \/ exists Wt Ot, p ll = Some (Locked Wt Ot))
@@ -2323,7 +2613,7 @@ Lemma sat_acquire:
           (p1l : p1 ll = Some Lock \/ p1 ll = None)
           (pl : p ll = Some Lock \/ p ll = None)
           (SAT1: sat p1 None C1 (subsas (snd (Iof ll)) (invs (fst (Iof ll)) wt ot))),
-      sat (phplus (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked wt ot))) p1) (Some (Oof ll :: O)) (ghplus C C1) (weakest_pre_ct sp (tt, tx) invs).
+      sat (phplus (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked wt ot))) p1) (Some (Oof ll :: O)) (ghplus C C1) (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   simpl.
   intros.
@@ -2529,10 +2819,11 @@ Proof.
   split; reflexivity.
   split; repeat php_.
 Qed.
+
 
 Lemma sat_wait4lock:
-  forall p O C l tx invs sp
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (Waiting4lock l, tx) invs)),
+  forall m p O C l tx invs sp
+        (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (Waiting4lock l, tx) invs)),
   exists ll
          (EQL: Aof ll = ([[l]]))
          (Pl: p ll = Some Lock \/ exists Wt Ot, p ll = Some (Locked Wt Ot))
@@ -2547,7 +2838,7 @@ Lemma sat_wait4lock:
           (p1l : p1 ll = Some Lock \/ p1 ll = None)
           (pl : p ll = Some Lock \/ p ll = None)
           (SAT1: sat p1 None C1 (subsas (snd (Iof ll)) (invs (fst (Iof ll)) wt ot))),
-      sat (phplus (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked wt ot))) p1) (Some (Oof ll :: O)) (ghplus C C1) (weakest_pre_ct sp (tt, tx) invs).
+      sat (phplus (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked wt ot))) p1) (Some (Oof ll :: O)) (ghplus C C1) (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   simpl.
   intros.
@@ -2754,9 +3045,10 @@ Proof.
   split; repeat php_.
 Qed.
 
+
 Lemma sat_release:
-  forall p O C l tx invs sp
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (Release l, tx) invs)),
+  forall m p O C l tx invs sp
+        (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (Release l, tx) invs)),
     exists ll p1 p2 wt ot C1 C2 O1
            (EQl: Aof ll = ([[l]]))
            (OO1: Permutation O (Oof ll :: O1))
@@ -2770,7 +3062,7 @@ Lemma sat_release:
            (C1C2: C = ghplus C1 C2) 
            (P1l: p1 ll = Some (Locked wt ot))
            (p2inv: sat p2 None C2 (subsas (snd (Iof ll)) (invs (fst (Iof ll)) wt ot))),
-    sat (upd (location_eq_dec Z.eq_dec) p1 ll (Some Lock)) (Some O1) C1 (weakest_pre_ct sp (tt, tx) invs).
+    sat (upd (location_eq_dec Z.eq_dec) p1 ll (Some Lock)) (Some O1) C1 (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   intros.
   simpl in SAT.
@@ -2951,7 +3243,7 @@ Proof.
   unfold weakest_pre_ct.
   simpl.
   assert (G: sat (phplus p2 (phplus p3 (upd (location_eq_dec Z.eq_dec) p5 (evall v0) (Some Lock)))) (Some (map evalol v)) (ghplus C2 (ghplus C3 C5))
-    (weakest_pre_tx sp tx invs 0)).
+    (weakest_pre_tx (S m) sp tx invs 0)).
   {
   apply tmp2 with (Some (map evalol v)); repeat php_.
   apply boundgh_mon with C6.
@@ -2999,12 +3291,13 @@ Proof.
   inversion H.
 Qed.
 
+
 Lemma sat_newcond:
-  forall p O C tx invs sp v (BP: boundph p) (BC: boundgh C)
+  forall m p O C tx invs sp v (BP: boundph p) (BC: boundgh C)
         (Pv: forall r I L X M M' P, p (v, r, I, L, X, M, M', P) = None)
-        (SAT: sat p O C (weakest_pre_ct sp (Newcond, tx) invs)),
+        (SAT: sat p O C (weakest_pre_ct (S m) sp (Newcond, tx) invs)),
     exists R X P,
-      sat (upd (location_eq_dec Z.eq_dec) p ((v, R, v, X, P), (0%Z,nil), (0,nil), nil) (Some Ucond)) O C (weakest_pre_ct sp (Val (Enum v), tx) invs).
+      sat (upd (location_eq_dec Z.eq_dec) p ((v, R, v, X, P), (0%Z,nil), (0,nil), nil) (Some Ucond)) O C (weakest_pre_ct (S m) sp (Val (Enum v), tx) invs).
 Proof.
   simpl.
   intros.
@@ -3074,22 +3367,25 @@ Proof.
   repeat php_.
 Qed.
 
+
 Lemma sat_initc:
-  forall p O C e tx invs sp
+  forall m p O C tx invs sp
         (INJ: injph p)
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (g_initc e, tx) invs)),
-    exists (l: location Z) ml m'l lk wt ot
+        (SAT: sat p (Some O) C ((EX v, (EX l, (EX M, (EX M', (EX wt, (EX ot, (EX e, (Abool (Z.eqb ([[e]]) ([[Aof v]])) &*
+        Aulock l wt ot ** Aucond v ** (Aulock l wt ot ** Aicond ((Aof v, Rof v, Aof l, Xof v, Pof v), Iof v, M, M') --*
+        (weakest_pre_tx (S m) sp tx invs 0)))))))))))),
+    exists (l: location Z) ml m'l lk wt ot e
            (EQl: Aof l = ([[e]]))
            (Pl: p l = Some Ucond)
            (Plk: p lk = Some (Ulock wt ot)),
-    sat (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p l None) ((Aof l, Rof l, Aof lk, Xof l, Pof l), Iof l, ml, m'l) (Some Icond)) (Some O) C (weakest_pre_ct sp (tt, tx) invs).
+    sat (upd (location_eq_dec Z.eq_dec) (upd (location_eq_dec Z.eq_dec) p l None) ((Aof l, Rof l, Aof lk, Xof l, Pof l), Iof l, ml, m'l) (Some Icond)) (Some O) C (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   simpl.
   intros.
-  destruct SAT as (v,(v0,(v1,(v2,(v3,(v4,(eqls,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2))))))))))))))))))))))))).
+  destruct SAT as (v,(v0,(v1,(v2,(v3,(v4,(v5,(eqls,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2)))))))))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,C3C4)))))))))))))))))).
   subst.
-  exists (evall v), v1, (map evalol v2), (evall v0), v3, v4.
+  exists (evall v), v1, (map evalol v2), (evall v0), v3, v4, v5.
   apply Z.eqb_eq in eqls.
   unfold id in *.
   exists.
@@ -3386,20 +3682,23 @@ Proof.
   split; reflexivity.
 Qed.
 
+
 Lemma sat_g_finlc:
-  forall p O C e tx invs sp
-        (SAT: sat p O C (weakest_pre_ct sp (g_finlc e, tx) invs)),
-    exists lv lk
+  forall m p O C tx invs sp
+        (SAT: sat p O C (EX v, (EX l, (EX e, ((Abool (andb (Z.eqb ([[e]]) ([[Aof v]])) (Z.eqb ([[Lof v]]) ([[Aof l]]))) &*
+        Aprop (spurious_ok sp (evall l) (evall v) invs)) &* Alock l ** Aicond v ** (Alock l ** Acond v --*
+       (weakest_pre_tx (S m) sp tx invs 0))))))),
+    exists lv lk e
            (EQl: Aof lv = ([[e]]))
            (EQl: Lof lv = Aof lk)
            (Pl: p lv = Some Icond)
            (Plk: p lk = Some Lock \/ exists wt ot, p lk = Some (Locked wt ot))
            (SPUR: spurious_ok sp lk lv invs),
-    sat (upd (location_eq_dec Z.eq_dec) p lv (Some Cond)) O C (weakest_pre_ct sp (tt, tx) invs).
+    sat (upd (location_eq_dec Z.eq_dec) p lv (Some Cond)) O C (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   simpl.
   intros.
-  destruct SAT as (v,(v0,((eql,SPUR),(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2))))))))))))))))))))).
+  destruct SAT as (v,(v0,(v5,((eql,SPUR),(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2)))))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,C3C4)))))))))))))))))).
   apply Coq.Bool.Bool.andb_true_iff in eql.
   destruct eql as (EQ1,EQ2).
@@ -3407,7 +3706,7 @@ Proof.
   apply Z.eqb_eq in EQ1.
   apply Z.eqb_eq in EQ2.
   subst.  
-  exists (evall v), (evall v0).
+  exists (evall v), (evall v0), v5.
   exists.
   rewrite EQ1.
   reflexivity.
@@ -3601,9 +3900,10 @@ Proof.
   split; reflexivity.
 Qed.
 
+
 Lemma sat_wait:
-  forall p O C ev el tx invs sp
-         (SAT: sat p (Some O) C (weakest_pre_ct sp (Wait ev el, tx) invs)),
+  forall m p O C ev el tx invs sp
+         (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (Wait ev el, tx) invs)),
     exists v l p1 p2 wt ot C1 C2 O1
            (EQl: Aof l = ([[el]]))
            (EQv: Aof v = ([[ev]]))
@@ -3623,7 +3923,7 @@ Lemma sat_wait:
            (Lvl: Lof v = Aof l)
            (SAFE_OBS: safe_obs v (S (wt (Aof v))) (ot (Aof v)) = true),
       sat (upd (location_eq_dec Z.eq_dec) p1 l (Some Lock)) (Some O1) C1
-        (weakest_pre_ct sp (Waiting4cond ev el, tx) invs).
+        (weakest_pre_ct (S m) sp (Waiting4cond ev el, tx) invs).
 Proof.
   simpl.
   intros.
@@ -4095,9 +4395,10 @@ Proof.
   try tauto.
 Qed.
 
+
 Lemma sat_wait4cond:
-  forall p O C ev el tx invs sp
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (Waiting4cond ev el, tx) invs)),
+  forall m p O C ev el tx invs sp
+        (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (Waiting4cond ev el, tx) invs)),
   exists l v
          (EQl: Aof l = ([[el]]))
          (EQv: Aof v = ([[ev]]))
@@ -4108,7 +4409,7 @@ Lemma sat_wait4cond:
          (PRCv: prcl (Oof v) O = true),
     forall pm Cm (PHPDEF: phplusdef p pm) (BPm: boundph pm) (BPmp: boundph (phplus pm p)) (GHPDEF: ghplusdef C Cm) (BCm: boundgh Cm) (BCmC: boundgh (ghplus Cm C))
            (SATM: sat pm None Cm (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb))),
-      sat (phplus p pm) (Some (M'of v ++ O)) (ghplus C Cm) (weakest_pre_ct sp (Waiting4lock el, tx) invs).
+      sat (phplus p pm) (Some (M'of v ++ O)) (ghplus C Cm) (weakest_pre_ct (S m) sp (Waiting4lock el, tx) invs).
 Proof.
   simpl.
   intros.
@@ -4727,13 +5028,12 @@ Proof.
   tauto.
 Qed.
 
+
 Lemma sat_notify:
-forall p O C v tx invs sp
-      (SAT: sat p (Some O) C (weakest_pre_ct sp (Notify v, tx) invs)),
+forall m p O C v tx invs sp
+      (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (Notify v, tx) invs)),
   exists p1 pm C1 Cm wt ot lv ll O'
          (PERM: Permutation ((if ltb 0 (wt (Aof lv)) then (M'of lv) else nil) ++ O') O)
-         (*PERM: Permutation (M'of lv ++ O') O*)
-         (*M'nil: M'of lv = nil \/ lt 0 (wt ([[v]]))*)
          (bp1: boundph p1)
          (bpm: boundph pm)
          (bp1pm: boundph (phplus p1 pm))
@@ -4745,9 +5045,9 @@ forall p O C v tx invs sp
          (EQl: Aof ll = Lof lv)
          (P1l: p1 ll = Some (Locked wt ot)) 
          (P1l: p1 lv = Some Cond)
-         (SATv: sat pm None Cm (subsas (snd (Mof lv)) (invs (fst (Mof lv)) empb empb))),
-    (lt 0 (wt ([[v]])) -> sat (upd (location_eq_dec Z.eq_dec) p1 ll (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) (Some O') C1 (weakest_pre_tx sp tx invs 0)) /\
-    (le (wt ([[v]])) 0 -> sat (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) (Some O') C (weakest_pre_tx sp tx invs 0)).
+         (SATm: lt 0 (wt ([[v]])) -> sat pm None Cm (subsas (snd (Mof lv)) (invs (fst (Mof lv)) empb empb)))
+         (SATn: le (wt ([[v]])) 0 -> pm = emp knowledge /\ Cm = emp (option nat * nat)),
+    sat (upd (location_eq_dec Z.eq_dec) p1 ll (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) (Some O') C1 (weakest_pre_tx (S m) sp tx invs 0).
 Proof.
   simpl.
   intros.
@@ -4837,28 +5137,6 @@ Proof.
   apply Z.eqb_eq in EQ1.
   apply Z.eqb_eq in EQ2.
   unfold id in *.
-
-  exists (phplus p3 (phplus p5 (phplus p7 p8))), p1.
-  exists (ghplus C3 (ghplus C5 (ghplus C7 C8))), C1.
-  exists v1, v2.
-  exists (evall v4), (evall v3).
-  exists (map evalol v0).
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. apply phplus_comm; repeat php_.
-  exists. repeat php_.
-  exists. apply ghplus_comm; repeat php_.
-  exists. symmetry. assumption.
-  exists. symmetry. assumption.
-  exists.
-  apply phplus_locked'; repeat php_.
-  apply phplus_locked; repeat php_.
-  exists.
-  apply phplus_Cond; repeat php_.
-  exists. assumption.
 
   assert (eqh: phplus p3 (phplus p5 (phplus p7 p8)) = phplus p5 (phplus p7 (phplus p8 p3))).
   {
@@ -5063,86 +5341,38 @@ Proof.
   apply Permutation_refl.
   }
 
-  split.
+  destruct (leb (v1 ([[Aof v4]])) 0) eqn:M1.
   {
-  intros.
-  rewrite EQH.
-  rewrite EQC.
-
-  apply tmp8 with (Some (map evalol v0)); repeat php_.
-  apply sn_op.
-  apply Permutation_refl.
-  exists p3, (phplus (upd (location_eq_dec Z.eq_dec) p5 (evall v3)
-    (Some (Locked (upd Z.eq_dec v1 ([[v]]) (v1 ([[v]]) - 1)%nat) v2))) p7).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists None, (Some (map evalol v0)).
-  exists C3, (ghplus C5 C7).
+  exists (phplus p1 (phplus p3 (phplus p5 (phplus p7 p8)))), (emp knowledge).
+  exists (ghplus C1 (ghplus C3 (ghplus C5 (ghplus C7 C8)))), (emp (option nat * nat)).
+  exists v1, v2.
+  exists (evall v4), (evall v3).
+  exists (map evalol v0).
+  exists. assumption.
+  exists. assumption.
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
-  apply sn_op.
-  apply Permutation_refl.
   exists. repeat php_.
-  split.
-  {
-  exists (upd (location_eq_dec Z.eq_dec) p5 (evall v3)
-    (Some (Locked (upd Z.eq_dec v1 ([[v]]) (v1 ([[v]]) - 1)%nat) v2))), p7.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists None, (Some (map evalol v0)).
-  exists C5, C7.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  apply sn_op.
-  apply Permutation_refl.
-  exists. repeat php_.
-  unfold upd.
-  destruct ((location_eq_dec Z.eq_dec) (evall v3) (evall v3)).
-  rewrite EQ2.
-  reflexivity.
-  contradiction.
-  split.
-  {
-  exists p7, (emp knowledge).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists None, (Some (map evalol v0)).
-  exists C7, (emp (option nat*nat)).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
+  exists. symmetry. assumption.
+  exists. symmetry. assumption.
   exists.
-  apply sn_op.
-  apply Permutation_refl.
+  apply phplus_locked'; repeat php_.
+  apply phplus_locked'; repeat php_.
+  apply phplus_locked; repeat php_.
   exists.
-  right.
-  apply Nat.ltb_lt.
-  rewrite <- EQ2.
-  assumption.
-  split.
-  apply fs_op.
-  apply Permutation_refl.
-  split; repeat php_.
-  }
-  split; reflexivity.
-  }
-  split; reflexivity.
-  }
-
+  apply phplus_Cond'; repeat php_.
+  apply phplus_Cond; repeat php_.
+  exists. intros.
+  apply Nat.leb_le in M1.
+  rewrite EQ2 in *.
+  omega.
+  exists.
   intros.
+  split; reflexivity.
+
 
   assert (eqh2: phplus p1 (phplus p3 (phplus p5 (phplus p7 p8))) =
     phplus p5 (phplus p1 (phplus p7 (phplus p8 p3)))).
@@ -5193,12 +5423,12 @@ Proof.
   assumption.
   unfold not.
   intros.
-  destruct H0 as (v0',(f,(v',(f',(CO,rest))))).
+  destruct H as (v0',(f,(v',(f',(CO,rest))))).
   inversion CO.
   intros.
-  inversion H0.
+  inversion H.
   intros.
-  inversion H0.
+  inversion H.
   }
 
   assert (EQC1: ghplus C1 (ghplus C3 (ghplus C5 (ghplus C7 C8))) =
@@ -5387,14 +5617,59 @@ Proof.
   reflexivity.
   contradiction.
   split.
+  apply fs_op.
+  apply Permutation_refl.
+  split; reflexivity.
+  }
+  split; reflexivity.
+  }
+
+  destruct satp1v3 as [SATM|SATM].
   {
-  exists p1, p7.
+  exists (phplus p3 (phplus p5 (phplus p7 p8))), p1.
+  exists (ghplus C3 (ghplus C5 (ghplus C7 C8))), C1.
+  exists v1, v2.
+  exists (evall v4), (evall v3).
+  exists (map evalol v0).
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply phplus_comm; repeat php_.
+  exists. repeat php_.
+  exists. apply ghplus_comm; repeat php_.
+  exists. symmetry. assumption.
+  exists. symmetry. assumption.
+  exists.
+  apply phplus_locked'; repeat php_.
+  apply phplus_locked; repeat php_.
+  exists.
+  apply phplus_Cond; repeat php_.
+  exists. intros. assumption.
+
+  split.
+  {
+  intros.
+  apply nat_leb_falseL in M1.
+  rewrite EQ2 in *.
+  omega.
+  }
+
+  rewrite EQH.
+  rewrite EQC.
+
+  apply tmp8 with (Some (map evalol v0)); repeat php_.
+  apply sn_op.
+  apply Permutation_refl.
+  exists p3, (phplus (upd (location_eq_dec Z.eq_dec) p5 (evall v3)
+    (Some (Locked (upd Z.eq_dec v1 ([[v]]) (v1 ([[v]]) - 1)%nat) v2))) p7).
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
   exists None, (Some (map evalol v0)).
-  exists C1, C7.
+  exists C3, (ghplus C5 C7).
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
@@ -5403,8 +5678,29 @@ Proof.
   apply sn_op.
   apply Permutation_refl.
   exists. repeat php_.
-  left.
-  assumption.
+  split.
+  {
+  exists (upd (location_eq_dec Z.eq_dec) p5 (evall v3)
+    (Some (Locked (upd Z.eq_dec v1 ([[v]]) (v1 ([[v]]) - 1)%nat) v2))), p7.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists None, (Some (map evalol v0)).
+  exists C5, C7.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  apply sn_op.
+  apply Permutation_refl.
+  exists. repeat php_.
+  unfold upd.
+  destruct ((location_eq_dec Z.eq_dec) (evall v3) (evall v3)).
+  rewrite EQ2.
+  reflexivity.
+  contradiction.
   split.
   apply fs_op.
   apply Permutation_refl.
@@ -5412,12 +5708,13 @@ Proof.
   }
   split; reflexivity.
   }
-  split; reflexivity.
+  inversion SATM.
 Qed.
 
+
 Lemma sat_notifyAll:
-forall p O C v tx invs sp
-      (SAT: sat p (Some O) C (weakest_pre_ct sp (NotifyAll v, tx) invs)),
+forall m p O C v tx invs sp
+      (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (NotifyAll v, tx) invs)),
   exists wt ot lv ll
          (M'nil: M'of lv = nil)
          (EQv: Aof lv = ([[v]]))
@@ -5425,7 +5722,7 @@ forall p O C v tx invs sp
          (P1l: p ll = Some (Locked wt ot)) 
          (P1l: p lv = Some Cond)
          (EMP: subsas (snd (Mof lv)) (invs (fst (Mof lv)) empb empb) = Abool true),
-    sat (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked (upd Z.eq_dec wt ([[v]]) 0%nat) ot))) (Some O) C (weakest_pre_tx sp tx invs 0).
+    sat (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked (upd Z.eq_dec wt ([[v]]) 0%nat) ot))) (Some O) C (weakest_pre_tx (S m) sp tx invs 0).
 Proof.
   simpl.
   intros.
@@ -5683,8 +5980,8 @@ Proof.
 Qed.
 
 Lemma sat_WasWaiting4cond:
-  forall sp p O C v l tx invs
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (WasWaiting4cond v l, tx) invs)),
+  forall m sp p O C v l tx invs
+        (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (WasWaiting4cond v l, tx) invs)),
   exists ll lv
          (EQL: Aof ll = ([[l]]))
          (EQV: Aof lv = ([[v]]))
@@ -5705,7 +6002,7 @@ Lemma sat_WasWaiting4cond:
           (LTWT: lt 0 (wt ([[v]])))
           (M'NIL: M'of lv = nil)
           (SAT1: sat p1 None C1 (subsas (snd (Iof ll)) (invs (fst (Iof ll)) wt ot))),
-      sat (phplus (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) p1) (Some (Oof ll :: O)) (ghplus C C1) (weakest_pre_ct sp (tt, tx) invs).
+      sat (phplus (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) p1) (Some (Oof ll :: O)) (ghplus C C1) (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   simpl.
   intros.
@@ -6122,20 +6419,24 @@ Proof.
   split; reflexivity.
 Qed.
 
+
 Lemma sat_chrg:
-  forall p O C v tx invs sp
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (g_chrg v, tx) invs)),
-    exists wt ot lv ll
+  forall m p O C tx invs sp
+        (SAT: sat p (Some O) C (EX O, (EX wt, (EX ot, (EX l, (EX v, (EX ev, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[ev]]) ([[Aof v]])))
+        &* Acond v ** Aobs O ** Alocked l wt ot 
+        ** ((Acond v ** Aobs (Oof v::O) ** Alocked l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) + 1)%nat)) --*
+        (weakest_pre_tx (S m) sp tx invs 0)))))))))),
+    exists wt ot lv ll v
            (EQv: Aof lv = ([[v]]))
            (EQl: Aof ll = Lof lv)
            (Pl: p ll = Some (Locked wt ot))
            (Pv: p lv = Some Cond),
       sat (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked wt (upd Z.eq_dec ot ([[v]]) (ot ([[v]]) + 1)%nat))))
-       (Some (Oof lv::O)) C (weakest_pre_ct sp (tt, tx) invs).
+       (Some (Oof lv::O)) C (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   simpl.
   intros.
-  destruct SAT as (v0,(v1,(v2,(v3,(v4,(eqls,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2)))))))))))))))))))))))).
+  destruct SAT as (v0,(v1,(v2,(v3,(v4,(v,(eqls,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2))))))))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,C3C4)))))))))))))))))).
   destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp6,(tmp7, (p5p6,C5C6)))))))))))))))))).
 
@@ -6326,7 +6627,7 @@ subst.
   apply Z.eqb_eq in EQ2.
   unfold id in *.
 
-  exists v1, v2, (evall v4), (evall v3).
+  exists v1, v2, (evall v4), (evall v3), v.
   exists. symmetry. assumption.
   exists. symmetry. assumption.
   exists. assumption.
@@ -6429,20 +6730,24 @@ subst.
   repeat php_.
 Qed.
 
+
 Lemma sat_chrgu:
-  forall p O C v tx invs sp
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (g_chrgu v, tx) invs)),
-    exists wt ot lv ll
+  forall m p O C tx invs sp
+        (SAT: sat p (Some O) C (EX O, (EX wt, (EX ot, (EX l, (EX v, (EX ev, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[ev]]) ([[Aof v]])))
+        &* Aicond v ** Aobs O ** Aulock l wt ot 
+        ** ((Aicond v ** Aobs (Oof v::O) ** Aulock l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) + 1)%nat)) --*
+        (weakest_pre_tx (S m) sp tx invs 0)))))))))),
+    exists wt ot lv ll v
            (EQv: Aof lv = ([[v]]))
            (EQl: Aof ll = Lof lv)
            (Pl: p ll = Some (Ulock wt ot))
            (Pv: p lv = Some Icond),
       sat (upd (location_eq_dec Z.eq_dec) p ll (Some (Ulock wt (upd Z.eq_dec ot ([[v]]) (ot ([[v]]) + 1)%nat))))
-       (Some (Oof lv::O)) C (weakest_pre_ct sp (tt, tx) invs).
+       (Some (Oof lv::O)) C (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   simpl.
   intros.
-  destruct SAT as (v0,(v1,(v2,(v3,(v4,(eqls,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2)))))))))))))))))))))))).
+  destruct SAT as (v0,(v1,(v2,(v3,(v4,(v,(eqls,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2))))))))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,C3C4)))))))))))))))))).
   destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp6,(tmp7, (p5p6,C5C6)))))))))))))))))).
 
@@ -6655,7 +6960,7 @@ subst.
   apply Z.eqb_eq in EQ2.
   unfold id in *.
 
-  exists v1, v2, (evall v4), (evall v3).
+  exists v1, v2, (evall v4), (evall v3), v.
   exists. symmetry. assumption.
   exists. symmetry. assumption.
   exists. assumption.
@@ -6757,10 +7062,15 @@ subst.
   repeat php_.
 Qed.
 
+
 Lemma sat_disch:
-  forall p O C v tx invs sp
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (g_disch v, tx) invs)),
-    exists wt ot O1 lv ll
+  forall m p O C tx invs sp
+        (SAT: sat p (Some O) C (EX O, (EX wt, (EX ot, (EX l, (EX v, (EX ev, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[ev]]) ([[Aof v]]))
+        (safe_obs (evall v) (wt ([[ev]])) ((ot ([[ev]]) - 1)))))
+        &* Acond v ** Aobs (Oof v::O) ** Alocked l wt ot 
+        ** ((Acond v ** Aobs O ** Alocked l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) - 1)%nat)) --*
+        (weakest_pre_tx (S m) sp tx invs 0)))))))))),
+    exists wt ot O1 lv ll v
            (O1eq: Permutation O (Oof lv::O1))
            (EQv: Aof lv = ([[v]]))
            (EQl: Aof ll = Lof lv)
@@ -6769,11 +7079,11 @@ Lemma sat_disch:
            (INO: In (Oof lv) O)
            (SAFE_OBS: safe_obs lv (wt ([[v]])) ((ot ([[v]])) - 1) = true),
       sat (upd (location_eq_dec Z.eq_dec) p ll (Some (Locked wt (upd Z.eq_dec ot ([[v]]) (ot ([[v]]) - 1)%nat))))
-       (Some O1) C (weakest_pre_ct sp (tt, tx) invs).
+       (Some O1) C (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   simpl.
   intros.
-  destruct SAT as (v0,(v1,(v2,(v3,(v4,(eqls,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2)))))))))))))))))))))))).
+  destruct SAT as (v0,(v1,(v2,(v3,(v4,(v,(eqls,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2))))))))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,C3C4)))))))))))))))))).
   destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp6,(tmp7, (p5p6,C5C6)))))))))))))))))).
 
@@ -6962,13 +7272,11 @@ subst.
   destruct eqls as (EQ1,EQ2).
   apply Coq.Bool.Bool.andb_true_iff in EQ2.
   destruct EQ2 as (EQ2,EQ3).
-  apply Coq.Bool.Bool.andb_true_iff in EQ3.
-  destruct EQ3 as (EQ3,EQ4).
   apply Z.eqb_eq in EQ1.
   apply Z.eqb_eq in EQ2.
   unfold id in *.
 
-  exists v1, v2, (map evalol v0), (evall v4), (evall v3).
+  exists v1, v2, (map evalol v0), (evall v4), (evall v3), v.
   exists PERM.
   exists. symmetry. assumption.
   exists. symmetry. assumption.
@@ -7076,10 +7384,15 @@ subst.
   repeat php_.
 Qed.
 
+
 Lemma sat_dischu:
-  forall p O C v tx invs sp
-        (SAT: sat p (Some O) C (weakest_pre_ct sp (g_dischu v, tx) invs)),
-    exists wt ot O1 lv ll
+  forall m p O C tx invs sp
+        (SAT: sat p (Some O) C (EX O, (EX wt, (EX ot, (EX l, (EX v, (EX ev, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (andb (Z.eqb ([[ev]]) ([[Aof v]]))
+        (safe_obs (evall v) (wt ([[ev]])) ((ot ([[ev]]) - 1)))))
+        &* Aicond v ** Aobs (Oof v::O) ** Aulock l wt ot 
+        ** ((Aicond v ** Aobs O ** Aulock l wt (upd Z.eq_dec ot ([[ev]]) (ot ([[ev]]) - 1)%nat)) --*
+        (weakest_pre_tx (S m) sp tx invs 0)))))))))),
+    exists wt ot O1 lv ll v
            (O1eq: Permutation O (Oof lv::O1))
            (EQv: Aof lv = ([[v]]))
            (EQl: Aof ll = Lof lv)
@@ -7088,11 +7401,11 @@ Lemma sat_dischu:
            (INO: In (Oof lv) O)
            (SAFE_OBS: safe_obs lv (wt ([[v]])) ((ot ([[v]])) - 1) = true),
       sat (upd (location_eq_dec Z.eq_dec) p ll (Some (Ulock wt (upd Z.eq_dec ot ([[v]]) (ot ([[v]]) - 1)%nat))))
-       (Some O1) C (weakest_pre_ct sp (tt, tx) invs).
+       (Some O1) C (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   simpl.
   intros.
-  destruct SAT as (v0,(v1,(v2,(v3,(v4,(eqls,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2)))))))))))))))))))))))).
+  destruct SAT as (v0,(v1,(v2,(v3,(v4,(v,(eqls,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(tmp1,(tmp2,(p1p2,C1C2))))))))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,C3C4)))))))))))))))))).
   destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp6,(tmp7, (p5p6,C5C6)))))))))))))))))).
 
@@ -7303,13 +7616,11 @@ subst.
   destruct eqls as (EQ1,EQ2).
   apply Coq.Bool.Bool.andb_true_iff in EQ2.
   destruct EQ2 as (EQ2,EQ3).
-  apply Coq.Bool.Bool.andb_true_iff in EQ3.
-  destruct EQ3 as (EQ3,EQ4).
   apply Z.eqb_eq in EQ1.
   apply Z.eqb_eq in EQ2.
   unfold id in *.
 
-  exists v1, v2, (map evalol v0), (evall v4), (evall v3).
+  exists v1, v2, (map evalol v0), (evall v4), (evall v3), v.
   exists PERM.
   exists. symmetry. assumption.
   exists. symmetry. assumption.
@@ -7416,11 +7727,12 @@ subst.
   repeat php_.
 Qed.
 
+
 Lemma sat_g_newctr:
-  forall p O C gc tx invs sp (BP: boundph p) (BC: boundgh C)
+  forall m p O C gc tx invs sp (BP: boundph p) (BC: boundgh C)
         (Cgc: C gc = None)
-        (SAT: sat p O C (weakest_pre_ct sp (g_newctr, tx) invs)),
-      sat p O (upd Z.eq_dec C gc (Some (Some 0%nat,0%nat))) (weakest_pre_ct sp (tt, tx) invs).
+        (SAT: sat p O C (FA gc, Actr (Enum gc) 0 --* (weakest_pre_tx (S m) sp tx invs 0))),
+      sat p O (upd Z.eq_dec C gc (Some (Some 0%nat,0%nat))) (weakest_pre_ct (S m) sp (tt, tx) invs).
 Proof.
   unfold weakest_pre_ct.
   unfold boundgh.
@@ -7479,17 +7791,18 @@ Proof.
   php_.
 Qed.
 
+
 Lemma sat_g_ctrinc:
-  forall p O C gc tx invs sp (BP: boundph p) (BC: boundgh C)
-        (SAT: sat p O C (weakest_pre_ct sp (g_ctrinc gc, tx) invs)),
-    exists t m
+  forall m' p O C tx invs sp (BP: boundph p) (BC: boundgh C)
+        (SAT: sat p O C (EX n, (EX gv, (Actr gv n ** (Actr gv (S n)%nat ** Atic gv --* (weakest_pre_tx (S m') sp tx invs 0)))))),
+    exists t m gc
       (Cgc: C ([[gc]]) = Some (Some t, m)),
-      sat p O (upd Z.eq_dec C ([[gc]]) (Some (Some (S t), S m))) (weakest_pre_ct sp (tt, tx) invs).
+      sat p O (upd Z.eq_dec C ([[gc]]) (Some (Some (S t), S m))) (weakest_pre_ct (S m') sp (tt, tx) invs).
 Proof.
   unfold weakest_pre_ct.
   simpl.
   intros.
-  destruct SAT as (v,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,((n,C1gc),(tmp2,(p1p2,C1C2))))))))))))))))))).
+  destruct SAT as (v,(gc,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,((n,C1gc),(tmp2,(p1p2,C1C2)))))))))))))))))))).
   subst.
   unfold id in *.
 
@@ -7644,6 +7957,7 @@ Proof.
   }
 
   exists v, (n+n0)%nat.
+  exists gc.
   exists.
   unfold ghplus.
   rewrite C1gc, C2gc.
@@ -7691,6 +8005,7 @@ Proof.
   }
 
   rewrite EQC.
+
   apply tmp2 with o1; repeat php_.
   apply oplus_comm.
   assumption.
@@ -7737,7 +8052,7 @@ Proof.
   reflexivity.
   }
 
-  exists v, n.
+  exists v, n, gc.
   exists.
   unfold ghplus.
   rewrite C1gc, C2gc.
@@ -7830,17 +8145,18 @@ Proof.
   reflexivity.
 Qed.
 
+
 Lemma sat_g_ctrdec:
-  forall p O C gc tx invs sp (BP: boundph p) (BC: boundgh C)
-        (SAT: sat p O C (weakest_pre_ct sp (g_ctrdec gc, tx) invs)),
-    exists t m
+  forall m' p O C tx invs sp (BP: boundph p) (BC: boundgh C)
+        (SAT: sat p O C (EX n, (EX ev, (Actr ev n ** Atic ev ** (Actr ev (n-1)%nat --* (weakest_pre_tx (S m') sp tx invs 0)))))),
+    exists gc t m
       (Cgc: C ([[gc]]) = Some (Some (S t),S m)),
-      sat p O (upd Z.eq_dec C ([[gc]]) (Some (Some t,m))) (weakest_pre_ct sp (tt, tx) invs).
+      sat p O (upd Z.eq_dec C ([[gc]]) (Some (Some t,m))) (weakest_pre_ct (S m') sp (tt, tx) invs).
 Proof.
   unfold weakest_pre_ct.
   simpl.
   intros.
-  destruct SAT as (v,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,((n,C1gc),(tmp2,(p1p2,C1C2))))))))))))))))))).
+  destruct SAT as (v,(gc,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,((n,C1gc),(tmp2,(p1p2,C1C2)))))))))))))))))))).
   destruct tmp2 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,C3C4)))))))))))))))))).
 
   rewrite <- C1C2.
@@ -7848,6 +8164,7 @@ Proof.
   unfold id in *.
   destruct tmp4 as (n',C3gc).
   unfold ghplus at 1 2 3 4.
+  exists gc.
   rewrite C1gc.
   destruct C3gc as (oc3,C3gc).
   rewrite C3gc.
@@ -8258,13 +8575,26 @@ Proof.
   omega.
 Qed.
 
+
 Lemma sat_frame:
-  forall f c p O C Q se invs sp
-         (SAT: sat p O C ((weakest_pre sp c (fun x : Z => Q x) se invs) ** f)),
-    sat p O C (weakest_pre sp c (fun x : Z => Q x ** f) se invs).
+  forall m f c p O C Q se invs sp
+         (SAT: sat p O C ((weakest_pre m sp c (fun x : Z => Q x) se invs) ** f)),
+    forall m' (LE: le m' m), sat p O C (weakest_pre m' sp c (fun x : Z => Q x ** f) se invs).
 Proof.
-  induction c; intros; try assumption.
+  induction m.
+  intros.
+  destruct m'.
+  reflexivity.
+  inversion LE.
+
+  destruct c; intros; try assumption.
   {
+  destruct m'; try reflexivity.
+  simpl in *.
+  assumption.
+  }
+  {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -8328,6 +8658,7 @@ Proof.
   split; repeat php_.
   }
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -8433,6 +8764,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -8537,6 +8869,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -8696,60 +9029,135 @@ Proof.
   split; repeat php_.
   split.
   intros.
+  eapply sat_weak_imp; try assumption.
   apply tmp5 with O'; repeat php_.
-  rewrite eqh, eqg.
-  split; reflexivity.
+  intros.
+  apply SAT0.
+  omega.
+  split; repeat php_.
   }
-
   {
-  simpl in *.
+  destruct m'; try reflexivity.
+  simpl.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
   subst.
+  simpl.
   eapply sat_weak_imp; repeat php_.
-  apply IHc1.
+  apply IHm.
+  simpl in tmp1.
   exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
   split.
   apply tmp1.
-  split. assumption.
+  split.
+  apply tmp2.
   split; reflexivity.
+  omega.
   simpl.
   intros.
   destruct SAT as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
-  eapply IHc2.
+  destruct p3p4.
+  subst.
+  apply IHm.
+  simpl.
   exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
   split. assumption.
-  split; assumption.
+  split; try assumption.
+  split; reflexivity.
+  omega.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
   subst.
   eapply sat_weak_imp; repeat php_.
-  apply IHc1.
+  apply IHm.
   exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
   split.
   apply tmp1.
-  split. assumption.
+  split.
+  apply tmp2.
   split; reflexivity.
+  omega.
   simpl.
   intros.
   destruct SAT as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
   subst.
   destruct ((0 <? z)%Z).
-  eapply IHc2.
+  eapply IHm.
   exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
   split. assumption.
   split; assumption.
-  eapply IHc3.
+  omega.
+  eapply IHm.
   exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
   split. assumption.
   split; assumption.
+  omega.
+  }
+  {
+  destruct m'; try reflexivity.
+  simpl in *.
+  intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
+  subst.
+  eapply sat_weak_imp with (n:=m'); try assumption.
+  apply IHm; try assumption.
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
+  split.
+  apply tmp1.
+  split.
+  apply tmp2.
+  split; reflexivity.
+  omega.
+  simpl.
+  intros.
+  destruct SAT as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, p3p4))))))))))))))))).
+  subst.
+  destruct ((0 <? z)%Z).
+  eapply sat_weak_imp with (n:=m); try assumption.
+  eapply IHm.
+  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
+  split.
+  apply tmp4.
+  split.
+  apply tmp5.
+  assumption.
+  omega.
+  simpl.
+  intros.
+  simpl.
+  destruct SAT as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
+  subst.
+  eapply sat_weak_imp with (n:=m); try assumption.
+  apply IHm.
+  exists p5, p6, phpdefp5p6, bp5, bp6, bp56, O5, O6, C5, C6, ghpdefC5C6, BC5, BC6, bc56, opO5O6.
+  split.
+  apply tmp8.
+  split.
+  apply tmp6.
+  split; reflexivity.
+  omega.
+  simpl.
+  intros.
+  assumption.
+  omega.
+  omega.
+  destruct p3p4.
+  subst.
+  simpl.
+  exists p3, p4, phpdefp3p4, bp3, bp4, bp34, O3, O4, C3, C4, ghpdefC3C4, BC3, BC4, bc34, opO3O4.
+  split. assumption.
+  split. assumption.
+  split; reflexivity.
+  omega.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -8818,6 +9226,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -8940,6 +9349,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -9044,6 +9454,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -9148,6 +9559,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -9205,6 +9617,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -9309,6 +9722,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -9540,6 +9954,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -9812,6 +10227,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -9917,6 +10333,7 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
   simpl in *.
   intros.
   destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
@@ -10022,14 +10439,37 @@ Proof.
   }
 
   {
+  destruct m'; try reflexivity.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
+  destruct tmp1 as [SAT|g_chrgu].
+  destruct SAT as [SAT|g_chrg].
+  destruct SAT as [SAT|g_dischu].
+  destruct SAT as [SAT|g_disch].
+  destruct SAT as [SAT|g_ctrinc].
+  destruct SAT as [SAT|g_ctrdec].
+  destruct SAT as [SAT|g_newctr].
+  destruct SAT as [SAT|g_finlc].
+  destruct SAT as [SAT|g_initc].
+  destruct SAT as [nop|g_initl].
+  {
+  left. left. left. left. left. left. left. left. left. left.
   simpl in *.
   intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
-  destruct tmp1 as (v,(v0,(v1,(v2,(v3,(v4,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4))))))))))))))))))))))))).
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2, C1, C2, ghpdefC1C2, BC1, BC2, bc12,opO1O2.
+  split. apply nop.
+  split; try assumption.
+  split; try assumption.
+  }
+
+  {
+  left. left. left. left. left. left. left. left. left. right.
+  simpl in *.
+  intros.
+  destruct g_initl as (v,(v0,(v1,(v2,(v3,(v4,(v5,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4)))))))))))))))))))))))))).
   destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
   destruct tmp6 as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(O7,(O8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(bc78,(opO7O8,(tmp7,(tmp9, (p7p8,C7C8)))))))))))))))))).
   subst.
-  exists v, v0, v1, v2, v3, v4.
+  exists v, v0, v1, v2, v3, v4, v5.
   split. assumption.
 
   assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 (phplus p7 p8)) p2). repeat php_.
@@ -10295,13 +10735,13 @@ Proof.
   }
 
   {
+  left. left. left. left. left. left. left. left. right.
   simpl in *.
   intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
-  destruct tmp1 as (v,(v0,(v1,(v2,(v3,(v4,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4))))))))))))))))))))))))).
+  destruct g_initc as (v,(v0,(v1,(v2,(v3,(v4,(v5,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4)))))))))))))))))))))))))).
   destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
   subst.
-  exists v, v0, v1, v2, v3, v4.
+  exists v, v0, v1, v2, v3, v4, v5.
   split. assumption.
 
 
@@ -10482,15 +10922,14 @@ Proof.
   }
 
   {
+  left. left. left. left. left. left. left. right.
   simpl in *.
   intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
-  destruct tmp1 as (v,(v0,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4))))))))))))))))))))).
+  destruct g_finlc as (v,(v0,(v1,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4)))))))))))))))))))))).
   destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
   subst.
-  exists v, v0.
+  exists v, v0, v1.
   split. assumption.
-
 
   assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 p6) p2). repeat php_.
   assert (phpdef2: phplusdef p5 p2 /\ phplusdef p6 p2). repeat php_.
@@ -10669,1102 +11108,9 @@ Proof.
   }
 
   {
+  left. left. left. left. left. left. right.
   simpl in *.
   intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
-  destruct tmp1 as (v,(v0,(v1,(v2,(v3,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4)))))))))))))))))))))))).
-  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
-  destruct tmp6 as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(O7,(O8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(bc78,(opO7O8,(tmp7,(tmp9, (p7p8,C7C8)))))))))))))))))).
-  subst.
-  exists v, v0, v1, v2, v3.
-  split. assumption.
-
-  assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 (phplus p7 p8)) p2). repeat php_.
-  assert (phpdef2: phplusdef p5 p2 /\ phplusdef (phplus p7 p8) p2). repeat php_.
-  assert (phpdef3: phplusdef p7 p2 /\ phplusdef p8 p2). repeat php_.
-  assert (phpdef4: phplusdef p3 p5 /\ phplusdef p3 (phplus p7 p8)). repeat php_.
-  assert (phpdef5: phplusdef p3 p7 /\ phplusdef p3 p8). repeat php_.
-  assert (phpdef6: phplusdef p5 p7 /\ phplusdef p5 p8). repeat php_.
-
-  assert (ghpdef1: ghplusdef C3 C2 /\ ghplusdef (ghplus C5 (ghplus C7 C8)) C2). repeat php_.
-  assert (ghpdef2: ghplusdef C5 C2 /\ ghplusdef (ghplus C7 C8) C2). repeat php_.
-  assert (ghpdef3: ghplusdef C7 C2 /\ ghplusdef C8 C2). repeat php_.
-  assert (ghpdef4: ghplusdef C3 C5 /\ ghplusdef C3 (ghplus C7 C8)). repeat php_.
-  assert (ghpdef5: ghplusdef C3 C7 /\ ghplusdef C3 C8). repeat php_.
-  assert (ghpdef6: ghplusdef C5 C7 /\ ghplusdef C5 C8). repeat php_.
-
-  assert (eqh1: phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))) =
-    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2). repeat php_.
-  assert (eqh2: phplus p5 (phplus p7 (phplus p8 p2)) = phplus p2 (phplus p5 (phplus p7 p8))).
-    symmetry. rewrite phplus_comm; repeat php_.
-  assert (eqh3: phplus (phplus p2 (phplus p5 (phplus p7 p8))) p3 =
-    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2).
-    rewrite phplus_assoc; repeat php_.
-  assert (eqg1: ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))) =
-    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2). repeat php_.
-  assert (eqg2: ghplus C5 (ghplus C7 (ghplus C8 C2)) = ghplus C2 (ghplus C5 (ghplus C7 C8))).
-    symmetry. rewrite ghplus_comm; repeat php_.
-  assert (eqg3: ghplus (ghplus C2 (ghplus C5 (ghplus C7 C8))) C3 =
-    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2).
-    rewrite ghplus_assoc; repeat php_.
-
-  assert (b35782: boundph (phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))))).
-    rewrite eqh1. assumption.
-  assert (b5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))).
-    rewrite eqh2.
-    apply boundph_mon with p3; repeat php_.
-    rewrite eqh3. assumption.
-
-  assert (bg35782: boundgh (ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))))).
-    rewrite eqg1. assumption.
-  assert (bg5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))).
-    rewrite eqg2.
-    apply boundgh_mon with C3; repeat php_.
-    rewrite eqg3. assumption.
-  exists p3, (phplus p5 (phplus p7 (phplus p8 p2))).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O24, oplus O2 O4 O24 /\ oplus O3 O24 O).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  inversion OP1.
-  rewrite <- H in *.
-  inversion OP2.
-  exists None.
-  split; apply None_op.
-  rewrite <- H in *.
-  inversion OP2.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  rewrite <- H in *.
-  inversion OP2.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  }
-  destruct exo as (O24,(op24,op324)).
-  exists O3, O24, C3, (ghplus C5 (ghplus C7 (ghplus C8 C2))).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  split. assumption.
-  split.
-
-  assert (eqh4: phplus (phplus (phplus p7 p8) p2) p5 = phplus p5 (phplus p7 (phplus p8 p2))). repeat php_.
-  assert (eqg4: ghplus (ghplus (ghplus C7 C8) C2) C5 = ghplus C5 (ghplus C7 (ghplus C8 C2))). repeat php_.
-
-  assert (bp5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))). repeat php_.
-  assert (bgp5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))). repeat php_.
-  assert (bp782: boundph (phplus p7 (phplus p8 p2))).
-  rewrite <- phplus_assoc; repeat php_. apply boundph_mon with p5; repeat php_.
-  rewrite eqh4. assumption.
-  assert (bgp782: boundgh (ghplus C7 (ghplus C8 C2))).
-  rewrite <- ghplus_assoc; repeat php_. apply boundgh_mon with C5; repeat php_.
-  rewrite eqg4. assumption.
-
-  exists p5, (phplus p7 (phplus p8 p2)).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O26, oplus O2 O6 O26 /\ oplus O5 O26 O24).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  assert (OP5:=op24).
-  inversion OP5.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists None.
-  split; apply None_op.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  }
-  destruct exo as (O26,(op26,op526)).
-
-  exists O5, O26, C5, (ghplus C7 (ghplus C8 C2)).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-
-  exists p7, (phplus p8 p2).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O28, oplus O2 O8 O28 /\ oplus O7 O28 O26).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  assert (OP5:=op24).
-  inversion op26.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists None.
-  split; apply None_op.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  }
-  destruct exo as (O28,(op28,op728)).
-  exists O7, O28, C7, (ghplus C8 C2).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  split.
-  intros.
-  destruct SAT as (p9,(p0,(phpdefp9p0,(bp9,(bp0,(bp90,(o9,(o0,(C9,(C0,(ghpdefC9C0,(BC9,(BC0,(BC9C0,(opo9o0,(tmp110,(tmp18,(p9p0,C9C0)))))))))))))))))).
-  subst.
-  assert (phpdef7: phplusdef p8 (phplus p9 p0) /\ phplusdef p2 (phplus p9 p0)). repeat php_.
-  assert (phpdef9: phplusdef p8 p9 /\ phplusdef p8 p0). repeat php_.
-  assert (phpdef10: phplusdef p2 p9 /\ phplusdef p2 p0). repeat php_.
-  assert (ghpdef7: ghplusdef C8 (ghplus C9 C0) /\ ghplusdef C2 (ghplus C9 C0)). repeat php_.
-  assert (ghpdef9: ghplusdef C8 C9 /\ ghplusdef C8 C0). repeat php_.
-  assert (ghpdef10: ghplusdef C2 C9 /\ ghplusdef C2 C0). repeat php_.
-
-  assert (eqh7: phplus (phplus p8 (phplus p9 p0)) p2 = 
-    phplus (phplus p8 p2) (phplus p9 p0)).
-    rewrite phplus_comm; repeat php_.
-    rewrite <- phplus_assoc; try assumption. symmetry.
-    rewrite <- phplus_assoc; try assumption.
-    replace (phplus p8 p2) with (phplus p2 p8); repeat php_.
-    repeat php_.
-  assert (eqg7: ghplus (ghplus C8 (ghplus C9 C0)) C2 = 
-    ghplus (ghplus C8 C2) (ghplus C9 C0)).
-    rewrite ghplus_comm; repeat php_.
-    rewrite <- ghplus_assoc; try assumption. symmetry.
-    rewrite <- ghplus_assoc; try assumption.
-    replace (ghplus C8 C2) with (ghplus C2 C8); repeat php_.
-    repeat php_.
-
-  exists (phplus p8 (phplus p9 p0)), p2.
-  exists. repeat php_.
-  exists. apply boundph_mon with p2; repeat php_. rewrite eqh7. assumption.
-  exists. repeat php_.
-  exists. rewrite eqh7. assumption.
-  assert (exo: exists O'8, oplus O' O8 O'8 /\ oplus O'8 O2 O'').
-  {
-  assert (OP1:=op28).
-  assert (OP2:=OPLUS).
-  inversion OPLUS.
-  rewrite <- H in *.
-  inversion OP1.
-  exists None.
-  split; apply None_op.
-  rewrite <- H in *.
-  inversion OP1.
-  exists None.
-  split. apply None_op.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  exists (Some o1).
-  split. apply sn_oplus.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  rewrite <- H in *.
-  inversion OP1.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply fs_op. assumption.
-  }
-  destruct exo as (O'8,(op'8,opd28)).
-  exists O'8, O2, (ghplus C8 (ghplus C9 C0)), C2.
-  exists. repeat php_.
-  exists. apply boundgh_mon with C2; repeat php_. rewrite eqg7. assumption.
-  exists. repeat php_.
-  exists. rewrite eqg7. assumption.
-  exists. repeat php_.
-  split.
-  apply tmp9 with O'; repeat php_.
-  rewrite eqh7. assumption.
-  rewrite eqg7. assumption.
-  apply oplus_comm; assumption.
-  exists p9, p0.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists o9, o0, C9, C0.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  split. assumption.
-  split. assumption.
-  split; reflexivity.
-  split. assumption.
-  split; repeat php_.
-  split; reflexivity.
-  split; reflexivity.
-  split; repeat php_.
-  }
-
-  {
-  simpl in *.
-  intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
-  destruct tmp1 as (v,(v0,(v1,(v2,(v3,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4)))))))))))))))))))))))).
-  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
-  destruct tmp6 as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(O7,(O8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(bc78,(opO7O8,(tmp7,(tmp9, (p7p8,C7C8)))))))))))))))))).
-  subst.
-  exists v, v0, v1, v2, v3.
-  split. assumption.
-
-  assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 (phplus p7 p8)) p2). repeat php_.
-  assert (phpdef2: phplusdef p5 p2 /\ phplusdef (phplus p7 p8) p2). repeat php_.
-  assert (phpdef3: phplusdef p7 p2 /\ phplusdef p8 p2). repeat php_.
-  assert (phpdef4: phplusdef p3 p5 /\ phplusdef p3 (phplus p7 p8)). repeat php_.
-  assert (phpdef5: phplusdef p3 p7 /\ phplusdef p3 p8). repeat php_.
-  assert (phpdef6: phplusdef p5 p7 /\ phplusdef p5 p8). repeat php_.
-
-  assert (ghpdef1: ghplusdef C3 C2 /\ ghplusdef (ghplus C5 (ghplus C7 C8)) C2). repeat php_.
-  assert (ghpdef2: ghplusdef C5 C2 /\ ghplusdef (ghplus C7 C8) C2). repeat php_.
-  assert (ghpdef3: ghplusdef C7 C2 /\ ghplusdef C8 C2). repeat php_.
-  assert (ghpdef4: ghplusdef C3 C5 /\ ghplusdef C3 (ghplus C7 C8)). repeat php_.
-  assert (ghpdef5: ghplusdef C3 C7 /\ ghplusdef C3 C8). repeat php_.
-  assert (ghpdef6: ghplusdef C5 C7 /\ ghplusdef C5 C8). repeat php_.
-
-  assert (eqh1: phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))) =
-    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2). repeat php_.
-  assert (eqh2: phplus p5 (phplus p7 (phplus p8 p2)) = phplus p2 (phplus p5 (phplus p7 p8))).
-    symmetry. rewrite phplus_comm; repeat php_.
-  assert (eqh3: phplus (phplus p2 (phplus p5 (phplus p7 p8))) p3 =
-    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2).
-    rewrite phplus_assoc; repeat php_.
-  assert (eqg1: ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))) =
-    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2). repeat php_.
-  assert (eqg2: ghplus C5 (ghplus C7 (ghplus C8 C2)) = ghplus C2 (ghplus C5 (ghplus C7 C8))).
-    symmetry. rewrite ghplus_comm; repeat php_.
-  assert (eqg3: ghplus (ghplus C2 (ghplus C5 (ghplus C7 C8))) C3 =
-    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2).
-    rewrite ghplus_assoc; repeat php_.
-
-  assert (b35782: boundph (phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))))).
-    rewrite eqh1. assumption.
-  assert (b5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))).
-    rewrite eqh2.
-    apply boundph_mon with p3; repeat php_.
-    rewrite eqh3. assumption.
-
-  assert (bg35782: boundgh (ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))))).
-    rewrite eqg1. assumption.
-  assert (bg5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))).
-    rewrite eqg2.
-    apply boundgh_mon with C3; repeat php_.
-    rewrite eqg3. assumption.
-  exists p3, (phplus p5 (phplus p7 (phplus p8 p2))).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O24, oplus O2 O4 O24 /\ oplus O3 O24 O).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  inversion OP1.
-  rewrite <- H in *.
-  inversion OP2.
-  exists None.
-  split; apply None_op.
-  rewrite <- H in *.
-  inversion OP2.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  rewrite <- H in *.
-  inversion OP2.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  }
-  destruct exo as (O24,(op24,op324)).
-  exists O3, O24, C3, (ghplus C5 (ghplus C7 (ghplus C8 C2))).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  split. assumption.
-  split.
-
-  assert (eqh4: phplus (phplus (phplus p7 p8) p2) p5 = phplus p5 (phplus p7 (phplus p8 p2))). repeat php_.
-  assert (eqg4: ghplus (ghplus (ghplus C7 C8) C2) C5 = ghplus C5 (ghplus C7 (ghplus C8 C2))). repeat php_.
-
-  assert (bp5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))). repeat php_.
-  assert (bgp5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))). repeat php_.
-  assert (bp782: boundph (phplus p7 (phplus p8 p2))).
-  rewrite <- phplus_assoc; repeat php_. apply boundph_mon with p5; repeat php_.
-  rewrite eqh4. assumption.
-  assert (bgp782: boundgh (ghplus C7 (ghplus C8 C2))).
-  rewrite <- ghplus_assoc; repeat php_. apply boundgh_mon with C5; repeat php_.
-  rewrite eqg4. assumption.
-
-  exists p5, (phplus p7 (phplus p8 p2)).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O26, oplus O2 O6 O26 /\ oplus O5 O26 O24).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  assert (OP5:=op24).
-  inversion OP5.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists None.
-  split; apply None_op.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  }
-  destruct exo as (O26,(op26,op526)).
-
-  exists O5, O26, C5, (ghplus C7 (ghplus C8 C2)).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-
-  exists p7, (phplus p8 p2).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O28, oplus O2 O8 O28 /\ oplus O7 O28 O26).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  assert (OP5:=op24).
-  inversion op26.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists None.
-  split; apply None_op.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  }
-  destruct exo as (O28,(op28,op728)).
-  exists O7, O28, C7, (ghplus C8 C2).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  split.
-  intros.
-  destruct SAT as (p9,(p0,(phpdefp9p0,(bp9,(bp0,(bp90,(o9,(o0,(C9,(C0,(ghpdefC9C0,(BC9,(BC0,(BC9C0,(opo9o0,(tmp110,(tmp18,(p9p0,C9C0)))))))))))))))))).
-  subst.
-  assert (phpdef7: phplusdef p8 (phplus p9 p0) /\ phplusdef p2 (phplus p9 p0)). repeat php_.
-  assert (phpdef9: phplusdef p8 p9 /\ phplusdef p8 p0). repeat php_.
-  assert (phpdef10: phplusdef p2 p9 /\ phplusdef p2 p0). repeat php_.
-  assert (ghpdef7: ghplusdef C8 (ghplus C9 C0) /\ ghplusdef C2 (ghplus C9 C0)). repeat php_.
-  assert (ghpdef9: ghplusdef C8 C9 /\ ghplusdef C8 C0). repeat php_.
-  assert (ghpdef10: ghplusdef C2 C9 /\ ghplusdef C2 C0). repeat php_.
-
-  assert (eqh7: phplus (phplus p8 (phplus p9 p0)) p2 = 
-    phplus (phplus p8 p2) (phplus p9 p0)).
-    rewrite phplus_comm; repeat php_.
-    rewrite <- phplus_assoc; try assumption. symmetry.
-    rewrite <- phplus_assoc; try assumption.
-    replace (phplus p8 p2) with (phplus p2 p8); repeat php_.
-    repeat php_.
-  assert (eqg7: ghplus (ghplus C8 (ghplus C9 C0)) C2 = 
-    ghplus (ghplus C8 C2) (ghplus C9 C0)).
-    rewrite ghplus_comm; repeat php_.
-    rewrite <- ghplus_assoc; try assumption. symmetry.
-    rewrite <- ghplus_assoc; try assumption.
-    replace (ghplus C8 C2) with (ghplus C2 C8); repeat php_.
-    repeat php_.
-
-  exists (phplus p8 (phplus p9 p0)), p2.
-  exists. repeat php_.
-  exists. apply boundph_mon with p2; repeat php_. rewrite eqh7. assumption.
-  exists. repeat php_.
-  exists. rewrite eqh7. assumption.
-  assert (exo: exists O'8, oplus O' O8 O'8 /\ oplus O'8 O2 O'').
-  {
-  assert (OP1:=op28).
-  assert (OP2:=OPLUS).
-  inversion OPLUS.
-  rewrite <- H in *.
-  inversion OP1.
-  exists None.
-  split; apply None_op.
-  rewrite <- H in *.
-  inversion OP1.
-  exists None.
-  split. apply None_op.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  exists (Some o1).
-  split. apply sn_oplus.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  rewrite <- H in *.
-  inversion OP1.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply fs_op. assumption.
-  }
-  destruct exo as (O'8,(op'8,opd28)).
-  exists O'8, O2, (ghplus C8 (ghplus C9 C0)), C2.
-  exists. repeat php_.
-  exists. apply boundgh_mon with C2; repeat php_. rewrite eqg7. assumption.
-  exists. repeat php_.
-  exists. rewrite eqg7. assumption.
-  exists. repeat php_.
-  split.
-  apply tmp9 with O'; repeat php_.
-  rewrite eqh7. assumption.
-  rewrite eqg7. assumption.
-  apply oplus_comm; assumption.
-  exists p9, p0.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists o9, o0, C9, C0.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  split. assumption.
-  split. assumption.
-  split; reflexivity.
-  split. assumption.
-  split; repeat php_.
-  split; reflexivity.
-  split; reflexivity.
-  split; repeat php_.
-  }
-
-  {
-  simpl in *.
-  intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
-  destruct tmp1 as (v,(v0,(v1,(v2,(v3,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4)))))))))))))))))))))))).
-  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
-  destruct tmp6 as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(O7,(O8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(bc78,(opO7O8,(tmp7,(tmp9, (p7p8,C7C8)))))))))))))))))).
-  subst.
-  exists v, v0, v1, v2, v3.
-  split. assumption.
-
-  assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 (phplus p7 p8)) p2). repeat php_.
-  assert (phpdef2: phplusdef p5 p2 /\ phplusdef (phplus p7 p8) p2). repeat php_.
-  assert (phpdef3: phplusdef p7 p2 /\ phplusdef p8 p2). repeat php_.
-  assert (phpdef4: phplusdef p3 p5 /\ phplusdef p3 (phplus p7 p8)). repeat php_.
-  assert (phpdef5: phplusdef p3 p7 /\ phplusdef p3 p8). repeat php_.
-  assert (phpdef6: phplusdef p5 p7 /\ phplusdef p5 p8). repeat php_.
-
-  assert (ghpdef1: ghplusdef C3 C2 /\ ghplusdef (ghplus C5 (ghplus C7 C8)) C2). repeat php_.
-  assert (ghpdef2: ghplusdef C5 C2 /\ ghplusdef (ghplus C7 C8) C2). repeat php_.
-  assert (ghpdef3: ghplusdef C7 C2 /\ ghplusdef C8 C2). repeat php_.
-  assert (ghpdef4: ghplusdef C3 C5 /\ ghplusdef C3 (ghplus C7 C8)). repeat php_.
-  assert (ghpdef5: ghplusdef C3 C7 /\ ghplusdef C3 C8). repeat php_.
-  assert (ghpdef6: ghplusdef C5 C7 /\ ghplusdef C5 C8). repeat php_.
-
-  assert (eqh1: phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))) =
-    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2). repeat php_.
-  assert (eqh2: phplus p5 (phplus p7 (phplus p8 p2)) = phplus p2 (phplus p5 (phplus p7 p8))).
-    symmetry. rewrite phplus_comm; repeat php_.
-  assert (eqh3: phplus (phplus p2 (phplus p5 (phplus p7 p8))) p3 =
-    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2).
-    rewrite phplus_assoc; repeat php_.
-  assert (eqg1: ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))) =
-    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2). repeat php_.
-  assert (eqg2: ghplus C5 (ghplus C7 (ghplus C8 C2)) = ghplus C2 (ghplus C5 (ghplus C7 C8))).
-    symmetry. rewrite ghplus_comm; repeat php_.
-  assert (eqg3: ghplus (ghplus C2 (ghplus C5 (ghplus C7 C8))) C3 =
-    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2).
-    rewrite ghplus_assoc; repeat php_.
-
-  assert (b35782: boundph (phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))))).
-    rewrite eqh1. assumption.
-  assert (b5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))).
-    rewrite eqh2.
-    apply boundph_mon with p3; repeat php_.
-    rewrite eqh3. assumption.
-
-  assert (bg35782: boundgh (ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))))).
-    rewrite eqg1. assumption.
-  assert (bg5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))).
-    rewrite eqg2.
-    apply boundgh_mon with C3; repeat php_.
-    rewrite eqg3. assumption.
-  exists p3, (phplus p5 (phplus p7 (phplus p8 p2))).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O24, oplus O2 O4 O24 /\ oplus O3 O24 O).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  inversion OP1.
-  rewrite <- H in *.
-  inversion OP2.
-  exists None.
-  split; apply None_op.
-  rewrite <- H in *.
-  inversion OP2.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  rewrite <- H in *.
-  inversion OP2.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  }
-  destruct exo as (O24,(op24,op324)).
-  exists O3, O24, C3, (ghplus C5 (ghplus C7 (ghplus C8 C2))).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  split. assumption.
-  split.
-
-  assert (eqh4: phplus (phplus (phplus p7 p8) p2) p5 = phplus p5 (phplus p7 (phplus p8 p2))). repeat php_.
-  assert (eqg4: ghplus (ghplus (ghplus C7 C8) C2) C5 = ghplus C5 (ghplus C7 (ghplus C8 C2))). repeat php_.
-
-  assert (bp5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))). repeat php_.
-  assert (bgp5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))). repeat php_.
-  assert (bp782: boundph (phplus p7 (phplus p8 p2))).
-  rewrite <- phplus_assoc; repeat php_. apply boundph_mon with p5; repeat php_.
-  rewrite eqh4. assumption.
-  assert (bgp782: boundgh (ghplus C7 (ghplus C8 C2))).
-  rewrite <- ghplus_assoc; repeat php_. apply boundgh_mon with C5; repeat php_.
-  rewrite eqg4. assumption.
-
-  exists p5, (phplus p7 (phplus p8 p2)).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O26, oplus O2 O6 O26 /\ oplus O5 O26 O24).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  assert (OP5:=op24).
-  inversion OP5.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists None.
-  split; apply None_op.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  }
-  destruct exo as (O26,(op26,op526)).
-
-  exists O5, O26, C5, (ghplus C7 (ghplus C8 C2)).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-
-  exists p7, (phplus p8 p2).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O28, oplus O2 O8 O28 /\ oplus O7 O28 O26).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  assert (OP5:=op24).
-  inversion op26.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists None.
-  split; apply None_op.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  }
-  destruct exo as (O28,(op28,op728)).
-  exists O7, O28, C7, (ghplus C8 C2).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  split.
-  intros.
-  destruct SAT as (p9,(p0,(phpdefp9p0,(bp9,(bp0,(bp90,(o9,(o0,(C9,(C0,(ghpdefC9C0,(BC9,(BC0,(BC9C0,(opo9o0,(tmp110,(tmp18,(p9p0,C9C0)))))))))))))))))).
-  subst.
-  assert (phpdef7: phplusdef p8 (phplus p9 p0) /\ phplusdef p2 (phplus p9 p0)). repeat php_.
-  assert (phpdef9: phplusdef p8 p9 /\ phplusdef p8 p0). repeat php_.
-  assert (phpdef10: phplusdef p2 p9 /\ phplusdef p2 p0). repeat php_.
-  assert (ghpdef7: ghplusdef C8 (ghplus C9 C0) /\ ghplusdef C2 (ghplus C9 C0)). repeat php_.
-  assert (ghpdef9: ghplusdef C8 C9 /\ ghplusdef C8 C0). repeat php_.
-  assert (ghpdef10: ghplusdef C2 C9 /\ ghplusdef C2 C0). repeat php_.
-
-  assert (eqh7: phplus (phplus p8 (phplus p9 p0)) p2 = 
-    phplus (phplus p8 p2) (phplus p9 p0)).
-    rewrite phplus_comm; repeat php_.
-    rewrite <- phplus_assoc; try assumption. symmetry.
-    rewrite <- phplus_assoc; try assumption.
-    replace (phplus p8 p2) with (phplus p2 p8); repeat php_.
-    repeat php_.
-  assert (eqg7: ghplus (ghplus C8 (ghplus C9 C0)) C2 = 
-    ghplus (ghplus C8 C2) (ghplus C9 C0)).
-    rewrite ghplus_comm; repeat php_.
-    rewrite <- ghplus_assoc; try assumption. symmetry.
-    rewrite <- ghplus_assoc; try assumption.
-    replace (ghplus C8 C2) with (ghplus C2 C8); repeat php_.
-    repeat php_.
-
-  exists (phplus p8 (phplus p9 p0)), p2.
-  exists. repeat php_.
-  exists. apply boundph_mon with p2; repeat php_. rewrite eqh7. assumption.
-  exists. repeat php_.
-  exists. rewrite eqh7. assumption.
-  assert (exo: exists O'8, oplus O' O8 O'8 /\ oplus O'8 O2 O'').
-  {
-  assert (OP1:=op28).
-  assert (OP2:=OPLUS).
-  inversion OPLUS.
-  rewrite <- H in *.
-  inversion OP1.
-  exists None.
-  split; apply None_op.
-  rewrite <- H in *.
-  inversion OP1.
-  exists None.
-  split. apply None_op.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  exists (Some o1).
-  split. apply sn_oplus.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  rewrite <- H in *.
-  inversion OP1.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply fs_op. assumption.
-  }
-  destruct exo as (O'8,(op'8,opd28)).
-  exists O'8, O2, (ghplus C8 (ghplus C9 C0)), C2.
-  exists. repeat php_.
-  exists. apply boundgh_mon with C2; repeat php_. rewrite eqg7. assumption.
-  exists. repeat php_.
-  exists. rewrite eqg7. assumption.
-  exists. repeat php_.
-  split.
-  apply tmp9 with O'; repeat php_.
-  rewrite eqh7. assumption.
-  rewrite eqg7. assumption.
-  apply oplus_comm; assumption.
-  exists p9, p0.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists o9, o0, C9, C0.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  split. assumption.
-  split. assumption.
-  split; reflexivity.
-  split. assumption.
-  split; repeat php_.
-  split; reflexivity.
-  split; reflexivity.
-  split; repeat php_.
-  }
-
-
-  {
-  simpl in *.
-  intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
-  destruct tmp1 as (v,(v0,(v1,(v2,(v3,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4)))))))))))))))))))))))).
-  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
-  destruct tmp6 as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(O7,(O8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(bc78,(opO7O8,(tmp7,(tmp9, (p7p8,C7C8)))))))))))))))))).
-  subst.
-  exists v, v0, v1, v2, v3.
-  split. assumption.
-
-  assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 (phplus p7 p8)) p2). repeat php_.
-  assert (phpdef2: phplusdef p5 p2 /\ phplusdef (phplus p7 p8) p2). repeat php_.
-  assert (phpdef3: phplusdef p7 p2 /\ phplusdef p8 p2). repeat php_.
-  assert (phpdef4: phplusdef p3 p5 /\ phplusdef p3 (phplus p7 p8)). repeat php_.
-  assert (phpdef5: phplusdef p3 p7 /\ phplusdef p3 p8). repeat php_.
-  assert (phpdef6: phplusdef p5 p7 /\ phplusdef p5 p8). repeat php_.
-
-  assert (ghpdef1: ghplusdef C3 C2 /\ ghplusdef (ghplus C5 (ghplus C7 C8)) C2). repeat php_.
-  assert (ghpdef2: ghplusdef C5 C2 /\ ghplusdef (ghplus C7 C8) C2). repeat php_.
-  assert (ghpdef3: ghplusdef C7 C2 /\ ghplusdef C8 C2). repeat php_.
-  assert (ghpdef4: ghplusdef C3 C5 /\ ghplusdef C3 (ghplus C7 C8)). repeat php_.
-  assert (ghpdef5: ghplusdef C3 C7 /\ ghplusdef C3 C8). repeat php_.
-  assert (ghpdef6: ghplusdef C5 C7 /\ ghplusdef C5 C8). repeat php_.
-
-  assert (eqh1: phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))) =
-    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2). repeat php_.
-  assert (eqh2: phplus p5 (phplus p7 (phplus p8 p2)) = phplus p2 (phplus p5 (phplus p7 p8))).
-    symmetry. rewrite phplus_comm; repeat php_.
-  assert (eqh3: phplus (phplus p2 (phplus p5 (phplus p7 p8))) p3 =
-    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2).
-    rewrite phplus_assoc; repeat php_.
-  assert (eqg1: ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))) =
-    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2). repeat php_.
-  assert (eqg2: ghplus C5 (ghplus C7 (ghplus C8 C2)) = ghplus C2 (ghplus C5 (ghplus C7 C8))).
-    symmetry. rewrite ghplus_comm; repeat php_.
-  assert (eqg3: ghplus (ghplus C2 (ghplus C5 (ghplus C7 C8))) C3 =
-    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2).
-    rewrite ghplus_assoc; repeat php_.
-
-  assert (b35782: boundph (phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))))).
-    rewrite eqh1. assumption.
-  assert (b5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))).
-    rewrite eqh2.
-    apply boundph_mon with p3; repeat php_.
-    rewrite eqh3. assumption.
-
-  assert (bg35782: boundgh (ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))))).
-    rewrite eqg1. assumption.
-  assert (bg5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))).
-    rewrite eqg2.
-    apply boundgh_mon with C3; repeat php_.
-    rewrite eqg3. assumption.
-  exists p3, (phplus p5 (phplus p7 (phplus p8 p2))).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O24, oplus O2 O4 O24 /\ oplus O3 O24 O).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  inversion OP1.
-  rewrite <- H in *.
-  inversion OP2.
-  exists None.
-  split; apply None_op.
-  rewrite <- H in *.
-  inversion OP2.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  rewrite <- H in *.
-  inversion OP2.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  }
-  destruct exo as (O24,(op24,op324)).
-  exists O3, O24, C3, (ghplus C5 (ghplus C7 (ghplus C8 C2))).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  split. assumption.
-  split.
-
-  assert (eqh4: phplus (phplus (phplus p7 p8) p2) p5 = phplus p5 (phplus p7 (phplus p8 p2))). repeat php_.
-  assert (eqg4: ghplus (ghplus (ghplus C7 C8) C2) C5 = ghplus C5 (ghplus C7 (ghplus C8 C2))). repeat php_.
-
-  assert (bp5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))). repeat php_.
-  assert (bgp5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))). repeat php_.
-  assert (bp782: boundph (phplus p7 (phplus p8 p2))).
-  rewrite <- phplus_assoc; repeat php_. apply boundph_mon with p5; repeat php_.
-  rewrite eqh4. assumption.
-  assert (bgp782: boundgh (ghplus C7 (ghplus C8 C2))).
-  rewrite <- ghplus_assoc; repeat php_. apply boundgh_mon with C5; repeat php_.
-  rewrite eqg4. assumption.
-
-  exists p5, (phplus p7 (phplus p8 p2)).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O26, oplus O2 O6 O26 /\ oplus O5 O26 O24).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  assert (OP5:=op24).
-  inversion OP5.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists None.
-  split; apply None_op.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  rewrite <- H0 in *.
-  inversion OP3.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  }
-  destruct exo as (O26,(op26,op526)).
-
-  exists O5, O26, C5, (ghplus C7 (ghplus C8 C2)).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-
-  exists p7, (phplus p8 p2).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  assert (exo: exists O28, oplus O2 O8 O28 /\ oplus O7 O28 O26).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=opO5O6).
-  assert (OP4:=opO7O8).
-  assert (OP5:=op24).
-  inversion op26.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists None.
-  split; apply None_op.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  rewrite <- H0 in *.
-  inversion OP4.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply sn_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  }
-  destruct exo as (O28,(op28,op728)).
-  exists O7, O28, C7, (ghplus C8 C2).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  split.
-  intros.
-  destruct SAT as (p9,(p0,(phpdefp9p0,(bp9,(bp0,(bp90,(o9,(o0,(C9,(C0,(ghpdefC9C0,(BC9,(BC0,(BC9C0,(opo9o0,(tmp110,(tmp18,(p9p0,C9C0)))))))))))))))))).
-  subst.
-  assert (phpdef7: phplusdef p8 (phplus p9 p0) /\ phplusdef p2 (phplus p9 p0)). repeat php_.
-  assert (phpdef9: phplusdef p8 p9 /\ phplusdef p8 p0). repeat php_.
-  assert (phpdef10: phplusdef p2 p9 /\ phplusdef p2 p0). repeat php_.
-  assert (ghpdef7: ghplusdef C8 (ghplus C9 C0) /\ ghplusdef C2 (ghplus C9 C0)). repeat php_.
-  assert (ghpdef9: ghplusdef C8 C9 /\ ghplusdef C8 C0). repeat php_.
-  assert (ghpdef10: ghplusdef C2 C9 /\ ghplusdef C2 C0). repeat php_.
-
-  assert (eqh7: phplus (phplus p8 (phplus p9 p0)) p2 = 
-    phplus (phplus p8 p2) (phplus p9 p0)).
-    rewrite phplus_comm; repeat php_.
-    rewrite <- phplus_assoc; try assumption. symmetry.
-    rewrite <- phplus_assoc; try assumption.
-    replace (phplus p8 p2) with (phplus p2 p8); repeat php_.
-    repeat php_.
-  assert (eqg7: ghplus (ghplus C8 (ghplus C9 C0)) C2 = 
-    ghplus (ghplus C8 C2) (ghplus C9 C0)).
-    rewrite ghplus_comm; repeat php_.
-    rewrite <- ghplus_assoc; try assumption. symmetry.
-    rewrite <- ghplus_assoc; try assumption.
-    replace (ghplus C8 C2) with (ghplus C2 C8); repeat php_.
-    repeat php_.
-
-  exists (phplus p8 (phplus p9 p0)), p2.
-  exists. repeat php_.
-  exists. apply boundph_mon with p2; repeat php_. rewrite eqh7. assumption.
-  exists. repeat php_.
-  exists. rewrite eqh7. assumption.
-  assert (exo: exists O'8, oplus O' O8 O'8 /\ oplus O'8 O2 O'').
-  {
-  assert (OP1:=op28).
-  assert (OP2:=OPLUS).
-  inversion OPLUS.
-  rewrite <- H in *.
-  inversion OP1.
-  exists None.
-  split; apply None_op.
-  rewrite <- H in *.
-  inversion OP1.
-  exists None.
-  split. apply None_op.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  exists (Some o1).
-  split. apply sn_oplus.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  rewrite <- H in *.
-  inversion OP1.
-  exists (Some o).
-  split. apply fs_oplus.
-  apply fs_op. assumption.
-  }
-  destruct exo as (O'8,(op'8,opd28)).
-  exists O'8, O2, (ghplus C8 (ghplus C9 C0)), C2.
-  exists. repeat php_.
-  exists. apply boundgh_mon with C2; repeat php_. rewrite eqg7. assumption.
-  exists. repeat php_.
-  exists. rewrite eqg7. assumption.
-  exists. repeat php_.
-  split.
-  apply tmp9 with O'; repeat php_.
-  rewrite eqh7. assumption.
-  rewrite eqg7. assumption.
-  apply oplus_comm; assumption.
-  exists p9, p0.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists o9, o0, C9, C0.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  exists. assumption.
-  split. assumption.
-  split. assumption.
-  split; reflexivity.
-  split. assumption.
-  split; repeat php_.
-  split; reflexivity.
-  split; reflexivity.
-  split; repeat php_.
-  }
-
-  {
-  simpl in *.
-  intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
   subst.
   assert (phpdef1: phplusdef p1 p' /\ phplusdef p2 p'). repeat php_.
   assert (ghpdef1: ghplusdef C1 g' /\ ghplusdef C2 g'). repeat php_.
@@ -11807,7 +11153,7 @@ Proof.
   exists. repeat php_. rewrite eqg. assumption.
   exists. repeat php_.
   split.
-  apply tmp1 with v O'; repeat php_.
+  apply g_newctr with v O'; repeat php_.
   rewrite eqp. assumption.
   rewrite eqg. assumption.
   split. assumption.
@@ -11815,117 +11161,13 @@ Proof.
   }
 
   {
+  left. left. left. left. left. right.
   simpl in *.
   intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
-  destruct tmp1 as (v,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4))))))))))))))))))).
-  subst.
-  exists v.
-
-  assert (phpdef1: phplusdef p3 p2 /\ phplusdef p4 p2). repeat php_.
-  assert (ghpdef1: ghplusdef C3 C2 /\ ghplusdef C4 C2). repeat php_.
-  assert (eqh: phplus (phplus p4 p2) p3 = phplus (phplus p3 p4) p2).
-  rewrite phplus_comm; repeat php_.
-  assert (eqg: ghplus (ghplus C4 C2) C3 = ghplus (ghplus C3 C4) C2).
-  rewrite ghplus_comm; repeat php_.
-  exists p3, (phplus p4 p2).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_. rewrite eqh. assumption.
-  exists. rewrite <- phplus_assoc; repeat php_.
-  assert (exo: exists O42, oplus O4 O2 O42 /\ oplus O3 O42 O).
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  inversion OP1.
-  rewrite <- H in OP2.
-  inversion OP2.
-  exists None.
-  split; apply None_op.
-  rewrite <- H in OP2.
-  inversion OP2.
-  exists None.
-  split. apply None_op.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists (Some o0).
-  split. apply fs_oplus.
-  apply sn_op. apply Permutation_trans with o; assumption.
-  rewrite <- H in OP2.
-  inversion OP2.
-  exists (Some o).
-  split. apply sn_oplus.
-  apply sn_op. assumption.
-  }
-  destruct exo as (O42,(op42,op342)).
-  exists O3, O42, C3, (ghplus C4 C2).
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_. rewrite eqg. assumption.
-  exists. repeat php_. rewrite <- ghplus_assoc; repeat php_.
-  exists op342.
-  split. assumption.
-  split.
-  intros.
-  assert (phpdef2: phplusdef p4 p' /\ phplusdef p2 p'). repeat php_.
-  assert (ghpdef2: ghplusdef C4 g' /\ ghplusdef C2 g'). repeat php_.
-  assert (eqh1: phplus (phplus p4 p') p2 = phplus (phplus p4 p2) p').
-  rewrite phplus_comm; try assumption. rewrite <- phplus_assoc; repeat php_. repeat php_.
-  assert (eqg1: ghplus (ghplus C4 g') C2 = ghplus (ghplus C4 C2) g').
-  rewrite ghplus_comm; try assumption. rewrite <- ghplus_assoc; repeat php_. repeat php_.
-  exists (phplus p4 p'), p2.
-  exists. repeat php_.
-  exists. repeat php_. rewrite eqh1. assumption.
-  exists. repeat php_.
-  exists. rewrite eqh1. assumption.
-  assert (exo: exists O4', oplus O4' O2 O'' /\ oplus O4 O' O4').
-  {
-  assert (OP1:=opO1O2).
-  assert (OP2:=opO3O4).
-  assert (OP3:=OPLUS).
-  assert (OP4:=op42).
-  inversion OP3.
-  rewrite <- H in *.
-  inversion OP4.
-  exists None.
-  split; apply None_op.
-  rewrite <- H in *.
-  inversion OP4.
-  exists (Some o').
-  split. apply fs_oplus.
-  apply fs_op. apply Permutation_trans with o; assumption.
-  exists None.
-  split. apply sn_op. apply Permutation_trans with o; assumption.
-  apply None_op.
-  rewrite <- H in *.
-  inversion OP4.
-  exists (Some o').
-  split. apply fs_oplus.
-  apply sn_op. assumption.
-  }
-  destruct exo as (O4',(op4'2,op4')).
-  exists O4', O2, (ghplus C4 g'), C2.
-  exists. repeat php_.
-  exists. repeat php_. rewrite eqg1. assumption.
-  exists. repeat php_.
-  exists. repeat php_. rewrite eqg1. assumption.
-  exists op4'2.
-  split.
-  apply tmp5 with O'; repeat php_.
-  rewrite eqh1. assumption.
-  rewrite eqg1. assumption.
-  split. assumption.
-  split; repeat php_.
-  split; repeat php_.
-  }
-
-  {
-  simpl in *.
-  intros.
-  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,(p1p2,c1c2)))))))))))))))))).
-  destruct tmp1 as (v,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4))))))))))))))))))).
+  destruct g_ctrdec as (v,(v1,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4)))))))))))))))))))).
   destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
   subst.
-  exists v.
+  exists v, v1.
 
   assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 p6) p2). repeat php_.
   assert (phpdef2: phplusdef p5 p2 /\ phplusdef p6 p2). repeat php_.
@@ -12076,5 +11318,1202 @@ Proof.
   split; repeat php_.
   split; reflexivity.
   split; repeat php_.
+  }
+
+  {
+  left. left. left. left. right.
+  simpl in *.
+  intros.
+  destruct g_ctrinc as (v,(v1,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4)))))))))))))))))))).
+  subst.
+  exists v, v1.
+
+  assert (phpdef1: phplusdef p3 p2 /\ phplusdef p4 p2). repeat php_.
+  assert (ghpdef1: ghplusdef C3 C2 /\ ghplusdef C4 C2). repeat php_.
+  assert (eqh: phplus (phplus p4 p2) p3 = phplus (phplus p3 p4) p2).
+  rewrite phplus_comm; repeat php_.
+  assert (eqg: ghplus (ghplus C4 C2) C3 = ghplus (ghplus C3 C4) C2).
+  rewrite ghplus_comm; repeat php_.
+  exists p3, (phplus p4 p2).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_. rewrite eqh. assumption.
+  exists. rewrite <- phplus_assoc; repeat php_.
+  assert (exo: exists O42, oplus O4 O2 O42 /\ oplus O3 O42 O).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  inversion OP1.
+  rewrite <- H in OP2.
+  inversion OP2.
+  exists None.
+  split; apply None_op.
+  rewrite <- H in OP2.
+  inversion OP2.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply fs_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  rewrite <- H in OP2.
+  inversion OP2.
+  exists (Some o).
+  split. apply sn_oplus.
+  apply sn_op. assumption.
+  }
+  destruct exo as (O42,(op42,op342)).
+  exists O3, O42, C3, (ghplus C4 C2).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_. rewrite eqg. assumption.
+  exists. repeat php_. rewrite <- ghplus_assoc; repeat php_.
+  exists op342.
+  split. assumption.
+  split.
+  intros.
+  assert (phpdef2: phplusdef p4 p' /\ phplusdef p2 p'). repeat php_.
+  assert (ghpdef2: ghplusdef C4 g' /\ ghplusdef C2 g'). repeat php_.
+  assert (eqh1: phplus (phplus p4 p') p2 = phplus (phplus p4 p2) p').
+  rewrite phplus_comm; try assumption. rewrite <- phplus_assoc; repeat php_. repeat php_.
+  assert (eqg1: ghplus (ghplus C4 g') C2 = ghplus (ghplus C4 C2) g').
+  rewrite ghplus_comm; try assumption. rewrite <- ghplus_assoc; repeat php_. repeat php_.
+  exists (phplus p4 p'), p2.
+  exists. repeat php_.
+  exists. repeat php_. rewrite eqh1. assumption.
+  exists. repeat php_.
+  exists. rewrite eqh1. assumption.
+  assert (exo: exists O4', oplus O4' O2 O'' /\ oplus O4 O' O4').
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=OPLUS).
+  assert (OP4:=op42).
+  inversion OP3.
+  rewrite <- H in *.
+  inversion OP4.
+  exists None.
+  split; apply None_op.
+  rewrite <- H in *.
+  inversion OP4.
+  exists (Some o').
+  split. apply fs_oplus.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists None.
+  split. apply sn_op. apply Permutation_trans with o; assumption.
+  apply None_op.
+  rewrite <- H in *.
+  inversion OP4.
+  exists (Some o').
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  }
+  destruct exo as (O4',(op4'2,op4')).
+  exists O4', O2, (ghplus C4 g'), C2.
+  exists. repeat php_.
+  exists. repeat php_. rewrite eqg1. assumption.
+  exists. repeat php_.
+  exists. repeat php_. rewrite eqg1. assumption.
+  exists op4'2.
+  split.
+  apply tmp5 with O'; repeat php_.
+  rewrite eqh1. assumption.
+  rewrite eqg1. assumption.
+  split. assumption.
+  split; repeat php_.
+  split; repeat php_.
+  }
+
+  {
+  left. left. left. right.
+  simpl in *.
+  intros.
+  destruct g_disch as (v,(v0,(v1,(v2,(v3,(v4,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4))))))))))))))))))))))))).
+  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
+  destruct tmp6 as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(O7,(O8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(bc78,(opO7O8,(tmp7,(tmp9, (p7p8,C7C8)))))))))))))))))).
+  subst.
+  exists v, v0, v1, v2, v3, v4.
+  split. assumption.
+
+  assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 (phplus p7 p8)) p2). repeat php_.
+  assert (phpdef2: phplusdef p5 p2 /\ phplusdef (phplus p7 p8) p2). repeat php_.
+  assert (phpdef3: phplusdef p7 p2 /\ phplusdef p8 p2). repeat php_.
+  assert (phpdef4: phplusdef p3 p5 /\ phplusdef p3 (phplus p7 p8)). repeat php_.
+  assert (phpdef5: phplusdef p3 p7 /\ phplusdef p3 p8). repeat php_.
+  assert (phpdef6: phplusdef p5 p7 /\ phplusdef p5 p8). repeat php_.
+
+  assert (ghpdef1: ghplusdef C3 C2 /\ ghplusdef (ghplus C5 (ghplus C7 C8)) C2). repeat php_.
+  assert (ghpdef2: ghplusdef C5 C2 /\ ghplusdef (ghplus C7 C8) C2). repeat php_.
+  assert (ghpdef3: ghplusdef C7 C2 /\ ghplusdef C8 C2). repeat php_.
+  assert (ghpdef4: ghplusdef C3 C5 /\ ghplusdef C3 (ghplus C7 C8)). repeat php_.
+  assert (ghpdef5: ghplusdef C3 C7 /\ ghplusdef C3 C8). repeat php_.
+  assert (ghpdef6: ghplusdef C5 C7 /\ ghplusdef C5 C8). repeat php_.
+
+  assert (eqh1: phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))) =
+    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2). repeat php_.
+  assert (eqh2: phplus p5 (phplus p7 (phplus p8 p2)) = phplus p2 (phplus p5 (phplus p7 p8))).
+    symmetry. rewrite phplus_comm; repeat php_.
+  assert (eqh3: phplus (phplus p2 (phplus p5 (phplus p7 p8))) p3 =
+    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2).
+    rewrite phplus_assoc; repeat php_.
+  assert (eqg1: ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))) =
+    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2). repeat php_.
+  assert (eqg2: ghplus C5 (ghplus C7 (ghplus C8 C2)) = ghplus C2 (ghplus C5 (ghplus C7 C8))).
+    symmetry. rewrite ghplus_comm; repeat php_.
+  assert (eqg3: ghplus (ghplus C2 (ghplus C5 (ghplus C7 C8))) C3 =
+    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2).
+    rewrite ghplus_assoc; repeat php_.
+
+  assert (b35782: boundph (phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))))).
+    rewrite eqh1. assumption.
+  assert (b5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))).
+    rewrite eqh2.
+    apply boundph_mon with p3; repeat php_.
+    rewrite eqh3. assumption.
+
+  assert (bg35782: boundgh (ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))))).
+    rewrite eqg1. assumption.
+  assert (bg5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))).
+    rewrite eqg2.
+    apply boundgh_mon with C3; repeat php_.
+    rewrite eqg3. assumption.
+  exists p3, (phplus p5 (phplus p7 (phplus p8 p2))).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O24, oplus O2 O4 O24 /\ oplus O3 O24 O).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  inversion OP1.
+  rewrite <- H in *.
+  inversion OP2.
+  exists None.
+  split; apply None_op.
+  rewrite <- H in *.
+  inversion OP2.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  rewrite <- H in *.
+  inversion OP2.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  }
+  destruct exo as (O24,(op24,op324)).
+  exists O3, O24, C3, (ghplus C5 (ghplus C7 (ghplus C8 C2))).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  split. assumption.
+  split.
+
+  assert (eqh4: phplus (phplus (phplus p7 p8) p2) p5 = phplus p5 (phplus p7 (phplus p8 p2))). repeat php_.
+  assert (eqg4: ghplus (ghplus (ghplus C7 C8) C2) C5 = ghplus C5 (ghplus C7 (ghplus C8 C2))). repeat php_.
+
+  assert (bp5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))). repeat php_.
+  assert (bgp5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))). repeat php_.
+  assert (bp782: boundph (phplus p7 (phplus p8 p2))).
+  rewrite <- phplus_assoc; repeat php_. apply boundph_mon with p5; repeat php_.
+  rewrite eqh4. assumption.
+  assert (bgp782: boundgh (ghplus C7 (ghplus C8 C2))).
+  rewrite <- ghplus_assoc; repeat php_. apply boundgh_mon with C5; repeat php_.
+  rewrite eqg4. assumption.
+
+  exists p5, (phplus p7 (phplus p8 p2)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O26, oplus O2 O6 O26 /\ oplus O5 O26 O24).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  assert (OP5:=op24).
+  inversion OP5.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists None.
+  split; apply None_op.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  }
+  destruct exo as (O26,(op26,op526)).
+
+  exists O5, O26, C5, (ghplus C7 (ghplus C8 C2)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+
+  exists p7, (phplus p8 p2).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O28, oplus O2 O8 O28 /\ oplus O7 O28 O26).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  assert (OP5:=op24).
+  inversion op26.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists None.
+  split; apply None_op.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  }
+  destruct exo as (O28,(op28,op728)).
+  exists O7, O28, C7, (ghplus C8 C2).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  split.
+  intros.
+  destruct SAT as (p9,(p0,(phpdefp9p0,(bp9,(bp0,(bp90,(o9,(o0,(C9,(C0,(ghpdefC9C0,(BC9,(BC0,(BC9C0,(opo9o0,(tmp110,(tmp18,(p9p0,C9C0)))))))))))))))))).
+  subst.
+  assert (phpdef7: phplusdef p8 (phplus p9 p0) /\ phplusdef p2 (phplus p9 p0)). repeat php_.
+  assert (phpdef9: phplusdef p8 p9 /\ phplusdef p8 p0). repeat php_.
+  assert (phpdef10: phplusdef p2 p9 /\ phplusdef p2 p0). repeat php_.
+  assert (ghpdef7: ghplusdef C8 (ghplus C9 C0) /\ ghplusdef C2 (ghplus C9 C0)). repeat php_.
+  assert (ghpdef9: ghplusdef C8 C9 /\ ghplusdef C8 C0). repeat php_.
+  assert (ghpdef10: ghplusdef C2 C9 /\ ghplusdef C2 C0). repeat php_.
+
+  assert (eqh7: phplus (phplus p8 (phplus p9 p0)) p2 = 
+    phplus (phplus p8 p2) (phplus p9 p0)).
+    rewrite phplus_comm; repeat php_.
+    rewrite <- phplus_assoc; try assumption. symmetry.
+    rewrite <- phplus_assoc; try assumption.
+    replace (phplus p8 p2) with (phplus p2 p8); repeat php_.
+    repeat php_.
+  assert (eqg7: ghplus (ghplus C8 (ghplus C9 C0)) C2 = 
+    ghplus (ghplus C8 C2) (ghplus C9 C0)).
+    rewrite ghplus_comm; repeat php_.
+    rewrite <- ghplus_assoc; try assumption. symmetry.
+    rewrite <- ghplus_assoc; try assumption.
+    replace (ghplus C8 C2) with (ghplus C2 C8); repeat php_.
+    repeat php_.
+
+  exists (phplus p8 (phplus p9 p0)), p2.
+  exists. repeat php_.
+  exists. apply boundph_mon with p2; repeat php_. rewrite eqh7. assumption.
+  exists. repeat php_.
+  exists. rewrite eqh7. assumption.
+  assert (exo: exists O'8, oplus O' O8 O'8 /\ oplus O'8 O2 O'').
+  {
+  assert (OP1:=op28).
+  assert (OP2:=OPLUS).
+  inversion OPLUS.
+  rewrite <- H in *.
+  inversion OP1.
+  exists None.
+  split; apply None_op.
+  rewrite <- H in *.
+  inversion OP1.
+  exists None.
+  split. apply None_op.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  exists (Some o1).
+  split. apply sn_oplus.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  rewrite <- H in *.
+  inversion OP1.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply fs_op. assumption.
+  }
+  destruct exo as (O'8,(op'8,opd28)).
+  exists O'8, O2, (ghplus C8 (ghplus C9 C0)), C2.
+  exists. repeat php_.
+  exists. apply boundgh_mon with C2; repeat php_. rewrite eqg7. assumption.
+  exists. repeat php_.
+  exists. rewrite eqg7. assumption.
+  exists. repeat php_.
+  split.
+  apply tmp9 with O'; repeat php_.
+  rewrite eqh7. assumption.
+  rewrite eqg7. assumption.
+  apply oplus_comm; assumption.
+  exists p9, p0.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists o9, o0, C9, C0.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  split. assumption.
+  split. assumption.
+  split; reflexivity.
+  split. assumption.
+  split; repeat php_.
+  split; reflexivity.
+  split; reflexivity.
+  split; repeat php_.
+  }
+
+  {
+  left. left. right.
+  simpl in *.
+  intros.
+  destruct g_dischu as (v,(v0,(v1,(v2,(v3,(v4,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4))))))))))))))))))))))))).
+  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
+  destruct tmp6 as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(O7,(O8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(bc78,(opO7O8,(tmp7,(tmp9, (p7p8,C7C8)))))))))))))))))).
+  subst.
+  exists v, v0, v1, v2, v3, v4.
+  split. assumption.
+
+  assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 (phplus p7 p8)) p2). repeat php_.
+  assert (phpdef2: phplusdef p5 p2 /\ phplusdef (phplus p7 p8) p2). repeat php_.
+  assert (phpdef3: phplusdef p7 p2 /\ phplusdef p8 p2). repeat php_.
+  assert (phpdef4: phplusdef p3 p5 /\ phplusdef p3 (phplus p7 p8)). repeat php_.
+  assert (phpdef5: phplusdef p3 p7 /\ phplusdef p3 p8). repeat php_.
+  assert (phpdef6: phplusdef p5 p7 /\ phplusdef p5 p8). repeat php_.
+
+  assert (ghpdef1: ghplusdef C3 C2 /\ ghplusdef (ghplus C5 (ghplus C7 C8)) C2). repeat php_.
+  assert (ghpdef2: ghplusdef C5 C2 /\ ghplusdef (ghplus C7 C8) C2). repeat php_.
+  assert (ghpdef3: ghplusdef C7 C2 /\ ghplusdef C8 C2). repeat php_.
+  assert (ghpdef4: ghplusdef C3 C5 /\ ghplusdef C3 (ghplus C7 C8)). repeat php_.
+  assert (ghpdef5: ghplusdef C3 C7 /\ ghplusdef C3 C8). repeat php_.
+  assert (ghpdef6: ghplusdef C5 C7 /\ ghplusdef C5 C8). repeat php_.
+
+  assert (eqh1: phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))) =
+    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2). repeat php_.
+  assert (eqh2: phplus p5 (phplus p7 (phplus p8 p2)) = phplus p2 (phplus p5 (phplus p7 p8))).
+    symmetry. rewrite phplus_comm; repeat php_.
+  assert (eqh3: phplus (phplus p2 (phplus p5 (phplus p7 p8))) p3 =
+    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2).
+    rewrite phplus_assoc; repeat php_.
+  assert (eqg1: ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))) =
+    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2). repeat php_.
+  assert (eqg2: ghplus C5 (ghplus C7 (ghplus C8 C2)) = ghplus C2 (ghplus C5 (ghplus C7 C8))).
+    symmetry. rewrite ghplus_comm; repeat php_.
+  assert (eqg3: ghplus (ghplus C2 (ghplus C5 (ghplus C7 C8))) C3 =
+    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2).
+    rewrite ghplus_assoc; repeat php_.
+
+  assert (b35782: boundph (phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))))).
+    rewrite eqh1. assumption.
+  assert (b5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))).
+    rewrite eqh2.
+    apply boundph_mon with p3; repeat php_.
+    rewrite eqh3. assumption.
+
+  assert (bg35782: boundgh (ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))))).
+    rewrite eqg1. assumption.
+  assert (bg5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))).
+    rewrite eqg2.
+    apply boundgh_mon with C3; repeat php_.
+    rewrite eqg3. assumption.
+  exists p3, (phplus p5 (phplus p7 (phplus p8 p2))).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O24, oplus O2 O4 O24 /\ oplus O3 O24 O).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  inversion OP1.
+  rewrite <- H in *.
+  inversion OP2.
+  exists None.
+  split; apply None_op.
+  rewrite <- H in *.
+  inversion OP2.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  rewrite <- H in *.
+  inversion OP2.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  }
+  destruct exo as (O24,(op24,op324)).
+  exists O3, O24, C3, (ghplus C5 (ghplus C7 (ghplus C8 C2))).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  split. assumption.
+  split.
+
+  assert (eqh4: phplus (phplus (phplus p7 p8) p2) p5 = phplus p5 (phplus p7 (phplus p8 p2))). repeat php_.
+  assert (eqg4: ghplus (ghplus (ghplus C7 C8) C2) C5 = ghplus C5 (ghplus C7 (ghplus C8 C2))). repeat php_.
+
+  assert (bp5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))). repeat php_.
+  assert (bgp5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))). repeat php_.
+  assert (bp782: boundph (phplus p7 (phplus p8 p2))).
+  rewrite <- phplus_assoc; repeat php_. apply boundph_mon with p5; repeat php_.
+  rewrite eqh4. assumption.
+  assert (bgp782: boundgh (ghplus C7 (ghplus C8 C2))).
+  rewrite <- ghplus_assoc; repeat php_. apply boundgh_mon with C5; repeat php_.
+  rewrite eqg4. assumption.
+
+  exists p5, (phplus p7 (phplus p8 p2)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O26, oplus O2 O6 O26 /\ oplus O5 O26 O24).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  assert (OP5:=op24).
+  inversion OP5.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists None.
+  split; apply None_op.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  }
+  destruct exo as (O26,(op26,op526)).
+
+  exists O5, O26, C5, (ghplus C7 (ghplus C8 C2)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+
+  exists p7, (phplus p8 p2).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O28, oplus O2 O8 O28 /\ oplus O7 O28 O26).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  assert (OP5:=op24).
+  inversion op26.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists None.
+  split; apply None_op.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  }
+  destruct exo as (O28,(op28,op728)).
+  exists O7, O28, C7, (ghplus C8 C2).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  split.
+  intros.
+  destruct SAT as (p9,(p0,(phpdefp9p0,(bp9,(bp0,(bp90,(o9,(o0,(C9,(C0,(ghpdefC9C0,(BC9,(BC0,(BC9C0,(opo9o0,(tmp110,(tmp18,(p9p0,C9C0)))))))))))))))))).
+  subst.
+  assert (phpdef7: phplusdef p8 (phplus p9 p0) /\ phplusdef p2 (phplus p9 p0)). repeat php_.
+  assert (phpdef9: phplusdef p8 p9 /\ phplusdef p8 p0). repeat php_.
+  assert (phpdef10: phplusdef p2 p9 /\ phplusdef p2 p0). repeat php_.
+  assert (ghpdef7: ghplusdef C8 (ghplus C9 C0) /\ ghplusdef C2 (ghplus C9 C0)). repeat php_.
+  assert (ghpdef9: ghplusdef C8 C9 /\ ghplusdef C8 C0). repeat php_.
+  assert (ghpdef10: ghplusdef C2 C9 /\ ghplusdef C2 C0). repeat php_.
+
+  assert (eqh7: phplus (phplus p8 (phplus p9 p0)) p2 = 
+    phplus (phplus p8 p2) (phplus p9 p0)).
+    rewrite phplus_comm; repeat php_.
+    rewrite <- phplus_assoc; try assumption. symmetry.
+    rewrite <- phplus_assoc; try assumption.
+    replace (phplus p8 p2) with (phplus p2 p8); repeat php_.
+    repeat php_.
+  assert (eqg7: ghplus (ghplus C8 (ghplus C9 C0)) C2 = 
+    ghplus (ghplus C8 C2) (ghplus C9 C0)).
+    rewrite ghplus_comm; repeat php_.
+    rewrite <- ghplus_assoc; try assumption. symmetry.
+    rewrite <- ghplus_assoc; try assumption.
+    replace (ghplus C8 C2) with (ghplus C2 C8); repeat php_.
+    repeat php_.
+
+  exists (phplus p8 (phplus p9 p0)), p2.
+  exists. repeat php_.
+  exists. apply boundph_mon with p2; repeat php_. rewrite eqh7. assumption.
+  exists. repeat php_.
+  exists. rewrite eqh7. assumption.
+  assert (exo: exists O'8, oplus O' O8 O'8 /\ oplus O'8 O2 O'').
+  {
+  assert (OP1:=op28).
+  assert (OP2:=OPLUS).
+  inversion OPLUS.
+  rewrite <- H in *.
+  inversion OP1.
+  exists None.
+  split; apply None_op.
+  rewrite <- H in *.
+  inversion OP1.
+  exists None.
+  split. apply None_op.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  exists (Some o1).
+  split. apply sn_oplus.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  rewrite <- H in *.
+  inversion OP1.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply fs_op. assumption.
+  }
+  destruct exo as (O'8,(op'8,opd28)).
+  exists O'8, O2, (ghplus C8 (ghplus C9 C0)), C2.
+  exists. repeat php_.
+  exists. apply boundgh_mon with C2; repeat php_. rewrite eqg7. assumption.
+  exists. repeat php_.
+  exists. rewrite eqg7. assumption.
+  exists. repeat php_.
+  split.
+  apply tmp9 with O'; repeat php_.
+  rewrite eqh7. assumption.
+  rewrite eqg7. assumption.
+  apply oplus_comm; assumption.
+  exists p9, p0.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists o9, o0, C9, C0.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  split. assumption.
+  split. assumption.
+  split; reflexivity.
+  split. assumption.
+  split; repeat php_.
+  split; reflexivity.
+  split; reflexivity.
+  split; repeat php_.
+  }
+
+  {
+  left. right.
+  simpl in *.
+  intros.
+  destruct g_chrg as (v,(v0,(v1,(v2,(v3,(v4,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4))))))))))))))))))))))))).
+  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
+  destruct tmp6 as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(O7,(O8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(bc78,(opO7O8,(tmp7,(tmp9, (p7p8,C7C8)))))))))))))))))).
+  subst.
+  exists v, v0, v1, v2, v3, v4.
+  split. assumption.
+
+  assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 (phplus p7 p8)) p2). repeat php_.
+  assert (phpdef2: phplusdef p5 p2 /\ phplusdef (phplus p7 p8) p2). repeat php_.
+  assert (phpdef3: phplusdef p7 p2 /\ phplusdef p8 p2). repeat php_.
+  assert (phpdef4: phplusdef p3 p5 /\ phplusdef p3 (phplus p7 p8)). repeat php_.
+  assert (phpdef5: phplusdef p3 p7 /\ phplusdef p3 p8). repeat php_.
+  assert (phpdef6: phplusdef p5 p7 /\ phplusdef p5 p8). repeat php_.
+
+  assert (ghpdef1: ghplusdef C3 C2 /\ ghplusdef (ghplus C5 (ghplus C7 C8)) C2). repeat php_.
+  assert (ghpdef2: ghplusdef C5 C2 /\ ghplusdef (ghplus C7 C8) C2). repeat php_.
+  assert (ghpdef3: ghplusdef C7 C2 /\ ghplusdef C8 C2). repeat php_.
+  assert (ghpdef4: ghplusdef C3 C5 /\ ghplusdef C3 (ghplus C7 C8)). repeat php_.
+  assert (ghpdef5: ghplusdef C3 C7 /\ ghplusdef C3 C8). repeat php_.
+  assert (ghpdef6: ghplusdef C5 C7 /\ ghplusdef C5 C8). repeat php_.
+
+  assert (eqh1: phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))) =
+    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2). repeat php_.
+  assert (eqh2: phplus p5 (phplus p7 (phplus p8 p2)) = phplus p2 (phplus p5 (phplus p7 p8))).
+    symmetry. rewrite phplus_comm; repeat php_.
+  assert (eqh3: phplus (phplus p2 (phplus p5 (phplus p7 p8))) p3 =
+    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2).
+    rewrite phplus_assoc; repeat php_.
+  assert (eqg1: ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))) =
+    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2). repeat php_.
+  assert (eqg2: ghplus C5 (ghplus C7 (ghplus C8 C2)) = ghplus C2 (ghplus C5 (ghplus C7 C8))).
+    symmetry. rewrite ghplus_comm; repeat php_.
+  assert (eqg3: ghplus (ghplus C2 (ghplus C5 (ghplus C7 C8))) C3 =
+    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2).
+    rewrite ghplus_assoc; repeat php_.
+
+  assert (b35782: boundph (phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))))).
+    rewrite eqh1. assumption.
+  assert (b5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))).
+    rewrite eqh2.
+    apply boundph_mon with p3; repeat php_.
+    rewrite eqh3. assumption.
+
+  assert (bg35782: boundgh (ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))))).
+    rewrite eqg1. assumption.
+  assert (bg5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))).
+    rewrite eqg2.
+    apply boundgh_mon with C3; repeat php_.
+    rewrite eqg3. assumption.
+  exists p3, (phplus p5 (phplus p7 (phplus p8 p2))).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O24, oplus O2 O4 O24 /\ oplus O3 O24 O).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  inversion OP1.
+  rewrite <- H in *.
+  inversion OP2.
+  exists None.
+  split; apply None_op.
+  rewrite <- H in *.
+  inversion OP2.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  rewrite <- H in *.
+  inversion OP2.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  }
+  destruct exo as (O24,(op24,op324)).
+  exists O3, O24, C3, (ghplus C5 (ghplus C7 (ghplus C8 C2))).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  split. assumption.
+  split.
+
+  assert (eqh4: phplus (phplus (phplus p7 p8) p2) p5 = phplus p5 (phplus p7 (phplus p8 p2))). repeat php_.
+  assert (eqg4: ghplus (ghplus (ghplus C7 C8) C2) C5 = ghplus C5 (ghplus C7 (ghplus C8 C2))). repeat php_.
+
+  assert (bp5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))). repeat php_.
+  assert (bgp5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))). repeat php_.
+  assert (bp782: boundph (phplus p7 (phplus p8 p2))).
+  rewrite <- phplus_assoc; repeat php_. apply boundph_mon with p5; repeat php_.
+  rewrite eqh4. assumption.
+  assert (bgp782: boundgh (ghplus C7 (ghplus C8 C2))).
+  rewrite <- ghplus_assoc; repeat php_. apply boundgh_mon with C5; repeat php_.
+  rewrite eqg4. assumption.
+
+  exists p5, (phplus p7 (phplus p8 p2)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O26, oplus O2 O6 O26 /\ oplus O5 O26 O24).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  assert (OP5:=op24).
+  inversion OP5.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists None.
+  split; apply None_op.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  }
+  destruct exo as (O26,(op26,op526)).
+
+  exists O5, O26, C5, (ghplus C7 (ghplus C8 C2)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+
+  exists p7, (phplus p8 p2).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O28, oplus O2 O8 O28 /\ oplus O7 O28 O26).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  assert (OP5:=op24).
+  inversion op26.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists None.
+  split; apply None_op.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  }
+  destruct exo as (O28,(op28,op728)).
+  exists O7, O28, C7, (ghplus C8 C2).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  split.
+  intros.
+  destruct SAT as (p9,(p0,(phpdefp9p0,(bp9,(bp0,(bp90,(o9,(o0,(C9,(C0,(ghpdefC9C0,(BC9,(BC0,(BC9C0,(opo9o0,(tmp110,(tmp18,(p9p0,C9C0)))))))))))))))))).
+  subst.
+  assert (phpdef7: phplusdef p8 (phplus p9 p0) /\ phplusdef p2 (phplus p9 p0)). repeat php_.
+  assert (phpdef9: phplusdef p8 p9 /\ phplusdef p8 p0). repeat php_.
+  assert (phpdef10: phplusdef p2 p9 /\ phplusdef p2 p0). repeat php_.
+  assert (ghpdef7: ghplusdef C8 (ghplus C9 C0) /\ ghplusdef C2 (ghplus C9 C0)). repeat php_.
+  assert (ghpdef9: ghplusdef C8 C9 /\ ghplusdef C8 C0). repeat php_.
+  assert (ghpdef10: ghplusdef C2 C9 /\ ghplusdef C2 C0). repeat php_.
+
+  assert (eqh7: phplus (phplus p8 (phplus p9 p0)) p2 = 
+    phplus (phplus p8 p2) (phplus p9 p0)).
+    rewrite phplus_comm; repeat php_.
+    rewrite <- phplus_assoc; try assumption. symmetry.
+    rewrite <- phplus_assoc; try assumption.
+    replace (phplus p8 p2) with (phplus p2 p8); repeat php_.
+    repeat php_.
+  assert (eqg7: ghplus (ghplus C8 (ghplus C9 C0)) C2 = 
+    ghplus (ghplus C8 C2) (ghplus C9 C0)).
+    rewrite ghplus_comm; repeat php_.
+    rewrite <- ghplus_assoc; try assumption. symmetry.
+    rewrite <- ghplus_assoc; try assumption.
+    replace (ghplus C8 C2) with (ghplus C2 C8); repeat php_.
+    repeat php_.
+
+  exists (phplus p8 (phplus p9 p0)), p2.
+  exists. repeat php_.
+  exists. apply boundph_mon with p2; repeat php_. rewrite eqh7. assumption.
+  exists. repeat php_.
+  exists. rewrite eqh7. assumption.
+  assert (exo: exists O'8, oplus O' O8 O'8 /\ oplus O'8 O2 O'').
+  {
+  assert (OP1:=op28).
+  assert (OP2:=OPLUS).
+  inversion OPLUS.
+  rewrite <- H in *.
+  inversion OP1.
+  exists None.
+  split; apply None_op.
+  rewrite <- H in *.
+  inversion OP1.
+  exists None.
+  split. apply None_op.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  exists (Some o1).
+  split. apply sn_oplus.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  rewrite <- H in *.
+  inversion OP1.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply fs_op. assumption.
+  }
+  destruct exo as (O'8,(op'8,opd28)).
+  exists O'8, O2, (ghplus C8 (ghplus C9 C0)), C2.
+  exists. repeat php_.
+  exists. apply boundgh_mon with C2; repeat php_. rewrite eqg7. assumption.
+  exists. repeat php_.
+  exists. rewrite eqg7. assumption.
+  exists. repeat php_.
+  split.
+  apply tmp9 with O'; repeat php_.
+  rewrite eqh7. assumption.
+  rewrite eqg7. assumption.
+  apply oplus_comm; assumption.
+  exists p9, p0.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists o9, o0, C9, C0.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  split. assumption.
+  split. assumption.
+  split; reflexivity.
+  split. assumption.
+  split; repeat php_.
+  split; reflexivity.
+  split; reflexivity.
+  split; repeat php_.
+  }
+
+  {
+  right.
+  simpl in *.
+  intros.
+  destruct g_chrgu as (v,(v0,(v1,(v2,(v3,(v4,(eql,(p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp34,(O3,(O4,(C3,(C4,(ghpdefC3C4,(BC3,(BC4,(bc34,(opO3O4,(tmp4,(tmp5, (p3p4,c3c4))))))))))))))))))))))))).
+  destruct tmp5 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(tmp8,(tmp6,(p5p6,c56)))))))))))))))))).
+  destruct tmp6 as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(O7,(O8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(bc78,(opO7O8,(tmp7,(tmp9, (p7p8,C7C8)))))))))))))))))).
+  subst.
+  exists v, v0, v1, v2, v3, v4.
+  split. assumption.
+
+  assert (phpdef1: phplusdef p3 p2 /\ phplusdef (phplus p5 (phplus p7 p8)) p2). repeat php_.
+  assert (phpdef2: phplusdef p5 p2 /\ phplusdef (phplus p7 p8) p2). repeat php_.
+  assert (phpdef3: phplusdef p7 p2 /\ phplusdef p8 p2). repeat php_.
+  assert (phpdef4: phplusdef p3 p5 /\ phplusdef p3 (phplus p7 p8)). repeat php_.
+  assert (phpdef5: phplusdef p3 p7 /\ phplusdef p3 p8). repeat php_.
+  assert (phpdef6: phplusdef p5 p7 /\ phplusdef p5 p8). repeat php_.
+
+  assert (ghpdef1: ghplusdef C3 C2 /\ ghplusdef (ghplus C5 (ghplus C7 C8)) C2). repeat php_.
+  assert (ghpdef2: ghplusdef C5 C2 /\ ghplusdef (ghplus C7 C8) C2). repeat php_.
+  assert (ghpdef3: ghplusdef C7 C2 /\ ghplusdef C8 C2). repeat php_.
+  assert (ghpdef4: ghplusdef C3 C5 /\ ghplusdef C3 (ghplus C7 C8)). repeat php_.
+  assert (ghpdef5: ghplusdef C3 C7 /\ ghplusdef C3 C8). repeat php_.
+  assert (ghpdef6: ghplusdef C5 C7 /\ ghplusdef C5 C8). repeat php_.
+
+  assert (eqh1: phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))) =
+    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2). repeat php_.
+  assert (eqh2: phplus p5 (phplus p7 (phplus p8 p2)) = phplus p2 (phplus p5 (phplus p7 p8))).
+    symmetry. rewrite phplus_comm; repeat php_.
+  assert (eqh3: phplus (phplus p2 (phplus p5 (phplus p7 p8))) p3 =
+    phplus (phplus p3 (phplus p5 (phplus p7 p8))) p2).
+    rewrite phplus_assoc; repeat php_.
+  assert (eqg1: ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))) =
+    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2). repeat php_.
+  assert (eqg2: ghplus C5 (ghplus C7 (ghplus C8 C2)) = ghplus C2 (ghplus C5 (ghplus C7 C8))).
+    symmetry. rewrite ghplus_comm; repeat php_.
+  assert (eqg3: ghplus (ghplus C2 (ghplus C5 (ghplus C7 C8))) C3 =
+    ghplus (ghplus C3 (ghplus C5 (ghplus C7 C8))) C2).
+    rewrite ghplus_assoc; repeat php_.
+
+  assert (b35782: boundph (phplus p3 (phplus p5 (phplus p7 (phplus p8 p2))))).
+    rewrite eqh1. assumption.
+  assert (b5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))).
+    rewrite eqh2.
+    apply boundph_mon with p3; repeat php_.
+    rewrite eqh3. assumption.
+
+  assert (bg35782: boundgh (ghplus C3 (ghplus C5 (ghplus C7 (ghplus C8 C2))))).
+    rewrite eqg1. assumption.
+  assert (bg5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))).
+    rewrite eqg2.
+    apply boundgh_mon with C3; repeat php_.
+    rewrite eqg3. assumption.
+  exists p3, (phplus p5 (phplus p7 (phplus p8 p2))).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O24, oplus O2 O4 O24 /\ oplus O3 O24 O).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  inversion OP1.
+  rewrite <- H in *.
+  inversion OP2.
+  exists None.
+  split; apply None_op.
+  rewrite <- H in *.
+  inversion OP2.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  rewrite <- H in *.
+  inversion OP2.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  }
+  destruct exo as (O24,(op24,op324)).
+  exists O3, O24, C3, (ghplus C5 (ghplus C7 (ghplus C8 C2))).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  split. assumption.
+  split.
+
+  assert (eqh4: phplus (phplus (phplus p7 p8) p2) p5 = phplus p5 (phplus p7 (phplus p8 p2))). repeat php_.
+  assert (eqg4: ghplus (ghplus (ghplus C7 C8) C2) C5 = ghplus C5 (ghplus C7 (ghplus C8 C2))). repeat php_.
+
+  assert (bp5782: boundph (phplus p5 (phplus p7 (phplus p8 p2)))). repeat php_.
+  assert (bgp5782: boundgh (ghplus C5 (ghplus C7 (ghplus C8 C2)))). repeat php_.
+  assert (bp782: boundph (phplus p7 (phplus p8 p2))).
+  rewrite <- phplus_assoc; repeat php_. apply boundph_mon with p5; repeat php_.
+  rewrite eqh4. assumption.
+  assert (bgp782: boundgh (ghplus C7 (ghplus C8 C2))).
+  rewrite <- ghplus_assoc; repeat php_. apply boundgh_mon with C5; repeat php_.
+  rewrite eqg4. assumption.
+
+  exists p5, (phplus p7 (phplus p8 p2)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O26, oplus O2 O6 O26 /\ oplus O5 O26 O24).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  assert (OP5:=op24).
+  inversion OP5.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists None.
+  split; apply None_op.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  rewrite <- H0 in *.
+  inversion OP3.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  }
+  destruct exo as (O26,(op26,op526)).
+
+  exists O5, O26, C5, (ghplus C7 (ghplus C8 C2)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+
+  exists p7, (phplus p8 p2).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  assert (exo: exists O28, oplus O2 O8 O28 /\ oplus O7 O28 O26).
+  {
+  assert (OP1:=opO1O2).
+  assert (OP2:=opO3O4).
+  assert (OP3:=opO5O6).
+  assert (OP4:=opO7O8).
+  assert (OP5:=op24).
+  inversion op26.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists None.
+  split; apply None_op.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply sn_op. assumption.
+  rewrite <- H0 in *.
+  inversion OP4.
+  exists None.
+  split. apply None_op.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  exists (Some o0).
+  split. apply sn_oplus.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  }
+  destruct exo as (O28,(op28,op728)).
+  exists O7, O28, C7, (ghplus C8 C2).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  split.
+  intros.
+  destruct SAT as (p9,(p0,(phpdefp9p0,(bp9,(bp0,(bp90,(o9,(o0,(C9,(C0,(ghpdefC9C0,(BC9,(BC0,(BC9C0,(opo9o0,(tmp110,(tmp18,(p9p0,C9C0)))))))))))))))))).
+  subst.
+  assert (phpdef7: phplusdef p8 (phplus p9 p0) /\ phplusdef p2 (phplus p9 p0)). repeat php_.
+  assert (phpdef9: phplusdef p8 p9 /\ phplusdef p8 p0). repeat php_.
+  assert (phpdef10: phplusdef p2 p9 /\ phplusdef p2 p0). repeat php_.
+  assert (ghpdef7: ghplusdef C8 (ghplus C9 C0) /\ ghplusdef C2 (ghplus C9 C0)). repeat php_.
+  assert (ghpdef9: ghplusdef C8 C9 /\ ghplusdef C8 C0). repeat php_.
+  assert (ghpdef10: ghplusdef C2 C9 /\ ghplusdef C2 C0). repeat php_.
+
+  assert (eqh7: phplus (phplus p8 (phplus p9 p0)) p2 = 
+    phplus (phplus p8 p2) (phplus p9 p0)).
+    rewrite phplus_comm; repeat php_.
+    rewrite <- phplus_assoc; try assumption. symmetry.
+    rewrite <- phplus_assoc; try assumption.
+    replace (phplus p8 p2) with (phplus p2 p8); repeat php_.
+    repeat php_.
+  assert (eqg7: ghplus (ghplus C8 (ghplus C9 C0)) C2 = 
+    ghplus (ghplus C8 C2) (ghplus C9 C0)).
+    rewrite ghplus_comm; repeat php_.
+    rewrite <- ghplus_assoc; try assumption. symmetry.
+    rewrite <- ghplus_assoc; try assumption.
+    replace (ghplus C8 C2) with (ghplus C2 C8); repeat php_.
+    repeat php_.
+
+  exists (phplus p8 (phplus p9 p0)), p2.
+  exists. repeat php_.
+  exists. apply boundph_mon with p2; repeat php_. rewrite eqh7. assumption.
+  exists. repeat php_.
+  exists. rewrite eqh7. assumption.
+  assert (exo: exists O'8, oplus O' O8 O'8 /\ oplus O'8 O2 O'').
+  {
+  assert (OP1:=op28).
+  assert (OP2:=OPLUS).
+  inversion OPLUS.
+  rewrite <- H in *.
+  inversion OP1.
+  exists None.
+  split; apply None_op.
+  rewrite <- H in *.
+  inversion OP1.
+  exists None.
+  split. apply None_op.
+  apply sn_op. apply Permutation_trans with o; assumption.
+  exists (Some o1).
+  split. apply sn_oplus.
+  apply fs_op. apply Permutation_trans with o; assumption.
+  rewrite <- H in *.
+  inversion OP1.
+  exists (Some o).
+  split. apply fs_oplus.
+  apply fs_op. assumption.
+  }
+  destruct exo as (O'8,(op'8,opd28)).
+  exists O'8, O2, (ghplus C8 (ghplus C9 C0)), C2.
+  exists. repeat php_.
+  exists. apply boundgh_mon with C2; repeat php_. rewrite eqg7. assumption.
+  exists. repeat php_.
+  exists. rewrite eqg7. assumption.
+  exists. repeat php_.
+  split.
+  apply tmp9 with O'; repeat php_.
+  rewrite eqh7. assumption.
+  rewrite eqg7. assumption.
+  apply oplus_comm; assumption.
+  exists p9, p0.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists o9, o0, C9, C0.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  split. assumption.
+  split. assumption.
+  split; reflexivity.
+  split. assumption.
+  split; repeat php_.
+  split; reflexivity.
+  split; reflexivity.
+  split; repeat php_.
+  }
   }
 Qed.

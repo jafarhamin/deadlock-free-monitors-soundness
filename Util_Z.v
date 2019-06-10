@@ -210,7 +210,7 @@ Definition can A (def: A -> A -> Prop) (f: A -> A -> A) :=
 Require Import Coq.QArith.Qcanon.
 Require Import Coq.QArith.QArith_base.
 
-Open Local Scope Qc.
+Local Open Scope Qc.
 
 Lemma qcplus_mono:
   forall q1 q2 q3, 
@@ -248,7 +248,7 @@ Proof.
       simpl.
       unfold Qlt.
       simpl.
-      assert ((0<(Qnum q1 * ' Qden q2 + Qnum q2 * ' Qden q1))%Z).
+      assert ((0<(Qnum q1 * QDen q2 + Qnum q2 * QDen q1))%Z).
       * unfold Z.lt.
         replace 0%Z with ((0%Z+0%Z)%Z).
         erewrite Zplus_compare_compat.
@@ -265,13 +265,13 @@ Proof.
         omega.
         reflexivity.
       * unfold Z.ggcd.
-        destruct ((Qnum q1 * ' Qden q2 + Qnum q2 * ' Qden q1)%Z) eqn:QQ.
+        destruct ((Qnum q1 * QDen q2 + Qnum q2 * QDen q1)%Z) eqn:QQ.
         -- inversion H1.
         -- destruct (Pos.ggcd p (Qden q1 * Qden q2)) eqn:AA.
            destruct p1.
            unfold snd.
            simpl.
-           unfold Zlt.
+           unfold Z.lt.
            destruct (Zpos (p1 * 1)) eqn:P1; inversion P1.
            reflexivity.
         -- inversion H1.
@@ -354,6 +354,24 @@ Proof.
   rewrite Qcplus_comm.
   tauto.
 Qed.
+
+Lemma Qc_Le_le_mon1:
+  forall (q1 q2: Qc)
+         (LE: q1 + q2 <= 1)
+         (LT: 0 <= q2),
+    q1 <= 1.
+Proof.
+  intros.
+  apply Qcle_trans with (q2 + q1).
+  rewrite Qcle_minus_iff.
+  rewrite <- Qcplus_assoc.
+  rewrite Qcplus_opp_r.
+  rewrite Qcplus_0_r.
+  assumption.
+  rewrite Qcplus_comm.
+  tauto.
+Qed.
+
 
 Lemma Qc_Le_mon2:
   forall (q1 q2: Qc)

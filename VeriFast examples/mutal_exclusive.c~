@@ -1,0 +1,163 @@
+/*
+  A Bounded channel Program Synchronized Using Monitors: Verification of Deadlock-Freedom
+*/
+
+#include "stdlib.h"
+#include "monitors.h"
+#include "mutal_exclusive.h"
+//@ #include "ghost_counters.gh"
+
+struct exclusive{
+   struct mutex *m;
+   struct condvar *v;
+   int n;
+   //@ int gv;
+};
+
+/*@
+predicate exclusive(struct exclusive *ex; void* v) =
+  [_]ex->v |-> v &*& 
+  [_]ex->m |-> ?m &*& 
+  [_]mutex(m) &*&  
+  [_]ex->gv |-> _ &*&
+  mutex_of(v) == m &*&
+  inv(m) == exclusive_inv(ex, v) &*&
+  X(m) == none &*&
+  wait_level_of(m) == pair({create_exclusive}, 0r) &*&
+  wait_level_lt(wait_level_of(m), wait_level_of(v)) == true &*&  
+  P(v)==true &*&
+  X(v) == some(wait_level_of(v));
+@*/
+
+/*@
+predicate_ctor exclusive_inv(struct exclusive *b, struct condvar *v)(fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot) = 
+  [_]b->m |-> ?m &*& 
+  b->n |-> ?n &*& 
+  [_]b->v |-> v &*& 
+  [_]b->gv |-> ?gv &*& 
+  [_]cond(v) &*&
+  n >= 0 &*& 
+  mutex_of(v)==m &*& 
+  Trn(v) == vtrn(gv) &*&
+  ctr(gv,?Cv) &*& 
+  0 <= Ot(v) &*&  
+  Wt(v) + Cv + n <= Ot(v) &*&
+  (Wt(v) < 1 ? true : Wt(v) < Ot(v));
+  
+predicate_ctor vtrn(int i)() = tic(i);
+@*/
+
+struct exclusive *create_exclusive()
+  //@ requires create_exclusive_ghost_args(?v_wlevel) &*& wait_level_lt(pair({(create_exclusive)}, 0r), v_wlevel) == true;
+  //@ ensures exclusive(result,?v) &*& wait_level_of(v) == v_wlevel;
+{
+    //@ leak create_exclusive_ghost_args(v_wlevel);
+    //@ close create_mutex_ghost_args(pair({create_exclusive}, 0r));
+    struct mutex *m = create_mutex();
+    
+    //@ int gv = new_ctr();
+    //@ close create_condvar_ghost_args(m,v_wlevel,true,vtrn(gv),some(v_wlevel));
+    struct condvar *v = create_condvar();
+    
+    struct exclusive *ex = malloc(sizeof(struct exclusive));
+    if (ex==0)
+      abort();
+    ex->m = m;
+    ex->v = v;
+    ex->n = 0;
+    //@ ex->gv = gv;
+    //@ leak [_]ex->v |-> _;
+    //@ leak [_]ex->m |-> _;    
+    //@ leak [_]ex->gv |-> _;
+    //@ leak [_]malloc_block_exclusive(_);
+    //@ leak [_]cond(v);
+    //@ close init_mutex_ghost_args(exclusive_inv(ex, v));
+    //@ close exclusive_inv(ex,v)(empb,empb);  
+    //@ init_mutex(m);
+    //@ leak [_]mutex(m);    
+    //@ close exclusive(ex,v);
+    return ex;
+}
+
+void enter_cs(struct exclusive *ex)
+  //@ requires [_]exclusive(ex,?v) &*& obs(?O) &*& w_level_below_all(v,O)== true;
+  //@ ensures [_]exclusive(ex,v) &*& obs(cons(v,O));
+{
+  //@ open exclusive(ex,v);
+  //@ assert [_]ex->m |-> ?m;
+  //@ close mutex_inv(m,exclusive_inv(ex, v));
+  //@ wait_level_lt_below_obs(wait_level_of(m), wait_level_of(v), O);  
+  mutex_acquire(ex->m);
+  //@ open exclusive_inv(ex, v)(_,_);
+  //@ assert [_]ex->gv |-> ?gv;    
+  //@ g_chrgl(v);
+  //@ inc_ctr(gv);
+  while (0 < ex->n)
+  /*@ invariant [_]ex->m |-> m &*& 
+                ex->n |-> ?n0 &*& 
+                [_]ex->v |-> v &*& 
+                [_]ex->gv |-> gv &*& 
+                [_]cond(v) &*&
+                n0 >= 0 &*& 
+                mutex_held(m, _, ?Wt, ?Ot) &*&
+                ctr(gv,?Cv) &*&
+		0 <= Ot(v) &*&                
+                Wt(v) + Cv + n0 <= Ot(v) &*&
+                (Wt(v) < 1 || Wt(v) < Ot(v)) &*&
+                obs(cons((void*)v,cons(m,O))) &*& tic(gv); @*/
+  {
+    //@ dec_ctr(gv);
+    //@ close exclusive_inv(ex,v)(finc(Wt,v),Ot);
+    //@ close mutex_inv(m,exclusive_inv(ex, v));
+    //@ close condvar_trn(v,vtrn(gv));
+    /*@
+    produce_lemma_function_pointer_chunk spurious(exclusive_inv(ex,v), vtrn(gv), v)() {
+     open exclusive_inv(ex,v)(?Wt2,?Ot2);
+     assert [_]ex->gv |-> ?g2;
+     inc_ctr(g2);
+     close exclusive_inv(ex,v)(fdec(Wt2,v),Ot2);
+     close vtrn(g2)();
+    };
+    @*/
+    //@ below_count(v,O);
+    //@ count_same(v,O); 
+    condvar_wait(ex->v, ex->m);
+    //@ open exclusive_inv(ex,v)(_,_);   
+    //@ open vtrn(gv)();
+  }  
+  ex->n ++;
+  //@ close mutex_inv(m,exclusive_inv(ex, v)); 
+  //@ dec_ctr(gv);
+  //@ assert mutex_held(m,_,?Wte,?Ote);
+  //@ close exclusive_inv(ex, v)(Wte,Ote);
+  mutex_release(ex->m);
+  //@ leak [_]mutex(m);    
+}
+
+void exit_cs(struct exclusive *ex)
+  //@ requires [_]exclusive(ex,?v) &*& obs(cons(v,?O)) &*& wait_level_below_obs(pair({(exit_cs)}, 0r), cons(v,O)) == true;
+  //@ ensures [_]exclusive(ex,v) &*& obs(O);
+{
+  //@ open exclusive(ex,v);
+  //@ assert [_]ex->m |-> ?m;
+  //@ close mutex_inv(m,exclusive_inv(ex, v));
+  //@ wait_level_lt_below_obs(wait_level_of(m), pair({(exit_cs)}, 0r), O);
+  mutex_acquire(ex->m);
+  //@ open exclusive_inv(ex, v)(?Wt,?Ot); 
+  if (ex->n <= 0) abort(); 
+  ex->n --;  
+  //@ assert [_]ex->gv |-> ?gv;      
+  //@ close condvar_trn(v,vtrn(gv)); 
+  /*@ if (Wt(v)>0){
+        inc_ctr(gv);
+        close vtrn(gv)();
+      }
+  @*/
+  condvar_signal(ex->v);
+  //@ g_dischl(v);
+  //@ close mutex_inv(m,exclusive_inv(ex, v)); 
+  //@ assert mutex_held(m,_,?Wte,?Ote);
+  //@ close exclusive_inv(ex,v)(Wte,Ote);
+  mutex_release(ex->m);
+  //@ leak [_]mutex(m);
+}

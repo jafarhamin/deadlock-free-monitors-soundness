@@ -1,3 +1,5 @@
+Add LoadPath "proofs".
+
 Require Import Coq.Bool.Bool.
 Require Import ZArith.
 Require Import List.
@@ -11,11 +13,9 @@ Set Implicit Arguments.
 Inductive exp := 
   | Evar (x: Z)
   | Enum (num: Z)
+  | Eneg (e: exp)
   | Eplus (e1: exp) (e2: exp).
 
-Inductive bexp :=
-  | Blt (e1: exp) (e2: exp)
-  | Bneg (b: bexp).
 
 (** # <font size="5"><b> Commands </b></font> # *)
 
@@ -27,6 +27,7 @@ Inductive cmd :=
   | Fork (c: cmd)
   | Let (x: Z) (c1 c2: cmd)
   | If (c c1 c2: cmd)
+  | While (c1 c2: cmd)
   | Newlock
   | Acquire (e: exp)
   | Release (e: exp)
@@ -37,16 +38,7 @@ Inductive cmd :=
   | NotifyAll (x: exp)
   | Waiting4cond (v l: exp)
   | WasWaiting4cond (v l: exp)
-  | g_initl (x: exp)
-  | g_initc (x: exp)
-  | g_finlc (x: exp)
-  | g_chrg (x:exp)
-  | g_chrgu (x:exp)
-  | g_disch (x:exp)
-  | g_dischu (x:exp)
-  | g_newctr
-  | g_ctrinc (x:exp)
-  | g_ctrdec (x:exp).
+  | nop.
 
 Definition exp_eq_dec (e1 e2: exp) : {e1 = e2} + {e1 <> e2}.
 Proof.
@@ -69,35 +61,26 @@ Inductive context :=
 Definition heap := Z -> option Z.
 Definition thrds := Z -> option (cmd * context).
 
-Open Local Scope Z.
+Local Open Scope Z.
 
 Fixpoint eval (e:exp) : Z :=
   match e with
     | Evar x => 0
     | Enum n => n
+    | Eneg e => - (eval e)
     | Eplus e1 e2 => (eval e1) + (eval e2)
   end.
 
 Notation "'[[' e ']]'" := 
   (eval e)(at level 100).
 
-Fixpoint beval (b:bexp) : bool :=
-  match b with
-    | Blt e1 e2 => if Z_lt_dec ([[e1]]) ([[e2]]) then true else false
-    | Bneg b => negb (beval b)
-  end.
 
 Fixpoint subse (x:Z) (z:Z) (e:exp): exp :=
   match e with 
     | Evar v => if Z.eq_dec x v then Enum z else Evar v
     | Enum n => Enum n
+    | Eneg e => Eneg (subse x z e)
     | Eplus e1 e2 => Eplus (subse x z e1) (subse x z e2)
-  end.
-
-Fixpoint subsb (b:bexp) (se: exp -> exp) : bexp :=
-  match b with 
-    | Blt e1 e2 => Blt (se e1) (se e2)
-    | Bneg b => Bneg (subsb b se)
   end.
 
 Fixpoint subs (c:cmd) (se: exp -> exp) : cmd :=
@@ -109,6 +92,7 @@ Fixpoint subs (c:cmd) (se: exp -> exp) : cmd :=
     | Fork c => Fork (subs c se)
     | Let x' c1 c2 => Let x' (subs c1 se) (subs c2 se)
     | If c c1 c2 => If (subs c se) (subs c1 se) (subs c2 se)
+    | While c c1 => While (subs c se) (subs c1 se)
     | Newlock => Newlock
     | Acquire e => Acquire (se e)
     | Release e => Release (se e)
@@ -119,22 +103,14 @@ Fixpoint subs (c:cmd) (se: exp -> exp) : cmd :=
     | NotifyAll v => NotifyAll (se v)
     | Waiting4cond v l => Waiting4cond (se v) (se l)
     | WasWaiting4cond v l => WasWaiting4cond (se v) (se l)
-    | g_initl e => g_initl (se e)
-    | g_initc e => g_initc (se e)
-    | g_finlc e => g_finlc (se e)
-    | g_chrg e => g_chrg (se e)
-    | g_chrgu e => g_chrgu (se e)
-    | g_disch e => g_disch (se e)
-    | g_dischu e => g_dischu (se e)
-    | g_newctr => g_newctr
-    | g_ctrinc e => g_ctrinc (se e)
-    | g_ctrdec e => g_ctrdec (se e)
+    | g => g
   end.
 
 Fixpoint is_free_e (e: exp) (x: Z): bool :=
   match e with
     | Evar y => Z.eqb x y
     | Enum n => false
+    | Eneg e => is_free_e e x
     | Eplus e1 e2 => orb (is_free_e e1 x) (is_free_e e2 x)
   end.
 
@@ -147,6 +123,7 @@ Fixpoint is_free (c: cmd) (x: Z): bool :=
     | Fork c => is_free c x
     | Let x' c1 c2 => orb (is_free c1 x) (is_free c2 x)
     | If c c1 c2 => orb (orb (is_free c x) (is_free c1 x)) (is_free c2 x)
+    | While c c1 => orb (is_free c x) (is_free c1 x)
     | Newlock => false
     | Acquire e => is_free_e e x
     | Release e => is_free_e e x
@@ -157,17 +134,98 @@ Fixpoint is_free (c: cmd) (x: Z): bool :=
     | NotifyAll v => is_free_e v x
     | Waiting4cond v l => orb (is_free_e v x) (is_free_e l x)
     | WasWaiting4cond v l => orb (is_free_e v x) (is_free_e l x)
-    | g_initl e => is_free_e e x
-    | g_initc e => is_free_e e x
-    | g_finlc e => is_free_e e x
-    | g_chrg e => is_free_e e x
-    | g_chrgu e => is_free_e e x
-    | g_disch e => is_free_e e x
-    | g_dischu e => is_free_e e x
-    | g_newctr => false
-    | g_ctrinc e => is_free_e e x
-    | g_ctrdec e => is_free_e e x
+    | g => false
   end.
+
+Lemma subsc_id:
+  forall c,
+    subs c (fun e: exp => e) = c.
+Proof.
+  induction c; simpl; try reflexivity; try rewrite IHc; try reflexivity.
+  rewrite IHc1. rewrite IHc2; reflexivity.
+  rewrite IHc1. rewrite IHc2. rewrite IHc3; reflexivity.
+  rewrite IHc1. rewrite IHc2; reflexivity.
+Qed.
+
+Lemma subse_subse:
+  forall (e: exp) x z z',
+    subse x z e = subse x z' (subse x z e).
+Proof.
+  induction e; simpl; intros.
+  destruct (Z.eq_dec x0 x); try reflexivity. simpl.
+  destruct (Z.eq_dec x0 x); try reflexivity. contradiction.
+  reflexivity.
+  rewrite <- IHe. reflexivity.
+  rewrite <- IHe1.
+  rewrite <- IHe2.
+  reflexivity.
+Qed.
+
+Lemma is_free_subse:
+  forall e x x' z
+         (IS_FREE : is_free_e e x = false),
+    is_free_e (subse x' z e) x = false.
+Proof.
+  induction e; simpl; intros.
+  destruct (Z.eq_dec x' x); try reflexivity. simpl. assumption. assumption.
+  apply IHe; assumption.
+  apply Coq.Bool.Bool.orb_false_iff in IS_FREE.
+  destruct IS_FREE.
+  apply Coq.Bool.Bool.orb_false_iff. split.
+  apply IHe1. assumption.
+  apply IHe2. assumption.
+Qed.
+
+Lemma is_free_subs:
+  forall c se x x' z
+         (IS_FREE: is_free (subs c se) x = false),
+    is_free (subs c (fun e => subse x' z (se e))) x = false.
+Proof.
+  induction c; simpl; intros; try apply is_free_subse; try assumption.
+  apply Coq.Bool.Bool.orb_false_iff in IS_FREE. destruct IS_FREE.
+  apply Coq.Bool.Bool.orb_false_iff. split;
+  apply is_free_subse; try assumption.
+  apply IHc; assumption.
+  apply Coq.Bool.Bool.orb_false_iff in IS_FREE. destruct IS_FREE.
+  apply Coq.Bool.Bool.orb_false_iff. split.
+  apply IHc1; assumption.
+  apply IHc2; assumption.
+  apply Coq.Bool.Bool.orb_false_iff in IS_FREE. destruct IS_FREE.
+  apply Coq.Bool.Bool.orb_false_iff in H. destruct H.
+  apply Coq.Bool.Bool.orb_false_iff. split.
+  apply Coq.Bool.Bool.orb_false_iff. split.
+  apply IHc1; assumption.
+  apply IHc2; assumption.
+  apply IHc3; assumption.
+  apply Coq.Bool.Bool.orb_false_iff in IS_FREE. destruct IS_FREE.
+  apply Coq.Bool.Bool.orb_false_iff. split.
+  apply IHc1; assumption.
+  apply IHc2; assumption.
+  apply Coq.Bool.Bool.orb_false_iff in IS_FREE. destruct IS_FREE.
+  apply Coq.Bool.Bool.orb_false_iff. split; apply is_free_subse; try assumption.
+  apply Coq.Bool.Bool.orb_false_iff in IS_FREE. destruct IS_FREE.
+  apply Coq.Bool.Bool.orb_false_iff. split; apply is_free_subse; try assumption.
+  apply Coq.Bool.Bool.orb_false_iff in IS_FREE. destruct IS_FREE.
+  apply Coq.Bool.Bool.orb_false_iff. split; apply is_free_subse; try assumption.
+Qed.
+
+Lemma subse_subse_neq:
+  forall (e: exp) x x0 z z0 (NEQ: x <> x0),
+    subse x0 z (subse x z0 e) = subse x z0 (subse x0 z e).
+Proof.
+  induction e; simpl; intros.
+  destruct (Z.eq_dec x0 x); try reflexivity. simpl.
+  destruct (Z.eq_dec x1 x); try reflexivity. rewrite <- e0 in e. contradiction.
+  simpl.
+  destruct (Z.eq_dec x0 x); try reflexivity. contradiction.
+  destruct (Z.eq_dec x1 x); try reflexivity. simpl.
+  destruct (Z.eq_dec x1 x); try reflexivity. contradiction. simpl.
+  destruct (Z.eq_dec x1 x); try reflexivity. contradiction.
+  destruct (Z.eq_dec x0 x); try reflexivity. contradiction. reflexivity.
+  rewrite IHe. reflexivity. assumption.
+  rewrite IHe1; try assumption.
+  rewrite IHe2; try assumption. reflexivity.
+Qed.
 
 
 (** # <font size="5"><b> Semantics of Commands </b></font> # *)
@@ -198,7 +256,7 @@ Inductive red: bool -> thrds -> heap -> thrds -> heap -> Prop :=
       red sp t h (upd Z.eq_dec t id (Some (Val (Enum a),tx))) (dstr_cells h (map (fun x => a + (Z.of_nat x)) (seq O n)) (Some 0))
   | red_Lookup: forall sp e h v id t tx (CMD: t id = Some (Lookup e,tx)) (ALC: h ([[e]]) = Some v),
       red sp t h (upd Z.eq_dec t id (Some (Val (Enum v),tx))) h
-  | red_Mutate: forall sp e1 e2 v h id t tx (CMD: t id = Some (Mutate e1 e2,tx)) (ALC: h ([[e1]]) = Some v),
+  | red_Mutate: forall sp e1 e2 h id t tx (CMD: t id = Some (Mutate e1 e2,tx)),
       red sp t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[e1]]) (Some ([[e2]])))
   | red_Fork: forall sp c h id t id' tx (CMD: t id = Some (Fork c,tx))(NIN: t id' = None),
       red sp t h (upd Z.eq_dec (upd Z.eq_dec t id (Some (tt,tx))) id' (Some (c,done))) h
@@ -214,6 +272,8 @@ Inductive red: bool -> thrds -> heap -> thrds -> heap -> Prop :=
       red sp t h (upd Z.eq_dec t id (Some (c1,tx))) h
   | red_If_false: forall sp e c1 c2 h id t tx (CMD: t id = Some (Val e, If' c1 c2 tx)) (TRUE: ([[e]]) <= 0),
       red sp t h (upd Z.eq_dec t id (Some (c2,tx))) h
+  | red_While: forall sp c c1 x h id t tx (CMD: t id = Some (While c c1,tx)) (NOTFREE: is_free (While c c1) x = false),
+      red sp t h (upd Z.eq_dec t id (Some (If c (Let x c1 (While c c1)) tt, tx))) h
   | red_Newlock: forall sp h l id t tx (CMD: t id = Some (Newlock,tx)) (NIN: h l = None),
       red sp t h (upd Z.eq_dec t id (Some (Val (Enum l),tx))) (upd Z.eq_dec h l (Some 1))
   | red_Acquire: forall sp l h id t tx (CMD: t id = Some (Acquire l,tx)) (OPEN: h ([[l]]) = Some 1),
@@ -222,39 +282,30 @@ Inductive red: bool -> thrds -> heap -> thrds -> heap -> Prop :=
       red sp t h (upd Z.eq_dec t id (Some (Waiting4lock l,tx))) h
   | red_Acquire1: forall sp l h id t tx (CMD: t id = Some (Waiting4lock l,tx)) (OPEN: h ([[l]]) = Some 1),
       red sp t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[l]]) (Some 0))
-  | red_Release: forall sp l h id t tx (CMD: t id = Some (Release l,tx)) (ALC: h ([[l]]) <> None) (HELD: h ([[l]]) <> Some 1),
+  | red_Release: forall sp l h id t tx (CMD: t id = Some (Release l,tx)),
       red sp t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[l]]) (Some 1))
   | red_Newcond: forall sp h v id t tx (CMD: t id = Some (Newcond,tx)) (NIN: h v = None),
       red sp t h (upd Z.eq_dec t id (Some (Val (Enum v),tx))) (upd Z.eq_dec h v (Some 0))
-  | red_Wait: forall sp h id t v l tx (CMD: t id = Some (Wait v l,tx)) (ALCl: h ([[l]]) <> None) (ALCv: h ([[v]]) <> None) (HELD: h ([[l]]) <> Some 1),
+  | red_Wait: forall sp h id t v l tx (CMD: t id = Some (Wait v l,tx)),
       red sp t h (upd Z.eq_dec t id (Some (Waiting4cond v l,tx))) (upd Z.eq_dec h ([[l]]) (Some 1))
-  | red_Notify0: forall sp h id t v tx (CMD: t id = Some (Notify v,tx)) (ALCv: h ([[v]]) <> None)
+  | red_Notify0: forall sp h id t v tx (CMD: t id = Some (Notify v,tx))
                         (NWT: ~ exists id' v' l tx' (EQvv': ([[v]]) = ([[v']])) , t id' = Some (Waiting4cond v' l,tx'))
                         (NWWT: ~ exists id' v' l tx' (EQvv': ([[v]]) = ([[v']])) , t id' = Some (WasWaiting4cond v' l,tx')),
       red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_Notify01: forall sp h id t v tx id' tx' l (CMD: t id = Some (Notify v,tx)) (ALCv: h ([[v]]) <> None)
+  | red_Notify01: forall sp h id t v tx id' tx' l (CMD: t id = Some (Notify v,tx))
                         (NWT: ~ exists id' v' l tx' (EQvv': ([[v]]) = ([[v']])) , t id' = Some (Waiting4cond v' l,tx'))
                         (WWT: exists v' (EQvv': ([[v]]) = ([[v']])) , t id' = Some (WasWaiting4cond v' l,tx')),
       red sp t h (upd Z.eq_dec (upd Z.eq_dec t id (Some (tt,tx))) id' (Some (Waiting4lock l,tx'))) h
-  | red_Notify: forall sp h id t v v' tx id' tx' l (ALCv: h ([[v]]) <> None)
+  | red_Notify: forall sp h id t v v' tx id' tx' l
                        (EQvv': ([[v]]) = ([[v']])) (CMD: t id = Some (Notify v,tx)) (CMD': t id' = Some (Waiting4cond v' l,tx')),
       red sp t h (upd Z.eq_dec (upd Z.eq_dec t id (Some (tt,tx))) id' (Some (Waiting4lock l,tx'))) h
   | red_SpuriousWakeup: forall h id t v tx l (CMD: t id = Some (Waiting4cond v l,tx)),
       red true t h (upd Z.eq_dec t id (Some (WasWaiting4cond v l,tx))) h
   | red_WasWait: forall sp h id t v l tx (CMD: t id = Some (WasWaiting4cond v l,tx)) (OPEN: h ([[l]]) = Some 1),
       red sp t h (upd Z.eq_dec t id (Some (tt,tx))) (upd Z.eq_dec h ([[l]]) (Some 0))
-  | red_NotifyAll: forall sp h id t v tx (CMD: t id = Some (NotifyAll v,tx)) (ALCv: h ([[v]]) <> None),
+  | red_NotifyAll: forall sp h id t v tx (CMD: t id = Some (NotifyAll v,tx)),
       red sp t h (upd Z.eq_dec (wakeupthrds ([[v]]) t) id (Some (tt,tx))) h
-  | red_g_initl: forall sp h id t l tx (CMD: t id = Some (g_initl l,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_initc: forall sp h id t l tx (CMD: t id = Some (g_initc l,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_finlc: forall sp h id t l tx (CMD: t id = Some (g_finlc l,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_chrg: forall sp h id t e tx (CMD: t id = Some (g_chrg e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_chrgu: forall sp h id t e tx (CMD: t id = Some (g_chrgu e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_disch: forall sp h id t e tx (CMD: t id = Some (g_disch e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_dischu: forall sp h id t e tx (CMD: t id = Some (g_dischu e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_newctr: forall sp h id t tx (CMD: t id = Some (g_newctr,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_ctrinc: forall sp h id t e tx (CMD: t id = Some (g_ctrinc e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h
-  | red_g_ctrdec: forall sp h id t e tx (CMD: t id = Some (g_ctrdec e,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h.
+  | red_nop: forall sp h id t tx (CMD: t id = Some (nop,tx)), red sp t h (upd Z.eq_dec t id (Some (tt,tx))) h.
 
 
 (** # <font size="5"><b> Semantics of Abort </b></font> # *)
@@ -379,47 +430,12 @@ Proof.
     reflexivity. right. exists v. right. reflexivity.
 Qed.
 
-
-(*
-Lemma waiting_for_lock_cond:
-  forall c h o
-         (W4lc: waiting_for h c = Some o),
-    exists e (EQ: o = ([[e]])), c = Waiting4lock e \/ exists l, c = Waiting4cond e l \/ c = WasWaiting4cond e l.
-Proof.
-  induction c; simpl; intros;
-  inversion W4lc.
-  - destruct (opZ_eq_dec (h ([[l]])) (Some 1%Z)); inversion W4lc.
-    exists l. exists. reflexivity. tauto.
-  - exists v. exists. reflexivity. right. exists l. left. reflexivity.
-  - exists l. exists. reflexivity. right. exists v. right. reflexivity.
-Qed.
-*)
-
 Lemma wfwk:
   forall c z,
     ifb (opZ_eq_dec (waiting_for_cond (wakeupcmd z c)) (Some z)) = false.
 Proof.
   induction c; repeat dstr_.
 Qed.
-
-
-(*
-Lemma waiting_for_dstr_neq:
-  forall c h z v
-         (NEQ: waiting_for_cond c <> waiting_for (upd Z.eq_dec h z v) c),
-    exists l, c = Waiting4lock l.
-Proof.
-  induction c; repeat dstr_; exists l; reflexivity.
-Qed.
-
-Lemma waiting_for_dstr_neq2a:
-  forall c h z v
-         (NEQ: waiting_for h c <> waiting_for (upd Z.eq_dec h z v) c),
-    exists l, c = Waiting4lock l.
-Proof.
-  induction c; repeat dstr_; exists l; reflexivity.
-Qed.
-*)
 
 Lemma waiting_for_dstr_eq:
   forall c h z z' v
@@ -443,6 +459,7 @@ Proof.
   repeat dstr_.
 Qed.
 
+
 (** # <font size="5"><b> Wellformed Commands </b></font> # *)
 
 Fixpoint wellformed_cmd (c:cmd) :=
@@ -450,6 +467,7 @@ Fixpoint wellformed_cmd (c:cmd) :=
     | Let x c1 c2 => wellformed_cmd c1 /\ wellformed_cmd c2 /\ not_waiting_in c1 /\ not_waiting_in c2
     | Fork c => not_waiting_in c /\ wellformed_cmd c
     | If c c1 c2 => wellformed_cmd c /\ wellformed_cmd c1 /\ wellformed_cmd c2 /\ not_waiting_in c /\ not_waiting_in c1 /\ not_waiting_in c2
+    | While c c1 => wellformed_cmd c /\ wellformed_cmd c1 /\ not_waiting_in c /\ not_waiting_in c1
     | _ => True
   end.
 
@@ -509,7 +527,21 @@ Proof.
   split. apply not_waiting_subs in N1; assumption.
   split. apply not_waiting_subs in N2; assumption.
   apply not_waiting_subs in N3; assumption.
+  split.
+  intros.
+  destruct H as (W1,(W2,(N1,N2))).
+  split. apply IHc1; assumption.
+  split. apply IHc2; assumption.
+  split. apply not_waiting_subs; assumption.
+  apply not_waiting_subs; assumption.
+  intros.
+  destruct H as (W1,(W2,(N1,N2))).
+  split. apply IHc1 in W1; assumption.
+  split. apply IHc2 in W2; assumption.
+  split. apply not_waiting_subs in N1; assumption.
+  apply not_waiting_subs in N2; assumption.
 Qed.
+
 
 (** # <font size="5"><b> Free Variables </b></font> # *)
 
@@ -517,6 +549,7 @@ Fixpoint free_var_e (e: exp) : list Z :=
   match e with
     | Evar y => y::nil
     | Enum n => nil
+    | Eneg e => free_var_e e
     | Eplus e1 e2 => (free_var_e e1) ++ (free_var_e e2)
   end.
 
@@ -529,6 +562,7 @@ Proof.
   apply Z.eqb_eq in NFREE.
   omega.
   inversion NFREE.
+  apply IHe; assumption.
   apply Coq.Bool.Bool.orb_true_iff in NFREE.
   apply in_app_iff.
   destruct NFREE.
@@ -549,6 +583,7 @@ Fixpoint free_var (c: cmd) : list Z :=
     | Fork c => free_var c
     | Let x' c1 c2 => free_var c1 ++ free_var c2
     | If c c1 c2 => free_var c ++ free_var c1 ++ free_var c2
+    | While c c1 => free_var c ++ free_var c1
     | Newlock => nil
     | Acquire e => free_var_e e
     | Release e => free_var_e e
@@ -559,16 +594,7 @@ Fixpoint free_var (c: cmd) : list Z :=
     | NotifyAll v => free_var_e v
     | Waiting4cond v l => free_var_e v ++ free_var_e l
     | WasWaiting4cond v l => free_var_e v ++ free_var_e l
-    | g_initl e => free_var_e e
-    | g_initc e => free_var_e e
-    | g_finlc e => free_var_e e
-    | g_chrg e => free_var_e e
-    | g_chrgu e => free_var_e e
-    | g_disch e => free_var_e e
-    | g_dischu e => free_var_e e
-    | g_newctr => nil
-    | g_ctrinc e => free_var_e e
-    | g_ctrdec e => free_var_e e
+    | g => nil
   end.
 
 Lemma is_free_var:
@@ -621,6 +647,13 @@ Proof.
   right.
   apply IHc3.
   assumption.
+
+  simpl.
+  apply in_app_iff.
+  apply Coq.Bool.Bool.orb_true_iff in H0.
+  destruct H0.
+  left. apply IHc1. assumption.
+  right. apply IHc2. assumption.
   simpl.
   apply in_app_iff.
   apply Coq.Bool.Bool.orb_true_iff in H0.
@@ -695,6 +728,34 @@ Proof.
   omega.
 Qed.
 
+Lemma subse_free:
+  forall e x z
+    (NOTFREE: is_free_e e x = false),
+  subse x z e = e.
+Proof.
+  induction e.
+  simpl.
+  intros.
+  apply neqb_neq in NOTFREE.
+  destruct (Z.eq_dec x0 x).
+  contradiction.
+  reflexivity.
+  simpl.
+  intros.
+  reflexivity.
+  simpl.
+  intros.
+  rewrite IHe.
+  reflexivity.
+  assumption.
+  simpl.
+  intros.
+  apply Coq.Bool.Bool.orb_false_iff in NOTFREE.
+  destruct NOTFREE.
+  rewrite IHe1; try assumption.
+  rewrite IHe2; try assumption.
+  reflexivity.
+Qed.
 
 (** # <font size="5"><b> Infinite Capacity </b></font> # *)
 
@@ -730,15 +791,37 @@ Proof.
   omega.
 Qed.
 
-Lemma steps_preserve_inf_capacity:
+Lemma steps_preserve_inf_capacity1:
   forall sp t h t' h'
-         (INF_CAP: inf_capacity t /\ inf_capacity h)
+         (INF_CAP: inf_capacity t)
          (RED: red sp t h t' h'),
-    inf_capacity t' /\ inf_capacity h'.
+    inf_capacity t'.
 Proof.
   intros.
   induction RED;
-  split;
+  try apply dstr_preserves_inf_capacity;
+  try tauto;
+  try apply dstr_preserves_inf_capacity;
+  try tauto.
+  unfold inf_capacity in *.
+  destruct INF_CAP.
+  unfold wakeupthrds.
+  unfold wakeupthrd.
+  exists x.
+  intros.
+  rewrite H.
+  reflexivity.
+  assumption.
+Qed.
+
+Lemma steps_preserve_inf_capacity2:
+  forall sp t h t' h'
+         (INF_CAP: inf_capacity h)
+         (RED: red sp t h t' h'),
+    inf_capacity h'.
+Proof.
+  intros.
+  induction RED;
   try apply dstr_preserves_inf_capacity;
   try tauto;
   try apply dstr_preserves_inf_capacity;
@@ -746,7 +829,6 @@ Proof.
   unfold dstr_cells.
   unfold inf_capacity in *.
   destruct INF_CAP.
-  destruct H0 as (x,INF).
   exists ((Z.max x (a+Z.of_nat n)%Z)+1)%Z.
   intros.
   destruct (in_dec Z.eq_dec y (map (fun x0 : nat => (a + Z.of_nat x0)%Z) (seq 0 n))) eqn:IN.
@@ -773,8 +855,7 @@ Proof.
   apply Z.compare_le_iff in EQ.
   omega.
   omega.
-
-  apply INF.
+  apply H.
   unfold Z.max in LE.
   destruct (x ?= a + Z.of_nat n)%Z eqn:EQ.
   apply Z.compare_eq_iff in EQ.
@@ -782,14 +863,17 @@ Proof.
   rewrite Z.compare_lt_iff in EQ.
   omega.
   omega.
-  unfold inf_capacity in *.
-  destruct INF_CAP.
-  destruct H as (x,INF).
-  unfold wakeupthrds.
-  unfold wakeupthrd.
-  exists x.
+Qed.
+
+Lemma steps_preserve_inf_capacity:
+  forall sp t h t' h'
+         (INF_CAP: inf_capacity t /\ inf_capacity h)
+         (RED: red sp t h t' h'),
+    inf_capacity t' /\ inf_capacity h'.
+Proof.
   intros.
-  rewrite INF.
-  reflexivity.
-  assumption.
+  destruct INF_CAP as (INF1,INF2).
+  split.
+  apply steps_preserve_inf_capacity1 with sp t h h'; assumption.
+  apply steps_preserve_inf_capacity2 with sp t h t'; assumption.
 Qed.
