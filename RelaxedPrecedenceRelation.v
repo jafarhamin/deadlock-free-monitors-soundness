@@ -7,7 +7,16 @@ Require Import Coq.Sorting.Permutation.
 Require Import Util_Z.
 Require Import Util_list.
 
-Set Implicit Arguments.
+
+Definition prc level ltl (ORD: order ltl) (o:Z) (O: list Z) (R: Z -> level) (P: Z -> bool) (R': Z -> option level) : Prop :=
+  match (R' o) with
+    | None => forallb (fun x => ltl (R o) (R x)) O = true
+    | Some R'o => length (filter (fun x => orb (negb (ltl (R o) (R x))) (negb (ltl R'o (R x)))) O) <= 1 /\
+                  (forall x (INX: In x O), (ltl (R o) (R x) = true /\ ltl (R'o) (R x) = true) \/
+                                          (exists R'x (EQR'x: R' x = Some R'x), (ltl (R o) (R'x) = true \/ R o = R'x) /\
+                                                                                (ltl (R'o) (R'x) = true \/ R'o = R'x))) /\
+                 (forallb (fun x => ltl (R o) (R x)) O = true \/ P o = true)
+  end.
 
 Definition node_dec (n1 n2: (Z * list Z * Z)) : {n1 = n2} + {n1 <> n2}.
 Proof.
@@ -36,41 +45,22 @@ Proof.
   apply Z_eq_dec.
 Qed.
 
-Definition prc (o:Z) (O: list Z) (R: Z -> Z) (P: Z -> bool) (X: Z -> option Z) : bool :=
-  match (X o) with
-    | None => forallb (fun x => Z.ltb (R o) (R x)) O
-    | Some xo => andb (leb (length (filter (fun x => Z.leb (R x) (Z.max (R o) xo)) O)) 1)
-                (andb (forallb (fun x => orb (Z.ltb (Z.max (R o) xo) (R x)) 
-                                             (leb_o (Z.max (R o) xo) (X x))) O)
-                (orb (forallb (fun x => Z.ltb (R o) (R x)) O)
-                (P o)))
-  end.
-
 Lemma prc_perm:
-  forall O O' o R P X
-         (PRC: prc o O R P X = true)
+  forall O O' o level ltl R P X ORD
+         (PRC: prc level ltl ORD o O R P X)
          (PERM: Permutation O' O),
-    prc o O' R P X = true.
+    prc level ltl ORD o O' R P X.
 Proof.
   unfold prc.
   intros.
   destruct (X o).
-  apply Coq.Bool.Bool.andb_true_iff in PRC.
-  destruct PRC as (PRC1,PRC2).
-  apply Coq.Bool.Bool.andb_true_iff in PRC2.
-  destruct PRC2 as (PRC2,PRC3).
-  apply Coq.Bool.Bool.orb_true_iff in PRC3.
-  apply Coq.Bool.Bool.andb_true_iff.
+  destruct PRC as (PRC1,(PRC2,PRC3)).
   split.
   rewrite prem_length_eq with (l':=O); assumption.
-  apply Coq.Bool.Bool.andb_true_iff.
   split.
-  apply forallb_forall.
   intros.
-  apply forallb_forall with (x:=x) in PRC2.
-  assumption.
-  apply Permutation_in with O'; assumption.
-  apply Coq.Bool.Bool.orb_true_iff.
+  apply Permutation_in with (l':=O) in INX; try assumption.
+  apply PRC2; assumption.
   destruct PRC3 as [PRC3|PRC3].
   left.
   apply forallb_forall.
@@ -89,93 +79,73 @@ Qed.
 
 
 Lemma prc_P:
-  forall R o o' O P X
-         (PRC: prc o O R P X = true)
+  forall level ltl ORD R o o' O P X
+         (PRC: prc level ltl ORD o O R P X)
          (IN: In o' O)
-         (LE: Z.le (R o') (R o)),
+         (LE: ltl (R o) (R o') = false),
     P o = true.
 Proof.
   unfold prc.
   intros.
   destruct (X o).
-  apply Coq.Bool.Bool.andb_true_iff in PRC.
   destruct PRC as (PRC1,PRC2).
-  apply Coq.Bool.Bool.andb_true_iff in PRC2.
   destruct PRC2 as (PRC2,PRC3).
-  apply Coq.Bool.Bool.orb_true_iff in PRC3.
   destruct PRC3 as [PRC3|PRC3].
   apply forallb_forall with (x:=o') in PRC3.
-  apply Z.ltb_lt in PRC3.
-  omega.
+  rewrite PRC3 in LE. inversion LE.
   assumption.
   assumption.
   apply forallb_forall with (x:=o') in PRC.
-  apply Z.ltb_lt in PRC.
-  omega.
+  rewrite PRC in LE. inversion LE.
   assumption.
 Qed.
 
-
 Lemma prc_X:
-  forall R o o' O P X
+  forall level ltl ORD R o o' O P X
          (IN: In o O)
-         (EQR: Z.le (R o) (R o'))
-         (PRC: prc o' O R P X = true),
+         (EQR: ltl (R o') (R o) = false)
+         (PRC: prc level ltl ORD o' O R P X),
    X o <> None.
 Proof.
   unfold prc.
   intros.
   destruct (X o').
-  apply Coq.Bool.Bool.andb_true_iff in PRC.
   destruct PRC as (PRC1,PRC2).
-  apply Coq.Bool.Bool.andb_true_iff in PRC2.
   destruct PRC2 as (PRC2,PRC3).
   apply Coq.Bool.Bool.orb_true_iff in PRC3.
-  apply forallb_forall with (x:=o) in PRC2.
-  apply Coq.Bool.Bool.orb_true_iff in PRC2.
-  destruct PRC2 as [PRC|PRC].
-  apply Z.ltb_lt in PRC.
-  apply Z.max_lub_lt_iff in PRC.
-  omega.
-  unfold leb_o in PRC.
-  destruct (X o).
+  destruct PRC2 with o as [PRC|PRC]; try assumption.
+  destruct PRC as (PRC4,PRC5).
+  rewrite PRC4 in EQR. inversion EQR.
+  destruct PRC as (R'x,(XO,rest)).
+  rewrite XO.
   apply some_none.
-  inversion PRC.
-  assumption.
   apply forallb_forall with (x:=o) in PRC.
-  apply Z.ltb_lt in PRC.
-  omega.
+  rewrite PRC in EQR. inversion EQR.
   assumption.
 Qed.
 
-
 Lemma ole_X_count:
-  forall O o o' R P X
-         (EQR: Z.le (R o') (R o))
-         (PRC: prc o O R P X = true),
+  forall O o o' level ltl ORD R P X
+         (EQR: ltl (R o) (R o') = false)
+         (PRC: prc level ltl ORD o O R P X),
     count_occ Z.eq_dec O o' <= 1.
 Proof.
   unfold prc.
   intros.
   destruct (X o).
-  apply Coq.Bool.Bool.andb_true_iff in PRC.
   destruct PRC as (PRC1,PRC2).
-  apply Coq.Bool.Bool.andb_true_iff in PRC2.
   destruct PRC2 as (PRC2,PRC3).
   apply Coq.Bool.Bool.orb_true_iff in PRC3.
-  apply le_trans with (length (filter (fun x : Z => (R x <=? Z.max (R o) z)%Z) O)).
+  apply le_trans with (length (filter (fun x : Z => (negb (ltl (R o) (R x)) || negb (ltl l (R x)))%bool) O)).
   apply count_filter_len.
-  apply Z.leb_le.
-  apply Z.le_trans with (R o).
-  assumption.
-  apply Z.le_max_l.
-  apply Nat.leb_le in PRC1.
+  apply Coq.Bool.Bool.orb_true_iff.
+  left.
+  apply Coq.Bool.Bool.negb_true_iff. assumption.
   assumption.
   destruct (count_occ Z.eq_dec O o') eqn:CNT.
   omega.
   apply forallb_forall with (x:=o') in PRC.
-  apply Z.ltb_lt in PRC.
-  omega.
+  rewrite EQR in PRC. inversion PRC.
   rewrite count_occ_In with (eq_dec := Z.eq_dec).
   omega.
 Qed.
@@ -896,78 +866,63 @@ Qed.
 
 
 Lemma prc_has_X:
-  forall O o o' W P X
-         (PRC: prc o' O W P X = true)
+  forall O o o' level ltl ORD W P X
+         (PRC: prc level ltl ORD o' O W P X)
          (IN: In o O)
-         (WLE: Z.le (W o) (W o')),
+         (WLE: ltl (W o') (W o) = false),
     exists xo, X o = Some xo.
 Proof.
   unfold prc.
   intros.
   destruct (X o').
-  apply Coq.Bool.Bool.andb_true_iff in PRC.
   destruct PRC as (PRC1,PRC2).
-  apply Coq.Bool.Bool.andb_true_iff in PRC2.
   destruct PRC2 as (PRC2,PRC3).
   apply Coq.Bool.Bool.orb_true_iff in PRC3.
-  apply forallb_forall with (x:=o) in PRC2.
-  apply Coq.Bool.Bool.orb_true_iff in PRC2.
-  destruct PRC2 as [PRC2|PRC2].
-  apply Z.ltb_lt in PRC2.
-  apply Z.max_lub_lt_iff in PRC2.
-  omega.
-  unfold leb_o in PRC2.
-  destruct (X o) eqn:Xo.
-  exists z0.
-  reflexivity.
-  inversion PRC2.
-  assumption.
+  apply PRC2 in IN.
+  destruct IN as [PRC4|PRC4].
+  destruct PRC4 as (PRC4,PRC5).
+  rewrite PRC4 in WLE. inversion WLE.
+  destruct PRC4 as (R'x,(XO,rest)).
+  exists R'x. assumption.
   apply forallb_forall with (x:=o) in PRC.
-  apply Z.ltb_lt in PRC.
-  omega.
+  rewrite PRC in WLE. inversion WLE.
   assumption.
 Qed.
 
 
 Lemma prc_le_X:
-  forall O o o' xo xo' W P X
-         (PRC: prc o' O W P X = true)
+  forall O o o' level ltl ORD xo xo' W P X
+         (PRC: prc level ltl ORD o' O W P X)
          (XO': X o' = Some xo')
          (XO': X o = Some xo)
          (IN: In o O)
-         (WLE: Z.le (W o) (W o')),
-    Z.le (Z.max (W o') xo') xo.
+         (WLE: ltl (W o') (W o) = false),
+    (ltl (W o') xo = true \/ W o' = xo) /\ (ltl xo' xo = true \/ xo' = xo).
 Proof.
   unfold prc.
   intros.
   rewrite XO' in PRC.
-  apply Coq.Bool.Bool.andb_true_iff in PRC.
   destruct PRC as (PRC1,PRC2).
-  apply Coq.Bool.Bool.andb_true_iff in PRC2.
   destruct PRC2 as (PRC2,PRC3).
   apply Coq.Bool.Bool.orb_true_iff in PRC3.
-  apply forallb_forall with (x:=o) in PRC2.
-  apply Coq.Bool.Bool.orb_true_iff in PRC2.
-  destruct PRC2 as [PRC2|PRC2].
-  apply Z.ltb_lt in PRC2.
-  apply Z.max_lub_lt_iff in PRC2.
-  omega.
-  unfold leb_o in PRC2.
-  rewrite XO'0 in PRC2.
-  apply Z.leb_le in PRC2.
-  assumption.
-  assumption.
+  apply PRC2 in IN.
+  destruct IN as [PRC4|PRC4].
+  destruct PRC4 as (PRC4,PRC5).
+  rewrite PRC4 in WLE. inversion WLE.
+  destruct PRC4 as (R'x,(XO,(LTL1,LTL2))).
+  rewrite XO'0 in XO.
+  inversion XO.
+  split; assumption.
 Qed.
 
-
 Lemma prc_ind1:
-  forall rmin r' R' R'' W P X
+  forall rmin r' level ltl ORD R' R'' W P X
          (INR'': In rmin R'')
          (INR': In rmin R')
-         (Rrmin: Z.le (W rmin) (W r'))
-         (OLER': prc rmin R' W P X = true)
-         (OLER'': prc r' R'' W P X = true),
-    prc r' (rmin :: remove Z.eq_dec rmin (R' ++ R'')) W P X = true.
+         (Rrmin: ltl (W r') (W rmin) = false)
+         (OLER': prc level ltl ORD rmin R' W P X)
+         (OLER'': prc level ltl ORD r' R'' W P X),
+    prc level ltl ORD r' (rmin :: remove Z.eq_dec rmin (R' ++ R'')) W P X.
 Proof.
   intros.
   assert (P1:=OLER'').
@@ -978,62 +933,71 @@ Proof.
   destruct (X r') eqn:Xr'.
   Focus 2.
   apply forallb_forall with (x:=rmin) in P1.
-  apply Z.ltb_lt in P1.
-  omega.
-  assumption.
-  apply Coq.Bool.Bool.andb_true_iff in P1.
+  rewrite Rrmin in P1. inversion P1. assumption.
+
   destruct P1 as (PRC1,PRC2).
-  apply Coq.Bool.Bool.andb_true_iff in PRC2.
   destruct PRC2 as (PRC2,PRC3).
   apply Coq.Bool.Bool.orb_true_iff in PRC3.
 
+
   assert (xrmin: exists xrm, X rmin = Some xrm).
   {
-  apply prc_has_X with (O:=R'') (o':=r') (W:=W) (P:=P); assumption.
+  eapply prc_has_X with (O:=R'') (o':=r') (W:=W) (P:=P); try assumption.
+  apply OLER''. assumption.
   }
   destruct xrmin as (xrm, xrmin).
 
   rewrite xrmin in P5.
-  apply Coq.Bool.Bool.andb_true_iff in P5.
   destruct P5 as (PRC5,PRC6).
-  apply Coq.Bool.Bool.andb_true_iff in PRC6.
   destruct PRC6 as (PRC6,PRC7).
   apply Coq.Bool.Bool.orb_true_iff in PRC7.
 
   assert (CNTR': count_occ Z.eq_dec R' rmin <= 1).
   {
-  eapply ole_X_count with (R:=W) (o:=rmin) (P:=P) (X:=X); try assumption.
-  omega.
+  apply ole_X_count with (R:=W) (o:=rmin) (P:=P) (X:=X) (ltl:=ltl) (ORD:=ORD); try assumption.
+  apply ltl_asym_false'. apply ltl_asym; try assumption.
   }
 
   assert (CNTR'': count_occ Z.eq_dec R'' rmin <= 1).
   {
   eapply ole_X_count with (R:=W) (o:=r').
-  omega.
+  apply Rrmin.
   apply OLER''.
   }
 
-  assert (LE1: (Z.max (W r') z <= xrm)%Z).
+  assert (LE1: (ltl (W r') xrm = true \/ W r' = xrm) /\ (ltl l xrm = true \/ l = xrm)).
   {
-  apply prc_le_X with (O:=R'') (o:=rmin) (P:=P) (X:=X); try assumption.
+    apply prc_le_X with (O:=R'') (o:=rmin) (P:=P) (X:=X) (ORD:=ORD); try assumption.
   }
 
-  apply Coq.Bool.Bool.andb_true_iff.
   split.
   {
+
   apply Nat.leb_le.
   simpl.
+
+(*
   destruct ((W rmin <=? Z.max (W r') z)%Z) eqn:le1.
   Focus 2.
   apply Z_leb_falseL in le1.
   apply Z.max_lub_lt_iff in le1.
   omega.
-  simpl.
-  destruct (filter (fun x : Z => (W x <=? Z.max (W r') z)%Z)
+*)
+
+  destruct (orb (negb (ltl (W r') (W rmin))) (negb (ltl l (W rmin)))) eqn:le1.
+
+  Focus 2.
+  rewrite <- Coq.Bool.Bool.negb_andb in le1.
+  apply Coq.Bool.Bool.negb_false_iff in le1.
+  apply Coq.Bool.Bool.andb_true_iff in le1.
+  destruct le1 as (le1,le2).
+  rewrite Rrmin in le1. inversion le1.
+
+  destruct (filter (fun x : Z => (negb (ltl (W r') (W x)) || negb (ltl l (W x)))%bool)
       (remove Z.eq_dec rmin (R' ++ R''))) eqn:FIL.
+  reflexivity.
   simpl.
-  omega.
-    assert (CO: In z0 (filter (fun x : Z => (W x <=? Z.max (W r') z)%Z)
+    assert (CO: In z (filter (fun x : Z => (negb (ltl (W r') (W x)) || negb (ltl l (W x)))%bool)
       (remove Z.eq_dec rmin (R' ++ R'')))).
     {
     rewrite FIL.
@@ -1047,20 +1011,21 @@ Proof.
     apply in_app_iff in CO1.
     destruct CO1 as [CO1|CO1].
     {
-    destruct (Z.eq_dec z0 rmin).
+    destruct (Z.eq_dec z rmin).
     exfalso.
     eapply remove_In.
     rewrite e in *.
     apply CO1.
 
-    assert (IN1: In rmin (filter (fun x : Z => (W x <=? Z.max (W r') z)%Z) R')).
+
+    assert (IN1: In rmin (filter (fun x : Z => (negb (ltl (W r') (W x)) || negb (ltl l (W x)))%bool) R')).
     {
     apply filter_In.
     split.
     assumption.
     assumption.
     }
-    assert (IN2: In z0 (filter (fun x : Z => (W x <=? Z.max (W r') z)%Z) R')).
+    assert (IN2: In z (filter (fun x : Z => (negb (ltl (W r') (W x)) || negb (ltl l (W x)))%bool) R')).
     {
     apply filter_In.
     split.
@@ -1069,29 +1034,47 @@ Proof.
     assumption.
     }
 
-    assert (G1: length (filter (fun x : Z => (W x <=? Z.max (W r') z)%Z) R') <= 1).
+    assert (G1: length (filter (fun x : Z => (negb (ltl (W r') (W x)) || negb (ltl l (W x)))%bool) R') <= 1).
     {
-    apply le_trans with (length (filter (fun x : Z => (W x <=? Z.max (W rmin) xrm)%Z) R')).
+    apply le_trans with (length (filter (fun x : Z => (negb (ltl (W rmin) (W x)) || negb (ltl xrm (W x)))%bool) R')).
     apply length_filter_le.
     intros.
-    apply Z.leb_le.
-    apply Z.leb_le in H.
-    apply Z.le_trans with (Z.max (W r') z).
-    assumption.
-    apply Z.le_trans with xrm.
-    assumption.
-    apply Z.max_le_iff.
-    omega.
+    rewrite <- Coq.Bool.Bool.negb_andb.
+    apply Coq.Bool.Bool.negb_true_iff.
+    apply Coq.Bool.Bool.andb_false_iff.
+    rewrite <- Coq.Bool.Bool.negb_andb in H.
+    apply Coq.Bool.Bool.negb_true_iff in H.
+    apply Coq.Bool.Bool.andb_false_iff in H.
+    destruct LE1 as (LE1,LE2).
+    destruct H as [LTL|LTL].
+    right.
+    destruct (ltl xrm (W x)) eqn:LTL1.
+    destruct LE1 as [LE1|LE1].
+    eapply ltl_trans in LE1.
+    rewrite LE1 in LTL.
+    inversion LTL. assumption. assumption.
+    rewrite LE1 in *.
+    rewrite LTL in LTL1.
+    inversion LTL1. reflexivity.
+
+    right.
+    destruct (ltl xrm (W x)) eqn:LTL1.
+    destruct LE2 as [LE2|LE2].
+    eapply ltl_trans in LE2.
+    rewrite LE2 in LTL.
+    inversion LTL. assumption. assumption.
+    rewrite LE2 in *.
+    rewrite LTL in LTL1.
+    inversion LTL1. reflexivity.
+
     unfold prc in OLER'.
     rewrite xrmin in OLER'.
-    apply Coq.Bool.Bool.andb_true_iff in OLER'.
     destruct OLER' as (OLER',OLER'1).
-    apply Nat.leb_le.
     assumption.
     }
-    destruct (filter (fun x : Z => (W x <=? Z.max (W r') z)%Z) R') eqn:FIL2.
+    destruct (filter (fun x : Z => (negb (ltl (W r') (W x)) || negb (ltl l (W x)))%bool) R') eqn:FIL2.
     inversion IN1.
-    destruct l0.
+    destruct l1.
     simpl in *.
     destruct IN1 as [IN1|F].
     destruct IN2 as [IN2|F].
@@ -1102,20 +1085,20 @@ Proof.
     omega.
     }
 
-    destruct (Z.eq_dec z0 rmin).
+    destruct (Z.eq_dec z rmin).
     exfalso.
     eapply remove_In.
     rewrite e in CO1.
     apply CO1.
 
-    assert (IN1: In rmin (filter (fun x : Z => (W x <=? Z.max (W r') z)%Z) R'')).
+    assert (IN1: In rmin (filter (fun x : Z => (negb (ltl (W r') (W x)) || negb (ltl l (W x)))%bool) R'')).
     {
     apply filter_In.
     split.
     assumption.
     assumption.
     }
-    assert (IN2: In z0 (filter (fun x : Z => (W x <=? Z.max (W r') z)%Z) R'')).
+    assert (IN2: In z (filter (fun x : Z => (negb (ltl (W r') (W x)) || negb (ltl l (W x)))%bool) R'')).
     {
     apply filter_In.
     split.
@@ -1124,29 +1107,26 @@ Proof.
     assumption.
     }
 
-    destruct (filter (fun x : Z => (W x <=? Z.max (W r') z)%Z) R'') eqn:FIL2.
+
+    destruct (filter (fun x : Z => (negb (ltl (W r') (W x)) || negb (ltl l (W x)))%bool) R'') eqn:FIL2.
     inversion IN1.
-    destruct l0.
+    destruct l1.
     simpl in *.
     destruct IN1 as [IN1|F].
     destruct IN2 as [IN2|F].
     omega.
     contradiction.
-    contradiction.
+    contradiction.    
     simpl in PRC1.
-    inversion PRC1.
+    omega.
     }
 
-    apply Coq.Bool.Bool.andb_true_iff.
     split.
     {
-    apply forallb_forall.
     intros.
-    destruct H as [EQ|IN].
+    destruct INX as [EQ|IN].
     rewrite <- EQ.
-    apply forallb_forall with (x:=rmin) in PRC2.
-    assumption.
-    assumption.
+    apply PRC2. assumption.
     rewrite remove_app in IN.
     apply in_app_iff in IN.
     destruct (Z.eq_dec x rmin).
@@ -1163,50 +1143,59 @@ Proof.
 
     destruct IN as [IN1|IN1].
     {
-    destruct (Z_le_dec (W x) xrm).
+    destruct (ltl xrm (W x)) eqn:LTL.
     {
-    apply forallb_forall with (x:=x) in PRC6.
-    apply Coq.Bool.Bool.orb_true_iff in PRC6.
-    destruct PRC6 as [P4|P4].
-    apply Z.ltb_lt in P4.
-    apply Z.max_lub_lt_iff in P4.
-    omega.
-    unfold leb_o in *.
-    destruct (X x).
-    apply Coq.Bool.Bool.orb_true_iff.
-    right.
-    apply Z.leb_le.
-    apply Z.le_trans with xrm.
-    assumption.
-    apply Z.leb_le in P4.
-    apply Z.max_lub_iff in P4.
-    omega.
-    inversion P4.
-    eapply in_remove_in.
-    apply IN1.
-    }
-    apply Coq.Bool.Bool.orb_true_iff.
+    destruct LE1 as (LE1,LE2).
     left.
-    apply Z.ltb_lt.
-    apply Z.le_lt_trans with xrm.
-    assumption.
-    omega.
+    split.
+    destruct LE1 as [LE1|LE1].
+    apply ltl_trans with xrm; try assumption. rewrite LE1. assumption.
+    destruct LE2 as [LE2|LE2].
+    apply ltl_trans with xrm; try assumption. rewrite LE2. assumption.
     }
-    apply forallb_forall with (x:=x) in PRC2.
-    assumption.
+    {
+    specialize PRC6 with x.
+    destruct PRC6 as [P4|P4].
+    eapply in_remove_in.
+    apply IN1.
+    destruct P4 as (P4,P5).
+    rewrite P5 in LTL. inversion LTL.
+    destruct (X x) eqn:XX.
+    right.
+    exists l0.
+    exists. reflexivity.
+    destruct P4 as (R'X,(EQ,(LTL1,LTL2))).
+    inversion EQ.
+    rewrite H0 in *.
+    destruct LE1 as (LE1,LE2).
+    split.
+    destruct LE1 as [LE1|LE1].
+    destruct LTL2 as [LTL2|LTL2].
+    left.
+    apply ltl_trans with xrm; try assumption. rewrite <- LTL2. left. assumption.
+    rewrite LE1 in *. assumption.
+    destruct LE2 as [LE2|LE2].
+    destruct LTL2 as [LTL2|LTL2].
+    left.
+    apply ltl_trans with xrm; try assumption. rewrite <- LTL2. left. assumption.
+    rewrite LE2 in *. assumption.
+    destruct P4 as (R'X,(EQ,(LTL1,LTL2))).
+    inversion EQ.
+    }
+    }
+    apply PRC2.
     eapply in_remove_in.
     apply IN1.
     }
-    apply Coq.Bool.Bool.orb_true_iff.
     right.
+    apply Coq.Bool.Bool.orb_true_iff in PRC3.
     destruct PRC3 as [P3|P3].
     apply forallb_forall with (x:=rmin) in P3.
-    apply Z.ltb_lt in P3.
-    omega.
+    rewrite P3 in Rrmin.
+    inversion Rrmin.
     assumption.
     assumption.
 Qed.
-
 
 Lemma in_in_count2 A B dec (f: A -> B):
   forall (l: list A) (a1 a2: A) fa1
@@ -1533,14 +1522,13 @@ Proof.
   omega.
 Qed.
 
-
 Lemma prc_ind2:
-  forall rmin r R R' W P X
+  forall rmin r level ltl ORD R R' W P X
          (INR': In rmin R')
-         (MIN: Z.le (W rmin) (W r))
-         (OLER: prc rmin R W P X = true)
-         (OLER': prc r R' W P X = true),
-    prc r (R ++ remove Z.eq_dec rmin R') W P X = true.
+         (MIN: ltl (W r) (W rmin) = false)
+         (OLER: prc level ltl ORD rmin R W P X)
+         (OLER': prc level ltl ORD r R' W P X),
+    prc level ltl ORD r (R ++ remove Z.eq_dec rmin R') W P X.
 Proof.
   intros.
   assert (P1:=OLER).
@@ -1551,57 +1539,51 @@ Proof.
   destruct (X r) eqn:Xr.
   Focus 2.
   apply forallb_forall with (x:=rmin) in P5.
-  apply Z.ltb_lt in P5.
-  omega.
+  rewrite P5 in MIN. inversion MIN.
   assumption.
-  apply Coq.Bool.Bool.andb_true_iff in P5.
   destruct P5 as (PRC1,PRC2).
-  apply Coq.Bool.Bool.andb_true_iff in PRC2.
   destruct PRC2 as (PRC2,PRC3).
   apply Coq.Bool.Bool.orb_true_iff in PRC3.
 
   assert (xrmin: exists xrm, X rmin = Some xrm).
   {
-  apply prc_has_X with (O:=R') (o':=r) (W:=W) (P:=P); assumption.
+  apply prc_has_X with (O:=R') (o':=r) (W:=W) (P:=P) (ltl:=ltl) (ORD:=ORD); assumption.
   }
   destruct xrmin as (xrm, xrmin).
 
   rewrite xrmin in P1.
-  apply Coq.Bool.Bool.andb_true_iff in P1.
   destruct P1 as (PRC5,PRC6).
-  apply Coq.Bool.Bool.andb_true_iff in PRC6.
   destruct PRC6 as (PRC6,PRC7).
   apply Coq.Bool.Bool.orb_true_iff in PRC7.
 
   assert (CNTR': count_occ Z.eq_dec R rmin <= 1).
   {
-  eapply ole_X_count with (R:=W) (o:=rmin) (P:=P) (X:=X); try assumption.
-  omega.
+  apply ole_X_count with (R:=W) (o:=rmin) (P:=P) (X:=X) (ltl:=ltl) (ORD:=ORD); try assumption.
+  apply ltl_asym_false'; try assumption. apply ltl_asym; try assumption.
   }
 
   assert (CNTR'': count_occ Z.eq_dec R' rmin <= 1).
   {
   eapply ole_X_count with (R:=W) (o:=r).
-  omega.
+  apply MIN.
   apply OLER'.
   }
 
-  assert (LE1: (Z.max (W r) z <= xrm)%Z).
+  assert (LE1: (ltl (W r) xrm = true \/ W r = xrm) /\ (ltl l xrm = true \/ l = xrm)).
   {
-  apply prc_le_X with (O:=R') (o:=rmin) (P:=P) (X:=X); try assumption.
+    apply prc_le_X with (O:=R') (o:=rmin) (P:=P) (X:=X) (ORD:=ORD); try assumption.
   }
 
-  apply Coq.Bool.Bool.andb_true_iff.
   split.
   {
     apply Nat.leb_le.
     rewrite filter_app.
-    assert (G1: length (filter (fun x : Z => (W x <=? Z.max (W r) z)%Z) (remove Z.eq_dec rmin R')) = 0).
+    assert (G1: length (filter (fun x : Z => (negb (ltl (W r) (W x)) || negb (ltl l (W x)))%bool) (remove Z.eq_dec rmin R')) = 0).
     {
-    destruct (filter (fun x : Z => (W x <=? Z.max (W r) z)%Z) (remove Z.eq_dec rmin R')) eqn:FIL.
+    destruct (filter (fun x : Z => (negb (ltl (W r) (W x)) || negb (ltl l (W x)))%bool) (remove Z.eq_dec rmin R')) eqn:FIL.
     simpl.
     reflexivity.
-    assert (G1: In z0 (filter (fun x : Z => (W x <=? Z.max (W r) z)%Z) (remove Z.eq_dec rmin R'))).
+    assert (G1: In z (filter (fun x : Z => (negb (ltl (W r) (W x)) || negb (ltl l (W x)))%bool) (remove Z.eq_dec rmin R'))).
     {
     rewrite FIL.
     left.
@@ -1609,24 +1591,23 @@ Proof.
     }
     apply filter_In in G1.
     destruct G1 as (G1,G2).
-    destruct (Z.eq_dec z0 rmin).
+    destruct (Z.eq_dec z rmin).
     rewrite e in G1.
     exfalso.
     eapply remove_In.
     apply G1.
 
     apply Nat.leb_le in PRC1.
-    assert (G3: In rmin (filter (fun x : Z => (W x <=? Z.max (W r) z)%Z) R')).
+    assert (G3: In rmin (filter (fun x : Z => (negb (ltl (W r) (W x)) || negb (ltl l (W x)))%bool) R')).
     {
     apply filter_In.
     split.
     assumption.
-    apply Z.leb_le.
-    apply Z.max_le_iff.
+    apply Coq.Bool.Bool.orb_true_iff.
     left.
-    assumption.
+    rewrite Coq.Bool.Bool.negb_true_iff. assumption.
     }
-    assert (G4: In z0 (filter (fun x : Z => (W x <=? Z.max (W r) z)%Z) R')).
+    assert (G4: In z (filter (fun x : Z => (negb (ltl (W r) (W x)) || negb (ltl l (W x)))%bool) R')).
     {
     apply filter_In.
     split.
@@ -1635,100 +1616,167 @@ Proof.
     assumption.
     }
 
-    destruct (filter (fun x : Z => (W x <=? Z.max (W r) z)%Z) R') eqn:FIL2.
+    destruct (filter (fun x : Z => (negb (ltl (W r) (W x)) || negb (ltl l (W x)))%bool) R') eqn:FIL2.
     inversion G3.
-    destruct l0.
+    destruct l1.
     destruct G3 as [G3|F].
     destruct G4 as [G4|F].
     omega.
     inversion F.
     inversion F.
-    simpl in PRC1.
-    omega.
+    simpl in PRC1. inversion PRC1.
     }
 
-    assert (LE1': (Z.max (W r) z <= xrm)%Z).
+    assert (G2: length (filter (fun x : Z => (negb (ltl (W r) (W x)) || negb (ltl l (W x)))%bool) R) <= 1).
     {
-    apply prc_le_X with (O:=R') (o:=rmin) (P:=P) (X:=X); try assumption.
-    }
-
-    assert (G2: length (filter (fun x : Z => (W x <=? Z.max (W r) z)%Z) R) <= 1).
-    {
-    apply le_trans with (length (filter (fun x : Z => (W x <=? Z.max (W rmin) xrm)%Z) R)).
+    apply le_trans with (length (filter (fun x : Z => (negb (ltl (W rmin) (W x)) || negb (ltl xrm (W x)))%bool) R)).
     apply length_filter_le.
     intros.
-    apply Z.leb_le in H.
-    apply Z.leb_le.
-    apply Z.le_trans with (Z.max (W r) z).
-    assumption.
-    apply Z.le_trans with xrm.
-    assumption.
-    apply Z.max_le_iff.
-    omega.
-    apply Nat.leb_le.
+    apply Coq.Bool.Bool.orb_true_iff in H.
+    rewrite Coq.Bool.Bool.negb_true_iff in H.
+    rewrite Coq.Bool.Bool.negb_true_iff in H.
+    apply Coq.Bool.Bool.orb_true_iff.
+    rewrite Coq.Bool.Bool.negb_true_iff.
+    rewrite Coq.Bool.Bool.negb_true_iff.
+    destruct LE1 as (LE1,LE2).
+    destruct H as [LTL|LTL].
+    destruct LE1 as [LE1|LE1].
+    right.
+    destruct (ltl xrm (W x)) eqn:LTL1.
+    eapply ltl_trans in LE1; try assumption.
+    apply LE1 in LTL1.
+    rewrite LTL in LTL1. inversion LTL1. reflexivity.
+    rewrite LE1 in *. right. assumption.
+    destruct LE2 as [LE2|LE2].
+    right.
+    destruct (ltl xrm (W x)) eqn:LTL1.
+    eapply ltl_trans in LE2; try assumption.
+    apply LE2 in LTL1.
+    rewrite LTL in LTL1. inversion LTL1. reflexivity.
+    rewrite LE2 in *. right. assumption.
     assumption.
     }
     rewrite length_app.
     rewrite G1.
+    apply Nat.leb_le.
     omega.
     }
 
-    apply Coq.Bool.Bool.andb_true_iff.
     split.
     {
-    apply forallb_forall.
     intros.
-    apply in_app_iff in H.
-    destruct H as [INxR|INxR'].
+    apply in_app_iff in INX.
+    destruct LE1 as (LE1,LE2).
+    destruct INX as [INxR|INxR'].
     {
-    apply Coq.Bool.Bool.orb_true_iff.
-    apply forallb_forall with (x:=x) in PRC6.
-    apply Coq.Bool.Bool.orb_true_iff in PRC6.
-    destruct PRC6 as [PRC6|PRC6].
-    apply Z.ltb_lt in PRC6.
+    specialize PRC6 with x.
+    destruct PRC6 as [PRC6|PRC6]. assumption.
+    destruct PRC6 as (PRC6,PRC61).
     left.
-    apply Z.ltb_lt.
-    apply Z.le_lt_trans with xrm.
-    assumption.
-    apply Z.max_lub_lt_iff in PRC6.
-    omega.
+    split.
+    destruct LE1 as [LE1|LE1].
+    eapply ltl_trans with xrm; try assumption.
+    rewrite LE1 in *. assumption.
+    destruct LE2 as [LE2|LE2].
+    eapply ltl_trans with xrm; try assumption.
+    rewrite LE2 in *. assumption.
     right.
-    unfold leb_o in *.
-    destruct (X x).
-    apply Z.leb_le.
-    apply Z.le_trans with xrm.
-    assumption.
-    apply Z.leb_le in PRC6.
-    apply Z.max_lub_iff in PRC6.
-    omega.
-    assumption.
-    assumption.
+    destruct PRC6 as (R'X,(XX,(LTL1,LTL2))).
+    exists R'X, XX.
+    split.
+    destruct LE1 as [LE1|LE1].
+    destruct LTL2 as [LTL2|LTL2].
+    left.
+    apply ltl_trans with xrm; try assumption. rewrite <- LTL2. left. assumption.
+    rewrite LE1 in *. assumption.
+    destruct LE2 as [LE2|LE2].
+    destruct LTL2 as [LTL2|LTL2].
+    left.
+    apply ltl_trans with xrm; try assumption. rewrite <- LTL2. left. assumption.
+    rewrite LE2 in *. assumption.
     }
-    apply forallb_forall with (x:=x) in PRC2.
-    assumption.
+    apply PRC2.
     eapply in_remove_in.
     apply INxR'.
     }
 
-    apply Coq.Bool.Bool.orb_true_iff.
+    apply Coq.Bool.Bool.orb_true_iff in PRC3.
     destruct PRC3 as [PRC3|PRC3].
     apply forallb_forall with (x:=rmin) in PRC3.
-    apply Z.ltb_lt in PRC3.
-    omega.
-    assumption.
-    right.
-    assumption.
+    rewrite PRC3 in MIN. inversion MIN. assumption.
+    right. assumption.
 Qed.
 
+Lemma list_has_minimal A level ltl (ORD: order (ltl: level -> level -> bool)) R:
+  forall (l: list A) (HAS_ELEMENT: length l > 0),
+    exists min (INl: In min l), ~ exists x (INl: In x l), ltl (R x) (R min) = true.
+Proof.
+  induction l.
+  simpl.
+  intros.
+  inversion HAS_ELEMENT.
+  simpl.
+  intros.
+  destruct (length l) eqn:LENL.
+  exists a.
+  exists.
+  left.
+  reflexivity.
+  unfold not.
+  intros NINl.
+  destruct NINl as (x,(EQ,LTL)).
+  destruct EQ as [EQ|EQ].
+  rewrite EQ in *.
+  assert (tmp:=LTL).
+  apply ltl_asym in LTL.
+  apply LTL. assumption. assumption.
+  destruct l.
+  inversion EQ.
+  inversion LENL.
+  assert (tmp: exists (min : A) (_ : In min l),
+        ~ (exists (x : A) (_ : In x l), ltl (R x) (R min) = true)).
+  apply IHl.
+  omega.
+  destruct tmp as (min,(INmin,MIN)).
+  destruct (ltl (R a) (R min)) eqn:LTLM.
+  exists a.
+  exists.
+  left. reflexivity.
+  unfold not.
+  intros.
+  destruct H as (x,(EQ,LTL)).
+  destruct EQ.
+  rewrite H in *.
+  assert (tmp:=LTL).
+  apply ltl_asym in LTL.
+  apply LTL. assumption. assumption.
+  apply MIN.
+  exists x, H.
+  eapply ltl_trans in LTL.
+  apply LTL. assumption. assumption.
+  exists min.
+  exists.
+  right.
+  assumption.
+  unfold not.
+  intros.
+  destruct H as (x,(EQ,LTL)).
+  destruct EQ.
+  rewrite H in *.
+  rewrite LTLM in LTL.
+  inversion LTL.
+  apply MIN.
+  exists x, H. assumption.
+Qed.
 
 Theorem valid_graph_is_deadlock_free:
-  forall n (G: list (Z * list Z * Z)) (R: Z -> Z) (P: Z -> bool) (X: Z -> option Z)
+  forall n (G: list (Z * list Z * Z)) level ltl (ORD: order (ltl: level -> level -> bool)) (R: Z -> level) (P: Z -> bool) (X: Z -> option level)
          (UNQ: NoDup (map snd G))
          (LEN: length G = n)
          (ONE: forall z o O (IN: In (o,O,z) G), one_ob G o)
          (SPARE: forall z o O (IN: In (o,O,z) G) (Po: P o = true), spare_ob G o)
          (OWN: forall z o O (IN: In (o,O,z) G) (INX: X o <> None), own_ob G o)
-         (PRC: forall z o O (ING: In (o,O,z) G), prc o O R P X = true),
+         (PRC: forall z o O (ING: In (o,O,z) G), prc level ltl ORD o O R P X),
     G = nil.
 Proof.
   induction n.
@@ -1740,11 +1788,12 @@ Proof.
   {
   simpl in *.
   intros.
-  assert (MIN: exists om O1 t1 (INom: In (om,O1,t1) G), 
-                forall o (IN: In o (map (fun x => fst (fst x)) G)), Z.le (R om) (R o)).
+  assert (MIN: exists om O1 t1 (INom: In (om,O1,t1) G),
+                 ~ exists o (IN: In o (map (fun x => fst (fst x)) G)), ltl (R o) (R om) = true).
   {
-    assert (MIN: exists min (INl: In min (map (fun x => fst (fst x)) G)), forall x (INl: In x (map (fun x => fst (fst x)) G)), Z.le (R min) (R x)).
-    apply list_has_min.
+    assert (MIN: exists min (INl: In min (map (fun x => fst (fst x)) G)),
+      ~ exists x (INl: In x (map (fun x => fst (fst x)) G)), ltl (R x) (R min) = true).
+    apply list_has_minimal. assumption.
     rewrite map_length.
     rewrite LEN.
     omega.
@@ -1797,7 +1846,7 @@ Proof.
     destruct omo2O1O2 as (omo2,O1O2).
     rewrite <- omo2 in T2.
 
-    assert (PRC_omO2: prc om O2 R P X = true).
+    assert (PRC_omO2: prc level ltl ORD om O2 R P X).
     {
       apply PRC with t2.
       assumption.
@@ -1810,15 +1859,16 @@ Proof.
       eapply prc_P.
       apply PRC_omO2.
       apply INO2.
-      omega.
+      apply ltl_asym_false'; try assumption.
+      apply ltl_asym; try assumption.
     }
 
     assert (CNTomO2': count_occ Z.eq_dec O2 om = 1).
     {
     assert (OCComO2: count_occ Z.eq_dec O2 om <= 1).
     {
-      eapply ole_X_count; try assumption.
-      reflexivity.
+      eapply ole_X_count with (ltl:=ltl) (R:=R) (o:=om); try assumption.
+      apply ltl_asym_false'. apply ltl_asym; assumption.
       apply PRC_omO2.
     }
     apply count_occ_In with (eq_dec := Z.eq_dec) in INO2.
@@ -1848,29 +1898,34 @@ Proof.
     }
     destruct T3 as (o3,(O3,(t3,(NEQt2t3,(INO3,T3))))).
 
-    assert (OLER: prc om O1 R P X = true).
+    assert (OLER: prc level ltl ORD om O1 R P X).
     {
       apply PRC with t1.
       assumption.
     }
 
-    assert (OLER': prc o3 O3 R P X = true).
+    assert (OLER': prc level ltl ORD o3 O3 R P X).
     {
       apply PRC with t3.
       assumption.
     }
 
-    assert (G2: Z.le (R om) (R o3)).
+    assert (G2: ltl (R o3) (R om) = false).
     {
-    apply MIN.
+    destruct (ltl (R o3) (R om)) eqn:LTL.
+    exfalso. apply MIN.
+    exists o3.
+    exists.
     apply in_map_iff.
     exists (o3, O3, t3).
-    auto.
+    auto. assumption.
+    reflexivity.
     }
 
     assert (CNTomO3: count_occ Z.eq_dec O3 om <= 1).
     {
       eapply ole_X_count with (o:=o3)(R:=R); try assumption.
+      apply G2.
       apply OLER'.
     }
 
@@ -1894,7 +1949,7 @@ Proof.
 
     assert (IND: ((o3,(om::remove Z.eq_dec om (O2++O3)),t2)::
                  (remove node_dec (o3,O3,t3) (remove node_dec (om,O2,t2) G))) = nil).
-    apply IHn with R P X.
+    apply IHn with level ltl ORD R P X.
     {
     simpl.
     apply NoDup_cons.
@@ -2107,14 +2162,13 @@ Proof.
     simpl in ING.
     destruct ING as [EQ1|IN1].
     inversion EQ1.
-
-
     apply prc_ind1.
     assumption.
 
     assumption.
-    apply MIN.
-    assumption.
+    destruct (ltl (R o) (R om)) eqn:LTL.
+    exfalso. apply MIN.
+    exists o, INoG. assumption. reflexivity.
     assumption.
     rewrite <- H0.
     eapply PRC.
@@ -2129,28 +2183,31 @@ Proof.
 
   (* ========================= t1 <> t2 *)
   {
-    assert (OLER: prc om O1 R P X = true).
+    assert (OLER: prc level ltl ORD om O1 R P X).
     {
       apply PRC with t1.
       assumption.
     }
 
-    assert (OLER': prc o2 O2 R P X = true).
+    assert (OLER': prc level ltl ORD o2 O2 R P X).
     {
       apply PRC with t2.
       assumption.
     }
-    assert (G1: Z.le (R om) (R o2)).
+    assert (G1: ltl (R o2) (R om) = false).
     {
-    apply MIN.
+    destruct (ltl (R o2) (R om)) eqn:LTL.
+    exfalso. apply MIN.
+    exists o2.
+    exists.
     apply in_map_iff.
     exists (o2, O2, t2).
-    auto.
+    auto. assumption. reflexivity.
     }
 
     assert (Pom: P o2 = true).
     {
-    apply prc_P with (R:=R) (o':=om) (O:=O2) (X:=X); try assumption.
+    apply prc_P with (R:=R) (o':=om) (O:=O2) (X:=X) (ltl:=ltl) (ORD:=ORD); try assumption.
     }
 
     assert (O2Mr': own_ob G o2).
@@ -2167,7 +2224,7 @@ Proof.
     assert (OCCrminR': count_occ Z.eq_dec O2 om <= 1).
     {
       eapply ole_X_count with (o:=o2) (R:=R).
-      omega.
+      apply G1.
       apply OLER'.
     }
     apply count_occ_In with (eq_dec := Z.eq_dec) in INO2.
@@ -2194,17 +2251,16 @@ Proof.
       assumption.
     }
 
-    assert (MIN': forall x0 : Z, In x0 (map (fun x => fst (fst x)) G) -> (R om <=? R x0)%Z = true).
+    assert (MIN': forall x0 : Z, In x0 (map (fun x => fst (fst x)) G) -> ltl (R x0) (R om) = false).
     {
       intros.
-      apply Z.leb_le.
-      apply MIN.
-      assumption.
+      destruct (ltl (R x0) (R om)) eqn:LTL.
+      exfalso. apply MIN. exists x0, H. assumption. reflexivity.
     }
 
     assert (IND: (o2,( O1 ++ (remove Z.eq_dec om O2)),t1)::
                  (remove node_dec (o2,O2,t2) (remove node_dec (om,O1,t1) G)) = nil).
-    apply IHn with R P X.
+    apply IHn with level ltl ORD R P X.
     simpl.
     {
     apply NoDup_cons.
@@ -2282,7 +2338,8 @@ Proof.
     {
     eapply OWN.
     apply T1.
-    apply prc_X with (R:=R) (o':=o2) (O:=O2) (P:=P); try assumption.
+    apply prc_X with (R:=R) (o':=o2) (O:=O2) (P:=P) (ltl:=ltl) (ORD:=ORD); try assumption.
+
     }
 
     assert (tmp: 1 < count_occ Z.eq_dec (concat (map (fun x => snd (fst x)) G)) om).
@@ -2333,11 +2390,14 @@ Proof.
       assumption.
       assumption.
       assumption.
-      apply ole_X_count with (o:=o2) (R:=R) (X:=X) (P:=P).
+      apply ole_X_count with (o:=o2) (R:=R) (X:=X) (P:=P) (ltl:=ltl) (ORD:=ORD).
+      destruct (ltl (R o2) (R om)) eqn:LTL.
+      exfalso.
       apply MIN.
+      exists o2. exists.
       apply in_map_iff.
       exists (o2, O2, t2).
-      auto.
+      auto. assumption. reflexivity.
       apply PRC with t2.
       assumption.
     }
@@ -2500,7 +2560,7 @@ Proof.
 
     apply prc_ind2.
     assumption.
-    apply MIN.
+    apply MIN'.
     assumption.
     assumption.
     rewrite <- H0.

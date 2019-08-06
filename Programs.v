@@ -574,6 +574,18 @@ Proof.
   assumption.
 Qed.
 
+Lemma is_free_e_var':
+  forall e x (NIN: ~ In x (free_var_e e)),
+    is_free_e e x = false.
+Proof.
+  intros.
+  destruct (is_free_e e x) eqn:ISF.
+  apply is_free_var_e in ISF.
+  contradiction.
+  reflexivity.
+Qed.
+
+
 Fixpoint free_var (c: cmd) : list Z :=
   match c with
     | Val e => free_var_e e
@@ -756,6 +768,42 @@ Proof.
   rewrite IHe2; try assumption.
   reflexivity.
 Qed.
+
+Lemma subs_eq:
+  forall e x z (NIN: ~ In x (free_var_e e)),
+    subse x z e = e.
+Proof.
+  induction e; simpl.
+  intros.
+  destruct (Z.eq_dec x0 x).
+  exfalso.
+  apply NIN.
+  left. omega.
+  reflexivity.
+  intros.
+  reflexivity.
+  simpl.
+  intros.
+  rewrite IHe.
+  reflexivity.
+  assumption.
+  simpl.
+  intros.
+  rewrite IHe1.
+  rewrite IHe2.
+  reflexivity.
+  unfold not.
+  intros.
+  apply NIN.
+  apply in_app_iff.
+  right. assumption.
+  unfold not.
+  intros.
+  apply NIN.
+  apply in_app_iff.
+  left. assumption.
+Qed.
+
 
 (** # <font size="5"><b> Infinite Capacity </b></font> # *)
 

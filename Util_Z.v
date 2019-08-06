@@ -1,4 +1,6 @@
 Require Import ZArith.
+Require Import Qcanon.
+Require Import QArith_base.
 Require Import Coq.Logic.FunctionalExtensionality.
 
 Set Implicit Arguments.
@@ -76,6 +78,12 @@ Proof.
   repeat decide equality.
 Qed.
 
+Definition opQc_eq_dec (o1 o2: option Qc) : {o1 = o2} + {o1 <> o2}.
+Proof.
+  repeat decide equality.
+  apply Qc_eq_dec.
+Qed.
+
 Definition exc_op A (o1 o2: option A) :=
   o1 = None \/ o2 = None.
 
@@ -141,6 +149,21 @@ Proof.
   contradiction.
 Qed.
 
+Lemma neqz A (a a': A) z z':
+  z <> z' -> (if Z.eq_dec z z' then a else a') = a'.
+Proof.
+  destruct (Z.eq_dec z z').
+  intros.
+  omega.
+  reflexivity.
+Qed.
+
+Lemma neq_symm A:
+  forall (x y:A), x <> y -> y <> x.
+Proof.
+  intros. auto.
+Qed.
+
 Lemma Z_leb_falseL:
   forall a b (LEB: (b <=? a)%Z = false),
     Z.lt a b.
@@ -156,7 +179,7 @@ Lemma nat_leb_falseL:
 Proof.
   induction b; intros; inversion LEB.
   destruct a; try omega.
-  assert (a<b).
+  assert (a<b)%nat.
   - apply IHb; assumption.
   - omega.
 Qed.
@@ -188,8 +211,8 @@ Qed.
 
 Definition filterb (L: Z -> option Z) (l: Z) (b: Z -> nat) :=
   fun x => match (L x) with
-            | None => 0
-            | Some lx => if Z.eq_dec x l then 0 else if Z.eq_dec lx l then b x else 0
+            | None => O
+            | Some lx => if Z.eq_dec x l then O else if Z.eq_dec lx l then b x else O
            end.
 
 (** # <font size="5"><b> comm_assoc_neutral </b></font> # *)
@@ -207,10 +230,15 @@ Definition can A (def: A -> A -> Prop) (f: A -> A -> A) :=
 
 (** # <font size="5"><b> Qc </b></font> # *)
 
-Require Import Coq.QArith.Qcanon.
-Require Import Coq.QArith.QArith_base.
-
 Local Open Scope Qc.
+
+Definition frac: Qc := 1/(1+1).
+
+Lemma frac_bound:
+  (0 < frac < 1)%Qc.
+Proof.
+  unfold Qclt. simpl. unfold Qlt. simpl. omega.
+Qed.
 
 Lemma qcplus_mono:
   forall q1 q2 q3, 
@@ -497,4 +525,162 @@ Proof.
   omega.
 Qed.
 
+Lemma frac2_bound:
+  forall (f:Qc) (POS: 0 < f < 1), f/(1+1) < 1.
+Proof.
+  intros.
+  apply Qclt_trans with f.
+  replace (f / (1 + 1)) with (f * (1/(1 + 1))).
+  replace f with (1*f) at 2.
+  rewrite Qcmult_comm.
+  apply Qcmult_lt_compat_r. destruct POS. assumption.
+  unfold Qclt, Qlt. simpl. omega.
+  apply Qcmult_1_l.
+  reflexivity.
+  destruct POS. assumption.
+Qed.
+
+Lemma frac2_pos:
+  forall (f:Qc) (POS: 0 < f), 0 < f/(1+1).
+Proof.
+  intros.
+  replace 0 with (0*1/(1+1)).
+  replace (f / (1 + 1)) with (f * 1/(1 + 1)).
+  apply Qcmult_lt_compat_r.
+  unfold Qclt, Qlt. simpl. omega.
+  rewrite Qcmult_0_l.
+  rewrite Qcmult_1_r.
+  assumption.
+  replace (f * 1) with f.
+  reflexivity.
+  symmetry. apply Qcmult_1_r.
+  apply Qcmult_0_l.
+Qed.
+
+Lemma frac2_plus:
+  forall (f: Qc), f = f/(1+1) + f/(1+1).
+Proof.
+  intros.
+  rewrite <- (Qcmult_1_l (f / (1 + 1))).
+  rewrite <- Qcmult_plus_distr_l.
+  rewrite Qcmult_div_r; trivial.
+  unfold not.
+  intros.
+  unfold Qcplus in H.
+  unfold Qplus in H.
+  inversion H.
+Qed.
+
+
+(** # <font size="5"><b> Partially ordered sets </b></font> # *)
+
+Definition transitive A R: Prop := forall x y z:A, R x y = true -> R y z = true -> R x z = true.
+Definition asymmetric A R : Prop := forall x y:A, R x y = true -> R y x = true -> False.
+
+Record order A (ltl: A -> A -> bool) : Prop :={
+  ltl_trans : transitive ltl;
+  ltl_asym : asymmetric ltl;
+}.
+
+Definition Qlt_bool x y :=
+  andb (Qle_bool x y) (negb (Qeq_bool x y)).
+
+Lemma order_Qc': order (fun x y : Qc => Qlt_bool x y).
+Proof.
+  unfold Qlt_bool.
+  split.
+  {
+  unfold transitive.
+  intros.
+  apply andb_true_iff.
+  apply andb_true_iff in H.
+  apply andb_true_iff in H0.
+  destruct H as (EQ1,EQ2).
+  destruct H0 as (EQ3,EQ4).
+  apply negb_true_iff in EQ2.
+  apply negb_true_iff in EQ4.
+  apply Qle_bool_iff in EQ1.
+  apply Qle_bool_iff in EQ3.
+  split.
+  apply Qle_bool_iff.
+  apply Qle_trans with y; assumption.
+  apply negb_true_iff.
+  apply Qeq_bool_neq in EQ4.
+  destruct (Qeq_bool x z) eqn:QEQ.
+  apply Qeq_bool_eq in QEQ.
+  rewrite QEQ in *.
+  exfalso. apply EQ4.
+  apply Qle_antisym; assumption. reflexivity.
+  }
+  unfold asymmetric.
+  intros.
+  apply andb_true_iff in H.
+  apply andb_true_iff in H0.
+  destruct H as (EQ1,EQ2).
+  destruct H0 as (EQ3,EQ4).
+  apply negb_true_iff in EQ2.
+  apply negb_true_iff in EQ4.
+  apply Qle_bool_iff in EQ1.
+  apply Qle_bool_iff in EQ3.
+  apply Qeq_bool_neq in EQ4.
+  apply EQ4.
+  apply Qle_antisym; assumption.
+Qed.
+
+Lemma ltl_asym_false A ltl (ASYM: asymmetric (ltl: A -> A -> bool)):
+  forall x y, ltl x y = true -> ltl y x = false.
+Proof.
+  intros.
+  destruct (ltl y x) eqn:LTL.
+  eapply ASYM in H. exfalso. apply H; assumption.
+  reflexivity.
+Qed.
+
+Lemma ltl_asym_false' A ltl (ASYM: asymmetric (ltl: A -> A -> bool)):
+  forall x, ltl x x = false.
+Proof.
+  intros.
+  destruct (ltl x x) eqn:LTL.
+  assert (tmp:=LTL).
+  apply ASYM in tmp.
+  apply tmp in LTL. contradiction.
+  reflexivity.
+Qed.
+
+Lemma ltl_le A ltl (ASYM: asymmetric (ltl: A -> A -> bool)):
+  forall x y (LEL: ltl x y = true \/ x = y),
+    ltl y x = false.
+Proof.
+  intros.
+  destruct LEL as [EQ1|EQ2].
+  apply ltl_asym_false; try assumption.
+  rewrite EQ2.
+  apply ltl_asym_false'; try assumption.
+Qed.
+
+Lemma Qlt_bool_trans:
+  forall x y z 
+         (LT1: Qle_bool x y = true)
+         (LT2: Qlt_bool y z = true),
+    Qlt_bool x z = true.
+Proof.
+  unfold Qlt_bool.
+  intros.
+  apply andb_true_iff in LT2.
+  destruct LT2 as (LT2,LT3).
+  apply andb_true_iff.
+  apply Qle_bool_iff in LT1.
+  apply Qle_bool_iff in LT2.
+  split.
+  apply Qle_bool_iff.
+  apply Qle_trans with y; try assumption.
+  apply negb_true_iff.
+  apply negb_true_iff in LT3.
+  apply Qeq_bool_neq in LT3.
+  destruct (Qeq_bool x z) eqn:EQ.
+  apply Qeq_bool_eq in EQ.
+  rewrite EQ in *.
+  apply Qle_antisym in LT1. contradiction. assumption.
+  reflexivity.
+Qed.
 

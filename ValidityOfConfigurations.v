@@ -180,12 +180,12 @@ Theorem validConfiguration_validWaitForGraph:
          (SAFE_OBS: forall z o O (IN: In (o,O,z) G),
            exists l (IN: In l locs) (EQ: (Aof l) = o), safe_obs l (length (filter (fun x => ifb (Z.eq_dec x o)) (map (fun x => fst (fst x)) G)))
                 (count_occ (olocation_eq_dec Z.eq_dec) (concat (map (fun x => snd (fst x)) G)) (Oof l)) = true)
-         (PRCL: forall z o O (ING: In (o,O,z) G), exists l (IN: In l locs) (EQ: (Aof l) = o), prcl (Oof l) O = true),
-    exists (R: Z -> Z) (P: Z -> bool) (X: Z -> option Z)
+         (PRCL: forall z o O (ING: In (o,O,z) G), exists l (IN: In l locs) (EQ: (Aof l) = o), prcl (Oof l) O),
+    exists (R: Z -> Qc) (P: Z -> bool) (X: Z -> option Qc)
          (ONE: forall z o O (IN: In (o,O,z) G), one_ob (map (fun x => (fst (fst x), map (fun x => Aofo x) (snd (fst x)), snd x)) G) o)
          (SPARE: forall z o O (IN: In (o,O,z) G) (Po: P o = true), spare_ob (map (fun x => (fst (fst x), map (fun x => Aofo x) (snd (fst x)), snd x)) G) o)
          (OWN: forall z o O (IN: In (o,O,z) G) (INX: X o <> None), own_ob (map (fun x => (fst (fst x), map (fun x => Aofo x) (snd (fst x)), snd x)) G) o)
-         (PRC: forall z o O (ING: In (o,O,z) G), prc o (map (fun x => Aofo x) O) R P X = true), True.
+         (PRC: forall z o O (ING: In (o,O,z) G), prc Qc Qlt_bool order_Qc' o (map (fun x => Aofo x) O) R P X), True.
 Proof.
   intros.
   assert (COMPOL: comp (map (fun x => Oof x) locs) (fun x => Aofo x)).
@@ -237,7 +237,7 @@ Proof.
   assumption.
   }
 
-  exists (fun x => lift 0%Z (xOf (fun x => Rof x) locs x)).
+  exists (fun x => lift 0%Qc (xOf (fun x => Rof x) locs x)).
   exists (fun x => lift false (xOf (fun x => Pof x) locs x)).
   exists (fun x => lift None (xOf (fun x => Xof x) locs x)).
   exists.
@@ -371,7 +371,7 @@ Proof.
   destruct SA2 as (SA2,SA3).
   apply Coq.Bool.Bool.orb_true_iff in SA3.
   destruct SA3 as [SA3|SA3].
-  destruct (opZ_eq_dec (Xof l) None).
+  destruct (opQc_eq_dec (Xof l) None).
   rewrite <- Aofl in INX.
   rewrite xOf_same in INX.
   contradiction.
@@ -429,14 +429,12 @@ Proof.
   rewrite H0 in *.
   destruct o0.
   {
-  apply Coq.Bool.Bool.andb_true_iff in PRCL1.
   destruct PRCL1 as (PR1,PR2).
-  apply Coq.Bool.Bool.andb_true_iff in PR2.
   destruct PR2 as (PR2,PR3).
-  apply Coq.Bool.Bool.andb_true_iff.
   split.
   {
-  rewrite filter_filter_map_eq with (f2:=fun x => (Rofo x <=? Z.max (Rof l) z0)%Z).
+
+  rewrite filter_filter_map_eq with (f2:= fun x => negb (Qlt_bool (Rof l) (Rofo x)) || negb (Qlt_bool q (Rofo x))).
   assumption.
   unfold comp.
   intros.
@@ -461,14 +459,11 @@ Proof.
   apply in_map.
   assumption.
   }
-  apply Coq.Bool.Bool.andb_true_iff.
   split.
   {
-  rewrite forallb_forall.
-  rewrite forallb_forall in PR2.
   intros.
-  apply in_map_iff in H.
-  destruct H as (x0,(EQx0,INx0)).
+  apply in_map_iff in INX.
+  destruct INX as (x0,(EQx0,INx0)).
   assert (INx1:=INx0).
   assert (INx0l: In x0 (map (fun x : location Z => Oof x) locs)).
   {
@@ -476,8 +471,6 @@ Proof.
   try tauto.
   }
   apply PR2 in INx0.
-  apply Coq.Bool.Bool.orb_true_iff in INx0.
-  apply Coq.Bool.Bool.orb_true_iff.
   destruct INx0 as [NEG|NEG].
   left.
   rewrite xOf_same;
@@ -501,8 +494,6 @@ Proof.
   apply in_map. assumption.
   }
 
-  apply Coq.Bool.Bool.orb_true_iff in PR3.
-  apply Coq.Bool.Bool.orb_true_iff.
   destruct PR3 as [PR3|PR3].
   left.
   {
@@ -567,7 +558,6 @@ Proof.
   try tauto.
 Qed.
 
-
 Lemma Cons_preserves_validity:
   forall m sp h t id a n tx
          (VALIDK: validk (S m) sp t h)
@@ -607,10 +597,10 @@ Proof.
   simpl in WF.
   destruct WF as (WF1,WF2).
   exists (updl T id (Val (Enum a), tx, dstr_cells' p 
-    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
+    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
     (Some (Cell full 0)), O, C, id)).
 
-  exists invs, ((map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n)) ++ locs), Pinv, Pleak, Ainv, Cinv, Cleak.
+  exists invs, ((map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n)) ++ locs), Pinv, Pleak, Ainv, Cinv, Cleak.
   simpl in *.
   rewrite map_map in *.
   rewrite map_map in *.
@@ -740,7 +730,7 @@ Proof.
   }
 
   assert (NODUP1: NoDup (map snd (updl T id (Val (Enum a), tx, dstr_cells' p 
-    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
+    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
     (Some (Cell full 0)), O, C, id)))).
   {
   apply NoDup_updl.
@@ -748,7 +738,7 @@ Proof.
   }
 
   assert (defl1: defl phplusdef (map (fun x0 => (pof x0, snd x0)) (updl T id (Val (Enum a), tx, dstr_cells' p 
-    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
+    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
     (Some (Cell full 0)), O, C, id)))).
   {
   unfold defl.
@@ -838,7 +828,7 @@ Proof.
   }
 
   assert (phpdefp0il: forall p0, In p0 (map pof (updl T id (Val (Enum a), tx, dstr_cells' p 
-    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
+    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
     (Some (Cell full 0)), O, C, id))) -> phplusdef p0 (phplus Pinv Pleak)).
   {
   unfold updl.
@@ -870,7 +860,7 @@ Proof.
   auto.
   }
 
-  assert (ina: forall x (IN: In x (map (fun x : nat => ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+  assert (ina: forall x (IN: In x (map (fun x : nat => ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))),
     In (Aof x) (map (fun x0 : nat => (a + Z.of_nat x0)%Z) (seq 0 n))).
   {
@@ -884,9 +874,9 @@ Proof.
   }
 
 
-  assert (CELL: forall z' (IN: In z' (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))),
+  assert (CELL: forall z' (IN: In z' (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))),
     fold_left phplus (map pof (updl T id (Val (Enum a), tx, dstr_cells' p 
-    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
+    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
     (Some (Cell full 0)), O, C, id))) (phplus Pinv Pleak)
     z' = Some (Cell full 0)).
   {
@@ -894,12 +884,12 @@ Proof.
   apply fold_cell_full with (dstr_cells' p
        (map
           (fun x : nat =>
-           ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+           ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
            (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0))) id; repeat php_.
   apply pofs.
   apply in_map_iff.
   exists (Val (Enum a), tx, dstr_cells' p (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0)), O, C, id).
   split. reflexivity.
   unfold updl.
@@ -910,7 +900,7 @@ Proof.
   auto.
   unfold dstr_cells'.
   destruct (in_dec (location_eq_dec Z.eq_dec) z'  (map
-    (fun x : nat => ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    (fun x : nat => ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   reflexivity.
   contradiction.
@@ -936,7 +926,7 @@ Proof.
   }
 
   assert (phpdpsi: phplusdef (dstr_cells' p (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0))) Pinv).
   {
   unfold phplusdef.
@@ -952,7 +942,7 @@ Proof.
   }
 
   assert (phpdpsl: phplusdef (dstr_cells' p (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0))) Pleak).
   {
   unfold phplusdef.
@@ -968,7 +958,7 @@ Proof.
   }
 
   assert (phpp0il: forall p0 : pheap, In p0 (map pof (updl T id (Val (Enum a), tx,
-     dstr_cells' p (map (fun x : nat => ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+     dstr_cells' p (map (fun x : nat => ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
      (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0)),
      O, C, id))) -> phplusdef p0 Pinv /\ phplusdef p0 Pleak).
   {
@@ -988,9 +978,9 @@ Proof.
   assumption.
   }
 
-  assert (EQH: forall z' (NIN: ~ In z' (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))),
+  assert (EQH: forall z' (NIN: ~ In z' (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))),
     fold_left phplus (map pof (updl T id (Val (Enum a), tx, dstr_cells' p 
-    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
+    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
     (Some (Cell full 0)), O, C, id))) (phplus Pinv Pleak)
     z' = fold_left phplus (map pof T) (phplus Pinv Pleak) z').
   {
@@ -1019,14 +1009,14 @@ Proof.
   }
 
   assert (bfp: boundph (fold_left phplus (map pof (updl T id
-   (Val (Enum a), tx, dstr_cells' p (map (fun x : nat => ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+   (Val (Enum a), tx, dstr_cells' p (map (fun x : nat => ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
    (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))(Some (Cell full 0)), O, C, id))) (phplus Pinv Pleak))).
   {
   unfold boundph.
   unfold dstr_cells'.
   intros.
   destruct (In_dec (location_eq_dec Z.eq_dec ) x (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   {
   rewrite CELL in H.
@@ -1048,7 +1038,7 @@ Proof.
 
   assert (EQG: map (fun x0 => (gof x0, snd x0))
     (updl T id (Val (Enum a), tx, dstr_cells' p 
-    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
+    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
     (Some (Cell full 0)), O, C, id)) =
     map (fun x0 => (gof x0, snd x0)) T).
   {
@@ -1076,7 +1066,7 @@ Proof.
   }
 
   assert (EQG': map gof (updl T id (Val (Enum a), tx, dstr_cells' p 
-    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
+    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
     (Some (Cell full 0)), O, C, id)) = map gof T).
   {
   unfold updl.
@@ -1167,7 +1157,7 @@ Proof.
   reflexivity.
   }
 
-  assert (WT0: forall d0 (IND: In d0 (map (fun x0 => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+  assert (WT0: forall d0 (IND: In d0 (map (fun x0 => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))),
     length (filter (fun c : cmd => ifb (opZ_eq_dec (waiting_for_cond c) (Some (Aof d0))))
      (map cmdof T)) = 0%nat).
@@ -1251,9 +1241,9 @@ Proof.
   }
 
   assert (EQWT: forall l0, WTs l0 (map cmdof (updl T id (Val (Enum a), tx, dstr_cells' p 
-    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
+    (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))
     (Some (Cell full 0)), O, C, id)))
-    ((map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n)) ++ locs) =
+    ((map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n)) ++ locs) =
     WTs l0 (map cmdof T) locs).
   {
   unfold WTs.
@@ -1265,7 +1255,7 @@ Proof.
   destruct (xOf (fun x1 => Lof x1) locs x) eqn:xof.
 
   assert (xof1: xOf (fun x1 => Lof x1)
-    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n) ++ locs) x = Some z).
   {
   apply xof_mon'.
@@ -1322,11 +1312,11 @@ Proof.
   rewrite xof1.
   reflexivity.
 
-  assert (G: xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+  assert (G: xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n) ++ locs) x =
-    xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) x \/
-    xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n) ++ locs) x =
     xOf (fun x0 => Lof x0) locs x).
   {
@@ -1341,12 +1331,12 @@ Proof.
 
 
   destruct (xOf (fun x0 : location Z => Lof x0) (map (fun x0 : nat =>
-    ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) x) eqn:xof2; try reflexivity.
   destruct (Z.eq_dec x (Aof l0)); try reflexivity.
   destruct (Z.eq_dec z (Aof l0)); try reflexivity.
   assert (G1: exists x' (IN: In x' (map (fun x0 : nat =>
-   ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+   ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
    (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))) (EQ1: Aof x' = x), Lof x' = z).
   {
   apply xOf_exists.
@@ -1373,7 +1363,7 @@ Proof.
   }
 
   assert (EQOT: forall l0,
-    OBs l0 (concat (map Aoof T)) ((map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n)) ++ locs) =
+    OBs l0 (concat (map Aoof T)) ((map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n)) ++ locs) =
     OBs l0 (concat (map Aoof T)) locs).
   {
   unfold OBs.
@@ -1384,7 +1374,7 @@ Proof.
   destruct (xOf (fun x1 => Lof x1) locs x) eqn:xof.
   {
   assert (xof1: xOf (fun x0 : location Z => Lof x0)
-    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n) ++ locs) x = Some z).
   {
   apply xof_mon'.
@@ -1424,11 +1414,11 @@ Proof.
   reflexivity.
   }
 
-  assert (G: xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+  assert (G: xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n) ++ locs) x =
-    xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) x \/
-    xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    xOf (fun x0 => Lof x0) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n) ++ locs) x =
     xOf (fun x0 => Lof x0) locs x).
   {
@@ -1442,12 +1432,12 @@ Proof.
   rewrite G.
 
   destruct (xOf (fun x0 : location Z => Lof x0) (map
-    (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) x) eqn:xof2.
   destruct (Z.eq_dec x (Aof l0)); try reflexivity.
   destruct (Z.eq_dec z (Aof l0)); try reflexivity.
   assert (G1: exists x' (IN: In x' (map (fun x0 : nat =>
-   ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+   ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
    (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))) (EQ1: Aof x' = x), Lof x' = z).
   {
   apply xOf_exists.
@@ -1529,7 +1519,7 @@ Proof.
   }
   intros.
   destruct (In_dec (location_eq_dec Z.eq_dec ) v (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   {
   rewrite CELL in CONDv.
@@ -1606,7 +1596,7 @@ Proof.
   intros.
   specialize PH with l.
   destruct (In_dec (location_eq_dec Z.eq_dec ) l (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   {
   rewrite CELL; try assumption.
@@ -1630,7 +1620,7 @@ Proof.
   unfold dstr_cells.
   destruct (in_dec Z.eq_dec z (map (fun x : nat => (a + Z.of_nat x)%Z) (seq 0 n))).
 
-  specialize NONE0 with (z, 0%Z, z, None, false, (0%Z, nil), (0%Z, nil), nil).
+  specialize NONE0 with (z, 0%Qc, z, None, false, (0%Z, nil), (0%Z, nil), nil).
   rewrite CELL in NONE0.
   assert (CO: Some (Cell full 0) = None).
   apply NONE0.
@@ -1672,7 +1662,7 @@ Proof.
   apply AinvOK in IN.
   destruct IN as (IN1,IN2).
   destruct (In_dec (location_eq_dec Z.eq_dec ) l (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   {
   rewrite NONE in IN1; try assumption.
@@ -1715,11 +1705,11 @@ Proof.
   unfold inj.
   intros.
   destruct (In_dec (location_eq_dec Z.eq_dec ) x1 (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   {
   destruct (In_dec (location_eq_dec Z.eq_dec ) x2 (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   {
   apply in_map_iff in i.
@@ -1742,7 +1732,7 @@ Proof.
   }
   rewrite EQH in px1; try assumption.
   destruct (In_dec (location_eq_dec Z.eq_dec ) x2 (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   {
   rewrite NONE in px1; try assumption.
@@ -1787,7 +1777,7 @@ Proof.
   {
   intros.
   destruct (In_dec (location_eq_dec Z.eq_dec ) l (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   split.
   intros.
@@ -1816,7 +1806,7 @@ Proof.
   destruct IN as (l',(EQl',pl')).
   exists l', EQl'.
   destruct (In_dec (location_eq_dec Z.eq_dec ) l' (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   rewrite CELL; try assumption.
   apply some_none.
@@ -1828,7 +1818,7 @@ Proof.
   {
   intros.
   destruct (In_dec (location_eq_dec Z.eq_dec ) l (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   rewrite CELL in LOCK; try assumption.
   destruct LOCK as [CO|CO].
@@ -1859,7 +1849,7 @@ Proof.
   {
   intros.
   destruct (In_dec (location_eq_dec Z.eq_dec ) l (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   rewrite CELL in ULOCK; try assumption.
   inversion ULOCK.
@@ -1872,7 +1862,7 @@ Proof.
   }
   intros.
   destruct (In_dec (location_eq_dec Z.eq_dec ) l (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   rewrite CELL in UCOND; try assumption.
   inversion UCOND.
@@ -1883,7 +1873,7 @@ Proof.
   {
   intros.
   destruct (In_dec (location_eq_dec Z.eq_dec ) l (map (fun x : nat =>
-    ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+    ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   {
   rewrite CELL in ULOCKED; try assumption.

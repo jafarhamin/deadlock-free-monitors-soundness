@@ -4,6 +4,7 @@ Require Import Coq.Init.Nat.
 Require Import Coq.Bool.Bool.
 Require Import ZArith.
 Require Import Qcanon.
+Require Import QArith_base.
 Require Import List.
 Require Import Util_Z.
 Require Import Util_list.
@@ -15,30 +16,40 @@ Set Implicit Arguments.
 
 (** # <font size="5"><b> Locations </b></font> # *)
 
-Definition olocation A := (A * Z * A * option Z * bool)%type.
+(* olocation = (Address , Level , Associated lock , level' , P) *)
+
+Definition olocation A := (A * Qc * A * option Qc * bool)%type.
+
+(* location = (olocation , lock invariant * transferred permissions, transferred obligations) *)
 
 Definition location A := (olocation A * (Z * list (Z * Z)) * (Z * list (Z * Z)) * list (olocation A))%type.
 
 Definition olocation_eq_dec A (dec: forall (x y:A), {x = y} + {x <> y}) (l1 l2: olocation A) : {l1 = l2} + {l1 <> l2}.
 Proof.
   repeat decide equality.
+  apply Qc_eq_dec.
+  apply Qc_eq_dec.
 Qed.
 
 Definition location_eq_dec A (dec: forall (x y:A), {x = y} + {x <> y}) (l1 l2: location A) : {l1 = l2} + {l1 <> l2}.
 Proof.
   repeat decide equality.
+  apply Qc_eq_dec.
+  apply Qc_eq_dec.
+  apply Qc_eq_dec.
+  apply Qc_eq_dec.
 Qed.
 
 Definition Aofo A (l: olocation A) : A :=
   fst (fst (fst (fst l))).
 
-Definition Rofo A (l: olocation A) : Z :=
+Definition Rofo A (l: olocation A) : Qc :=
   snd (fst (fst (fst l))).
 
 Definition Lofo A (l: olocation A) : A :=
   snd (fst (fst l)).
 
-Definition Xofo A (l: olocation A) : option Z :=
+Definition Xofo A (l: olocation A) : option Qc :=
   snd (fst l).
 
 Definition Pofo A (l: olocation A) : bool :=
@@ -50,13 +61,13 @@ Definition Oof A (l: location A) : olocation A :=
 Definition Aof A (l: location A) : A :=
   Aofo (Oof l).
 
-Definition Rof A (l: location A) : Z :=
+Definition Rof A (l: location A) : Qc :=
   Rofo (Oof l).
 
 Definition Lof A (l: location A) : A :=
   Lofo (Oof l).
 
-Definition Xof A (l: location A) : option Z :=
+Definition Xof A (l: location A) : option Qc :=
   Xofo (Oof l).
 
 Definition Pof A (l: location A) : bool :=
@@ -351,47 +362,37 @@ Notation "P '|->' Q" :=
 
 (** # <font size="5"><b> Precedence Relation </b></font> # *)
 
-Definition prcl (o:olocation Z) (O: list (olocation Z)) : bool :=
+Definition prcl (o:olocation Z) (O: list (olocation Z)) : Prop :=
   match (Xofo o) with
-    | None => forallb (fun x => Z.ltb (Rofo o) (Rofo x)) O
-    | Some xo => andb (leb (length (filter (fun x => Z.leb (Rofo x) (Z.max (Rofo o) xo)) O)) 1)
-                (andb (forallb (fun x => orb (Z.ltb (Z.max (Rofo o) xo) (Rofo x)) 
-                                             (leb_o (Z.max (Rofo o) xo) (Xofo x))) O)
-                (orb (forallb (fun x => Z.ltb (Rofo o) (Rofo x)) O)
-                (Pofo o)))
+    | None => forallb (fun x => Qlt_bool (Rofo o) (Rofo x)) O = true
+    | Some R'o => le (length (filter (fun x => orb (negb (Qlt_bool (Rofo o) (Rofo x))) (negb (Qlt_bool R'o (Rofo x)))) O)) 1 /\
+                  (forall x (INX: In x O), (Qlt_bool (Rofo o) (Rofo x) = true /\ Qlt_bool (R'o) (Rofo x) = true) \/
+                                           (exists R'x (EQR'x: Xofo x = Some R'x), (Qlt_bool (Rofo o) (R'x) = true \/ Rofo o = R'x) /\
+                                                                                   (Qlt_bool (R'o) (R'x) = true \/ R'o = R'x))) /\
+                 (forallb (fun x => Qlt_bool (Rofo o) (Rofo x)) O = true \/ Pofo o = true)
   end.
 
 Lemma prcl_perm:
   forall O O' o
-         (PRC: prcl o O = true)
+         (PRC: prcl o O)
          (PERM: Permutation O' O),
-    prcl o O' = true.
+    prcl o O'.
 Proof.
   unfold prcl.
   intros.
   destruct (Xofo o).
-  apply Coq.Bool.Bool.andb_true_iff in PRC.
   destruct PRC as (PRC1,PRC2).
-  apply Nat.leb_le in PRC1.
-  apply Coq.Bool.Bool.andb_true_iff.
   split.
-  apply Nat.leb_le.
   rewrite prem_length_eq with (l':=O).
   assumption.
   assumption.
-  apply Coq.Bool.Bool.andb_true_iff in PRC2.
   destruct PRC2 as (PRC2,PRC3).
-  apply Coq.Bool.Bool.andb_true_iff.
   split.
-  apply forallb_forall.
   intros.
-  apply forallb_forall with (x:=x) in PRC2.
   apply PRC2.
   apply Permutation_in with O'.
   assumption.
   assumption.
-  apply Coq.Bool.Bool.orb_true_iff.
-  apply Coq.Bool.Bool.orb_true_iff in PRC3.
   destruct PRC3 as [PRC3|PRC3].
   left.
   apply forallb_forall.
@@ -414,33 +415,23 @@ Qed.
 
 Lemma prcl_mono:
   forall l O1 O2
-         (PRCL: prcl l (O1 ++ O2) = true),
-    prcl l O2 = true.
+         (PRCL: prcl l (O1 ++ O2)),
+    prcl l O2.
 Proof.
   unfold prcl.
   intros.
   destruct (Xofo l).
-  apply Coq.Bool.Bool.andb_true_iff in PRCL.
   destruct PRCL as (P1,P2).
-  apply Nat.leb_le in P1.
   rewrite length_filter_app in P1.
-  apply Coq.Bool.Bool.andb_true_iff.
   split.
-  apply Nat.leb_le.
   omega.
-  apply Coq.Bool.Bool.andb_true_iff in P2.
   destruct P2 as (P2,P3).
-  apply Coq.Bool.Bool.andb_true_iff.
   split.
-  apply forallb_forall.
   intros.
-  rewrite forallb_forall in P2.
   apply P2.
   apply in_app_iff.
   right.
   assumption.
-  apply Coq.Bool.Bool.orb_true_iff in P3.
-  apply Coq.Bool.Bool.orb_true_iff.
   destruct P3 as [P3|P3].
   left.
   apply forallb_forall.
@@ -461,14 +452,28 @@ Proof.
   assumption.
 Qed.
 
+Lemma precedence_relaxed:
+  forall v O
+         (PRC: forallb (fun x : olocation exp => Qlt_bool (Rof v) (Rofo x)) O = true)
+         (XOF: Xofo (evalol (Oof v)) = None),
+    prcl (evalol (Oof v)) (map evalol O).
+Proof.
+  intros.
+  unfold prcl. rewrite XOF. simpl.
+  apply forallb_forall. intros.
+  apply in_map_iff in H.
+  destruct H as (x0,(eq,INx)).
+  eapply forallb_forall with (x:=x0) in PRC; try assumption.
+  rewrite <- eq. assumption.
+Qed.
+
 
 (** # <font size="5"><b> Safe Number of Obligations </b></font> # *)
 
 Definition safe_obs (o:location Z) (Wt Ot: nat) := 
   andb (orb (Nat.eqb Wt 0) (ltb 0 Ot))
        (andb (orb (negb (Pof o))(orb (Nat.eqb Wt 0) (ltb Wt Ot)))
-             (orb (ifb (opZ_eq_dec (Xof o) None)) (leb Wt Ot))).
-
+             (orb (ifb (opQc_eq_dec (Xof o) None)) (leb Wt Ot))).
 
 Lemma safe_obs_wt_weak:
   forall v wt ot wt'
@@ -7112,16 +7117,16 @@ Lemma eq_heap_dstr A m:
          (DEFLb: forall p0 (IN: In p0 (map m l)), phplusdef p0 b)
          (DEFU: forall p0 id' (NEQ: id <> id') (IN: In (p0,id') (map (fun x => (m x, snd x)) l)), phplusdef p0 
              (dstr_cells' p (map  (fun x : nat =>
-             ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+             ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
              (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0))))
          (DEFUb: phplusdef (dstr_cells' p (map  (fun x : nat =>
-             ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+             ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
              (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0))) b)
          (IN: In (p,id) (map (fun x => (m x, snd x)) l))
          (X: m (x,id) = dstr_cells' p (map  (fun x : nat =>
-             ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+             ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
              (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0)))
-         (NIN: ~ In z' (map (fun x => (((a + (Z.of_nat x))%Z, 0%Z, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))),
+         (NIN: ~ In z' (map (fun x => (((a + (Z.of_nat x))%Z, 0%Qc, (a + (Z.of_nat x))%Z, None, false), (0%Z,nil), (0%Z,nil), nil)) (seq 0 n))),
     fold_left phplus (map m (updl l id (x, id))) b z' = fold_left phplus (map m l) b z'.
 Proof.
   intros.
@@ -7159,7 +7164,7 @@ Proof.
 
   erewrite fold_left_move_m_eq with (def:=phplusdef) (x1:=emp knowledge)
     (x2:=(dstr_cells' p (map  (fun x : nat =>
-             ((a + Z.of_nat x)%Z, 0%Z, (a + Z.of_nat x)%Z, None, false,
+             ((a + Z.of_nat x)%Z, 0%Qc, (a + Z.of_nat x)%Z, None, false,
              (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0))))(id:=id)(x:=empx); try tauto.
   rewrite updl_updl.
   apply phplus_dstr1.
@@ -15338,11 +15343,11 @@ Definition points_tos (ns: list nat) (l: location exp) : list assn := map (fun i
 Lemma sat_dstr:
   forall n m a,
     sat (dstr_cells' (emp knowledge) (map (fun x0 : nat =>
-     ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+     ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
      (0%Z, nil), (0%Z, nil), nil)) (seq m n)) (Some (Cell full 0))) None
      (emp (option nat * nat))
      (fold_left Astar (points_tos (seq m n)
-     (Enum a, 0%Z, Enum a, None, false, (0%Z, nil), (0%Z, nil), nil))
+     (Enum a, 0%Qc, Enum a, None, false, (0%Z, nil), (0%Z, nil), nil))
      (Abool true)).
 Proof.
   induction n.
@@ -15352,16 +15357,16 @@ Proof.
   replace (emp (option nat * nat)) with (ghplus (emp (option nat * nat)) (emp (option nat * nat))).
   Focus 2. repeat php_.
   assert (EQH: dstr_cells' (emp knowledge)
-     (((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)
+     (((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)
      :: map (fun x0 : nat =>
-     ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+     ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
      (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n)) (Some (Cell full 0)) =
     phplus (dstr_cells' (emp knowledge)
      (map (fun x0 : nat =>
-     ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+     ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
      (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n)) (Some (Cell full 0)))
      (fun x => if location_eq_dec Z.eq_dec x 
-     ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil) then
+     ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil) then
      Some (Cell full 0) else None)).
   {
   apply functional_extensionality.
@@ -15369,14 +15374,14 @@ Proof.
   unfold dstr_cells'.
   unfold phplus.
   destruct (in_dec (location_eq_dec Z.eq_dec) x (map
-    (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
   destruct (in_dec (location_eq_dec Z.eq_dec) x
-    (((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),(0%Z, nil), nil)
-    :: map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),(0%Z, nil), nil)
+    :: map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
   destruct (location_eq_dec Z.eq_dec x
-    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
+    ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
   rewrite e in i.
   apply in_map_iff in i.
   destruct i as (y1,(y2,y3)).
@@ -15394,19 +15399,19 @@ Proof.
   right.
   assumption.
   destruct (in_dec (location_eq_dec Z.eq_dec) x
-    (((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)
-    :: map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)
+    :: map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
   destruct i as [i1|i2].
   rewrite <- i1.
   destruct (location_eq_dec Z.eq_dec
-    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)
-    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
+    ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)
+    ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
   reflexivity.
   contradiction.
   contradiction.
   destruct (location_eq_dec Z.eq_dec x
-    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
+    ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
   exfalso.
   apply n1.
   left.
@@ -15422,13 +15427,13 @@ Proof.
   unfold dstr_cells'.
   intros.
   destruct (in_dec (location_eq_dec Z.eq_dec) x
-    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
   destruct (location_eq_dec Z.eq_dec x
-    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
+    ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
     (0%Z, nil), nil)); reflexivity.
   destruct (location_eq_dec Z.eq_dec x
-    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
+    ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
     (0%Z, nil), nil)); reflexivity.
   }
   {
@@ -15436,7 +15441,7 @@ Proof.
   unfold dstr_cells'.
   intros.
   destruct (in_dec (location_eq_dec Z.eq_dec) x
-    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
   inversion H.
   apply full_bound.
@@ -15446,7 +15451,7 @@ Proof.
   unfold boundph.
   intros.
   destruct (location_eq_dec Z.eq_dec x
-    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false,
+    ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)).
   inversion H.
   apply full_bound.
@@ -15458,10 +15463,10 @@ Proof.
   unfold phplus.
   intros.
   destruct (in_dec (location_eq_dec Z.eq_dec) x
-    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq (S m) n))).
   destruct (location_eq_dec Z.eq_dec x
-    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
+    ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
     (0%Z, nil), nil)).
   rewrite e in i.
   apply in_map_iff in i.
@@ -15477,7 +15482,7 @@ Proof.
   inversion H.
   apply full_bound.
   destruct (location_eq_dec Z.eq_dec x
-    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
+    ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil),
     (0%Z, nil), nil)).
   unfold emp in H.
   inversion H.
@@ -15493,8 +15498,8 @@ Proof.
   unfold QArith_base.Qle.
   simpl.
   omega.
-  destruct (location_eq_dec Z.eq_dec (evall (array (Enum a, 0%Z, Enum a, None, false, (0%Z, nil), (0%Z, nil), nil) m))
-    ((a + Z.of_nat m)%Z, 0%Z, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
+  destruct (location_eq_dec Z.eq_dec (evall (array (Enum a, 0%Qc, Enum a, None, false, (0%Z, nil), (0%Z, nil), nil) m))
+    ((a + Z.of_nat m)%Z, 0%Qc, (a + Z.of_nat m)%Z, None, false, (0%Z, nil), (0%Z, nil), nil)).
   reflexivity.
   contradiction.
 Qed.

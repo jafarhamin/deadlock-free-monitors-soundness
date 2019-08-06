@@ -597,11 +597,11 @@ Proof.
   exists p, O, C.
   assumption.
   assumption.
-  assert (G1: exists (R: Z -> Z) (P: Z -> bool) (X: Z -> option Z)
+  assert (G1: exists (R: Z -> Qc) (P: Z -> bool) (X: Z -> option Qc)
          (ONE: forall z o O (IN: In (o,O,z) (map (fun x => (lift 0%Z (wof h x), oof x, snd x)) T)), one_ob (map (fun x => (fst (fst x), map (fun x => Aofo x) (snd (fst x)), snd x)) (map (fun x => (lift 0%Z (wof h x), oof x, snd x)) T)) o)
          (SPARE: forall z o O (IN: In (o,O,z) (map (fun x => (lift 0%Z (wof h x), oof x, snd x)) T)) (Po: P o = true), spare_ob (map (fun x => (fst (fst x), map (fun x => Aofo x) (snd (fst x)), snd x)) (map (fun x => (lift 0%Z (wof h x), oof x, snd x)) T)) o)
          (OWN: forall z o O (IN: In (o,O,z) (map (fun x => (lift 0%Z (wof h x), oof x, snd x)) T)) (INX: X o <> None), own_ob (map (fun x => (fst (fst x), map (fun x => Aofo x) (snd (fst x)), snd x)) (map (fun x => (lift 0%Z (wof h x), oof x, snd x)) T)) o)
-         (PRC: forall z o O (ING: In (o,O,z) (map (fun x => (lift 0%Z (wof h x), oof x, snd x)) T)), prc o (map (fun x => Aofo x) O) R P X = true), True).
+         (PRC: forall z o O (ING: In (o,O,z) (map (fun x => (lift 0%Z (wof h x), oof x, snd x)) T)), prc Qc Qlt_bool order_Qc' o (map (fun x => Aofo x) O) R P X), True).
   {
   apply validConfiguration_validWaitForGraph with locs;
   try tauto.
@@ -767,7 +767,7 @@ Proof.
   {
   apply Coq.Bool.Bool.orb_true_iff.
   left.
-  destruct (opZ_eq_dec (Xof ll) None).
+  destruct (opQc_eq_dec (Xof ll) None).
   reflexivity.
   contradiction.
   }
@@ -1226,7 +1226,7 @@ Proof.
   {
   apply Coq.Bool.Bool.orb_true_iff.
   left.
-  destruct (opZ_eq_dec (Xof ll) None).
+  destruct (opQc_eq_dec (Xof ll) None).
   reflexivity.
   contradiction.
   }
@@ -1368,7 +1368,7 @@ Proof.
   rewrite map_map in *.
   assert (GOAL: (map (fun x => (lift 0%Z (wof h x), map (fun x => Aofo x) (oof x), snd x)) T) = nil).
   {
-  apply valid_graph_is_deadlock_free with (length T) R P X.
+  apply valid_graph_is_deadlock_free with (length T) Qc Qlt_bool order_Qc' R P X.
   rewrite map_map.
   simpl.
   assumption.
@@ -1842,8 +1842,9 @@ Proof.
   simpl in SAT.
 
   destruct SAT as (v0,(v1,(v2,(eql,rest)))).
-  apply Coq.Bool.Bool.andb_true_iff in eql.
-  destruct eql.
+  destruct eql as (eql1,eql2).
+  apply Coq.Bool.Bool.andb_true_iff in eql1.
+  destruct eql1.
   assumption.
   inversion CO.
   intros.

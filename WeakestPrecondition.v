@@ -25,14 +25,14 @@ Fixpoint weakest_pre (n': nat) (sp: bool) (c:cmd) (Q: Z -> assn) (se: exp -> exp
     | S n =>
   match c with
     | Val e => Q ([[se e]])
-    | Cons n => FA l, (fold_left Astar (points_tos (seq O n) ((Enum l, 0, Enum l, None, false), (0,nil), (0,nil), nil)) (Abool true) --* (Q l))
+    | Cons n => FA l, (fold_left Astar (points_tos (seq O n) ((Enum l, 0%Qc, Enum l, None, false), (0,nil), (0,nil), nil)) (Abool true) --* (Q l))
     | Lookup e => EX l, (EX z, (EX f, (Abool (Z.eqb ([[se e]]) ([[Aof l]])) &* Apointsto f l (Enum z) ** (Apointsto f l (Enum z) --* Q z))))
     | Mutate e1 e2 => EX l, (EX z, (Abool (Z.eqb ([[se e1]]) ([[Aof l]])) &* l |-> z) ** (l |-> (se e2) --* Q 0))
     | Let x c1 c2 => weakest_pre n sp c1 (fun z => weakest_pre n sp c2 Q (fun e => subse x z (se e)) invs) se invs
     | Fork c => EX O, (EX O', ((Aobs(O ++ O') ** (Aobs(O) --* Q 0)) ** (Aobs(O') --* weakest_pre n sp c (fun _ => Aobs(nil)) se invs)))
     | Newlock => FA l, (EX r, 
         (Aulock ((Enum l,r,Enum l, None, false), (0,nil), (0,nil), nil) empb empb --* Q l))
-    | Acquire e => EX O, (EX l, ((Abool (andb (Z.eqb ([[se e]]) ([[Aof l]])) (prcl (evalol (Oof l)) (map evalol O))) &* Alock l ** Aobs O) **
+    | Acquire e => EX O, (EX l, (((Abool (Z.eqb ([[se e]]) ([[Aof l]])) &* Aprop (prcl (evalol (Oof l)) (map evalol O))) &* Alock l ** Aobs O) **
         (FA wt, (FA ot, ((Aobs ((Oof l)::O) ** Alocked l wt ot ** 
         (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)))) --* Q 0))))
     | Release e => EX O, (EX l, (EX wt, (EX ot,
@@ -40,37 +40,37 @@ Fixpoint weakest_pre (n': nat) (sp: bool) (c:cmd) (Q: Z -> assn) (se: exp -> exp
         (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)))) ** ((Aobs O ** Alock l --* Q 0)))))
     | Newcond => FA v, (EX R, (EX P, (EX X,
         (Aucond ((Enum v,R,Enum v,X,P),(0,nil),(0,nil),nil) --* Q v))))
-    | Waiting4lock e => EX O, (EX l, ((Abool (andb (Z.eqb ([[se e]]) ([[Aof l]])) (prcl (evalol (Oof l)) (map evalol O))) &* Alock l ** Aobs O) **
+    | Waiting4lock e => EX O, (EX l, (((Abool (Z.eqb ([[se e]]) ([[Aof l]])) &* Aprop (prcl (evalol (Oof l)) (map evalol O))) &* Alock l ** Aobs O) **
         (FA wt, (FA ot, ((Aobs ((Oof l)::O) ** Alocked l wt ot ** 
         (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)))) --* Q 0))))
     | Wait ev el => EX O, (EX l, (EX v, (EX wt, (EX ot,
         ((Abool (andb (Z.eqb ([[se ev]]) ([[Aof v]]))
         (andb (Z.eqb ([[se el]]) ([[Aof l]]))
         (andb (Z.eqb ([[Lof v]]) ([[Aof l]]))
-        (andb (safe_obs (evall v) (S (wt ([[Aof v]]))) (ot ([[Aof v]])))
-        (andb (prcl (evalol (Oof v)) (map evalol O))
-        (prcl (evalol (Oof l)) (map evalol (M'of v ++ O))))))))) &*
+        (safe_obs (evall v) (S (wt ([[Aof v]]))) (ot ([[Aof v]])))))) &*
+        (Aprop (prcl (evalol (Oof v)) (map evalol O)) &*
+        Aprop (prcl (evalol (Oof l)) (map evalol (M'of v ++ O))))) &*
         ((subsas (snd (Iof l)) (invs (fst (Iof l)) (upd Z.eq_dec wt ([[Aof v]]) (S (wt ([[Aof v]])))) ot)) ** Aobs (Oof l::O) ** Acond v ** Alocked l wt ot)))) **
-        (FA wt', (FA ot', ((Aobs (Oof l:: M'of v ++ O) ** Alocked l wt' ot' ** (subsas (snd (Iof l)) (invs (fst (Iof l)) wt' ot')) ** 
+        (FA wt', (FA ot', ((Aobs (Oof l:: M'of v ++ O) ** Acond v ** Alocked l wt' ot' ** (subsas (snd (Iof l)) (invs (fst (Iof l)) wt' ot')) ** 
         (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb))) --* Q 0)))))
     | Waiting4cond ev el => EX O, (EX l, (EX v, 
         (Abool (andb (Z.eqb ([[se ev]]) ([[Aof v]]))
         (andb (Z.eqb ([[se el]]) ([[Aof l]]))
-        (andb (Z.eqb ([[Lof v]]) ([[Aof l]]))
-        (andb (prcl (evalol (Oof v)) (map evalol O))
-        (prcl (evalol (Oof l)) (map evalol (M'of v ++ O)))))))) &* 
+        (Z.eqb ([[Lof v]]) ([[Aof l]])))) &*
+        (Aprop (prcl (evalol (Oof v)) (map evalol O)) &*
+        Aprop (prcl (evalol (Oof l)) (map evalol (M'of v ++ O))))) &* 
         (Acond v ** Alock l ** Aobs O) **
-        (FA wt, (FA ot, ((Aobs (Oof l:: M'of v ++ O) ** Alocked l wt ot ** (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)) **
+        (FA wt, (FA ot, ((Aobs (Oof l:: M'of v ++ O) ** Acond v ** Alocked l wt ot ** (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)) **
         (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) --* Q 0))))))
     | WasWaiting4cond ev el => EX O, (EX l, (EX v, 
         (Abool (andb sp
         (andb (Z.eqb ([[se ev]]) ([[Aof v]]))
         (andb (Z.eqb ([[se el]]) ([[Aof l]]))
-        (andb (Z.eqb ([[Lof v]]) ([[Aof l]]))
-        (andb (prcl (evalol (Oof v)) (map evalol O))
-        (prcl (evalol (Oof l)) (map evalol (M'of v ++ O))))))))) &* 
+        (Z.eqb ([[Lof v]]) ([[Aof l]]))))) &*
+        (Aprop (prcl (evalol (Oof v)) (map evalol O)) &*
+        Aprop (prcl (evalol (Oof l)) (map evalol (M'of v ++ O))))) &* 
         (Acond v ** Alock l ** Aobs O) **
-        (FA wt, (FA ot, ((Aobs (Oof l:: M'of v ++ O) ** Alocked l wt ot ** (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)) **
+        (FA wt, (FA ot, ((Aobs (Oof l:: M'of v ++ O) ** Acond v ** Alocked l wt ot ** (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot)) **
         (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) --* Q 0))))))
     | Notify ev => EX O, (EX wt, (EX ot, (EX l, (EX v, (Abool (andb (Z.eqb ([[Lof v]]) ([[Aof l]])) (Z.eqb ([[se ev]]) ([[Aof v]]))) &*
        ((subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb)) |* Abool (leb (wt ([[Aof v]])) 0)) ** Acond v ** Alocked l wt ot ** 
@@ -496,10 +496,10 @@ Proof.
   destruct n'; try reflexivity.
   simpl.
   intros.
-  destruct SAT as (v0,(v1,(v2,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))))).
+  destruct SAT as (v0,(v1,(v2,((EQ1,EQ2),(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(bc12,(opO1O2,(tmp1,(tmp2,tmp3))))))))))))))))))))).
   exists v0, v1, v2.
   exists.
-  tauto.
+  split; assumption.
   exists p1, p2, phpdefp1p2, bp1, bp2, bp12, O1, O2,C1, C2, ghpdefC1C2, BC1, BC2, bc12, opO1O2.
   split.
   assumption.
@@ -1421,19 +1421,19 @@ Lemma sat_Cons:
   forall m p O C sp n tx invs a
          (BP: boundph p)
          (BG: boundgh C)
-         (NONE: forall z (IN: In z (map (fun x0 => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+         (NONE: forall z (IN: In z (map (fun x0 => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
                   (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))), p z = None)
          (SAT: sat p O C (weakest_pre_ct (S m) sp (Cons n, tx) invs)),
     sat (dstr_cells' p (map (fun x0 : nat =>
-      ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+      ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
       (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0)))
       O C (weakest_pre_ct (S m) sp (Val (Enum a), tx) invs).
 Proof.
   intros.
   unfold weakest_pre_ct.
-  assert (EQH: dstr_cells' p (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+  assert (EQH: dstr_cells' p (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0)) = 
-    phplus p (dstr_cells' (emp knowledge) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    phplus p (dstr_cells' (emp knowledge) (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n)) (Some (Cell full 0)))).
   {
   apply functional_extensionality.
@@ -1441,7 +1441,7 @@ Proof.
   unfold phplus.
   intros.
   destruct (in_dec (location_eq_dec Z.eq_dec) x
-    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   rewrite NONE.
   reflexivity.
@@ -1462,7 +1462,7 @@ Proof.
   unfold dstr_cells'.
   intros.
   destruct (in_dec (location_eq_dec Z.eq_dec) x
-    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   inversion H.
   apply full_bound.
@@ -1473,7 +1473,7 @@ Proof.
   unfold dstr_cells'.
   intros.
   destruct (in_dec (location_eq_dec Z.eq_dec) x
-    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   rewrite NONE; try assumption. trivial.
   unfold emp.
@@ -1485,7 +1485,7 @@ Proof.
   unfold phplus.
   intros.
   destruct (in_dec (location_eq_dec Z.eq_dec) x
-    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Z, (a + Z.of_nat x0)%Z, None, false,
+    (map (fun x0 : nat => ((a + Z.of_nat x0)%Z, 0%Qc, (a + Z.of_nat x0)%Z, None, false,
     (0%Z, nil), (0%Z, nil), nil)) (seq 0 n))).
   rewrite NONE in H; try assumption.
   inversion H.
@@ -2508,7 +2508,7 @@ Lemma sat_acquire0:
   exists ll
          (EQL: Aof ll = ([[l]]))
          (Pl: p ll = Some Lock \/ exists Wt Ot, p ll = Some (Locked Wt Ot))
-         (PRCl: prcl (Oof ll) O = true),
+         (PRCl: prcl (Oof ll) O),
     sat p (Some O) C (weakest_pre_ct (S m) sp (Waiting4lock l, tx) invs).
 Proof.
   simpl.
@@ -2518,7 +2518,6 @@ Proof.
   subst.
   assert (phpdefp32p42: phplusdef p3 p2 /\ phplusdef p4 p2). repeat php_.
   assert (ghpdefp32p42: ghplusdef C3 c2 /\ ghplusdef C4 c2). repeat php_.
-  apply Coq.Bool.Bool.andb_true_iff in eqls.
   destruct eqls as (EQ1,EQ2).
   apply Z.eqb_eq in EQ1.
   unfold id in *.
@@ -2570,7 +2569,6 @@ Proof.
   apply Permutation_refl.
   split.
   split.
-  apply Coq.Bool.Bool.andb_true_iff.
   split.
   apply Z.eqb_eq.
   assumption.
@@ -2602,7 +2600,7 @@ Lemma sat_acquire:
   exists ll
          (EQL: Aof ll = ([[l]]))
          (Pl: p ll = Some Lock \/ exists Wt Ot, p ll = Some (Locked Wt Ot))
-         (PRCl: prcl (Oof ll) O = true),
+         (PRCl: prcl (Oof ll) O),
     forall p1 C1 wt ot 
           (bp: boundph p1)
           (bp1p: boundph (phplus p1 p))
@@ -2624,7 +2622,6 @@ Proof.
   assert (phpdefp32p42: phplusdef p3 p2 /\ phplusdef p4 p2). repeat php_.
   assert (ghpdefp32p42: ghplusdef C3 c2 /\ ghplusdef C4 c2). repeat php_.
 
-  apply Coq.Bool.Bool.andb_true_iff in eqls.
   destruct eqls as (EQ1,EQ2).
   apply Z.eqb_eq in EQ1.
   unfold id in *.
@@ -2827,7 +2824,7 @@ Lemma sat_wait4lock:
   exists ll
          (EQL: Aof ll = ([[l]]))
          (Pl: p ll = Some Lock \/ exists Wt Ot, p ll = Some (Locked Wt Ot))
-         (PRCl: prcl (Oof ll) O = true),
+         (PRCl: prcl (Oof ll) O),
     forall p1 C1 wt ot 
           (bp: boundph p1)
           (bp1p: boundph (phplus p1 p))
@@ -2849,7 +2846,6 @@ Proof.
   assert (phpdefp32p42: phplusdef p3 p2 /\ phplusdef p4 p2). repeat php_.
   assert (ghpdefp32p42: ghplusdef C3 c2 /\ ghplusdef C4 c2). repeat php_.
 
-  apply Coq.Bool.Bool.andb_true_iff in eqls.
   destruct eqls as (EQ1,EQ2).
   apply Z.eqb_eq in EQ1.
   unfold id in *.
@@ -3900,7 +3896,6 @@ Proof.
   split; reflexivity.
 Qed.
 
-
 Lemma sat_wait:
   forall m p O C ev el tx invs sp
          (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (Wait ev el, tx) invs)),
@@ -3917,8 +3912,8 @@ Lemma sat_wait:
            (p1l: p1 l = Some (Locked wt ot))
            (p1v: p1 v = Some Cond)
            (p2inv: sat p2 None C2 (subsas (snd (Iof l)) (invs (fst (Iof l)) (upd Z.eq_dec wt (Aof v) (S (wt (Aof v)))) ot)))
-           (PRCv: prcl (Oof v) O1 = true)
-           (PRCl: prcl (Oof l) (M'of v ++ O1) = true)
+           (PRCv: prcl (Oof v) O1)
+           (PRCl: prcl (Oof l) (M'of v ++ O1))
            (NEQlv: v <> l)
            (Lvl: Lof v = Aof l)
            (SAFE_OBS: safe_obs v (S (wt (Aof v))) (ot (Aof v)) = true),
@@ -3932,16 +3927,13 @@ Proof.
   destruct tmp1 as (p5,(p6,(phpdefp5p6,(bp5,(bp6,(bp56,(O5,(O6,(C5,(C6,(ghpdefC5C6,(BC5,(BC6,(bc56,(opO5O6,(ops56,(tmp1,(p56,C56)))))))))))))))))).
   destruct tmp1 as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(O7,(O8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(bc78,(opO7O8,(ops78,(tmp1,(p78,C78)))))))))))))))))).
   assert (EQ1:=EQ).
+  destruct EQ as (EQ,(prcv1,prcv0)).
   apply Coq.Bool.Bool.andb_true_iff in EQ.
   destruct EQ as (eqev,EQ).
   apply Coq.Bool.Bool.andb_true_iff in EQ.
   destruct EQ as (eqel,EQ).
   apply Coq.Bool.Bool.andb_true_iff in EQ.
-  destruct EQ as (lov1,EQ).
-  apply Coq.Bool.Bool.andb_true_iff in EQ.
-  destruct EQ as (safe1,EQ).
-  apply Coq.Bool.Bool.andb_true_iff in EQ.
-  destruct EQ as (prcv1,prcv0).
+  destruct EQ as (lov1,safe1).
   unfold id in *.
 
   assert (eqO: Permutation O (evalol (Oof v0) :: map evalol v) /\ O3 = None /\ o2 = None).
@@ -4194,19 +4186,15 @@ Proof.
   exists safe1.
   exists v, v0, v1.
   exists.
+  split.
   apply Coq.Bool.Bool.andb_true_iff.
   split.
   assumption.
   apply Coq.Bool.Bool.andb_true_iff.
   split.
   assumption.
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
   assumption.
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
-  assumption.
-  assumption.
+  split; assumption.
   exists (upd (location_eq_dec Z.eq_dec) p4 (evall v0) (Some Lock)), p2.
   exists.
   apply phpdef_locked_lock.
@@ -4243,6 +4231,7 @@ Proof.
   apply fs_op.
   apply Permutation_refl.
   split.
+  {
   exists (phplus p5 p7), (upd (location_eq_dec Z.eq_dec) p8 (evall v0) (Some Lock)).
   exists.
   apply phpdef_comm.
@@ -4366,10 +4355,12 @@ Proof.
   exists v2, v3.
   tauto.
   apply ghplus_emp.
+  }
   split.
+  {
   intros.
-  apply sat2 with v4 v5 O';
-  try tauto.
+  apply sat2 with v4 v5 O'; repeat php_.
+  }
   split.
   replace (phplus p2 p4) with (phplus p4 p2).
   apply phplus_upd;
@@ -4395,7 +4386,6 @@ Proof.
   try tauto.
 Qed.
 
-
 Lemma sat_wait4cond:
   forall m p O C ev el tx invs sp
         (SAT: sat p (Some O) C (weakest_pre_ct (S m) sp (Waiting4cond ev el, tx) invs)),
@@ -4405,8 +4395,8 @@ Lemma sat_wait4cond:
          (Pv: p v = Some Cond)
          (Pl: p l = Some Lock \/ exists wt ot, p l = Some (Locked wt ot))
          (lvl: Lof v = ([[el]]))
-         (PRCl: prcl (Oof l) (M'of v ++ O) = true)
-         (PRCv: prcl (Oof v) O = true),
+         (PRCl: prcl (Oof l) (M'of v ++ O))
+         (PRCv: prcl (Oof v) O),
     forall pm Cm (PHPDEF: phplusdef p pm) (BPm: boundph pm) (BPmp: boundph (phplus pm p)) (GHPDEF: ghplusdef C Cm) (BCm: boundgh Cm) (BCmC: boundgh (ghplus Cm C))
            (SATM: sat pm None Cm (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb))),
       sat (phplus p pm) (Some (M'of v ++ O)) (ghplus C Cm) (weakest_pre_ct (S m) sp (Waiting4lock el, tx) invs).
@@ -4443,13 +4433,11 @@ Proof.
   destruct PERM as (PERM, o2N).
   rewrite o2N in *.
 
-  apply Coq.Bool.Bool.andb_true_iff in EQ.
-  destruct EQ as (EQ1,EQ2).
+  destruct EQ as (EQ1,EQ4).
+  apply Coq.Bool.Bool.andb_true_iff in EQ1.
+  destruct EQ1 as (EQ1,EQ2).
   apply Coq.Bool.Bool.andb_true_iff in EQ2.
   destruct EQ2 as (EQ2,EQ3).
-  apply Coq.Bool.Bool.andb_true_iff in EQ3.
-  destruct EQ3 as (EQ3,EQ4).
-  apply Coq.Bool.Bool.andb_true_iff in EQ4.
   destruct EQ4 as (EQ4,EQ5).
   apply Z.eqb_eq in EQ1.
   apply Z.eqb_eq in EQ2.
@@ -4587,447 +4575,378 @@ Proof.
   rewrite ghplus_comm;
   try tauto.
   }
+  subst.
+
+  assert (phpd1: phplusdef (phplus p3 (phplus p5 p6)) p2 /\ phplusdef (phplus p3 (phplus p5 p6)) pm). apply phpdef_dist'; repeat php_.
+  destruct phpd1 as (phpd3562,phpd356m).
+  assert (phpd1: phplusdef p3 pm /\ phplusdef (phplus p5 p6) pm). apply phpdef_dist; repeat php_.
+  destruct phpd1 as (phpd3m,phpd56m).
+  assert (phpd1: phplusdef p5 pm /\ phplusdef p6 pm). apply phpdef_dist; repeat php_.
+  destruct phpd1 as (phpd5m,phpd6m).
+  assert (phpd1: phplusdef p3 p2 /\ phplusdef (phplus p5 p6) p2). apply phpdef_dist; repeat php_.
+  destruct phpd1 as (phpd32,phpd562).
+  assert (phpd1: phplusdef p5 p2 /\ phplusdef p6 p2). apply phpdef_dist; repeat php_.
+  destruct phpd1 as (phpd52,phpd62).
+
+  assert (phpd1: ghplusdef (ghplus C3 (ghplus C5 C6)) C2 /\ ghplusdef (ghplus C3 (ghplus C5 C6)) Cm). apply ghpdef_dist'; repeat php_.
+  destruct phpd1 as (ghpd3562,ghpd356m).
+  assert (phpd1: ghplusdef C3 Cm /\ ghplusdef (ghplus C5 C6) Cm). apply ghpdef_dist; repeat php_.
+  destruct phpd1 as (ghpd3m,ghpd56m).
+  assert (phpd1: ghplusdef C5 Cm /\ ghplusdef C6 Cm). apply ghpdef_dist; repeat php_.
+  destruct phpd1 as (ghpd5m,ghpd6m).
+  assert (phpd1: ghplusdef C3 C2 /\ ghplusdef (ghplus C5 C6) C2). apply ghpdef_dist; repeat php_.
+  destruct phpd1 as (ghpd32,ghpd562).
+  assert (phpd1: ghplusdef C5 C2 /\ ghplusdef C6 C2). apply ghpdef_dist; repeat php_.
+  destruct phpd1 as (ghpd52,ghpd62).
+
+  assert (eqh1: phplus (phplus p3 (phplus p2 pm)) (phplus p5 p6) = 
+    phplus (phplus p3 (phplus p5 p6)) (phplus p2 pm)).
+  {
+  repeat php_. rewrite <- phplus_assoc.
+  symmetry.
+  rewrite <- phplus_assoc. repeat php_.
+  repeat php_. repeat php_. repeat php_. repeat php_. repeat php_. repeat php_.
+  }
+
+  assert (eqg1: ghplus (ghplus C3 (ghplus C2 Cm)) (ghplus C5 C6) = 
+    ghplus (ghplus C3 (ghplus C5 C6)) (ghplus C2 Cm)).
+  {
+  repeat php_. rewrite <- ghplus_assoc.
+  symmetry.
+  rewrite <- ghplus_assoc. repeat php_.
+  repeat php_. repeat php_. repeat php_. repeat php_. repeat php_. repeat php_.
+  }
+
+  assert (bp32m : boundph (phplus p3 (phplus p2 pm))).
+  {
+  apply boundph_mon with (phplus p5 p6); repeat php_. rewrite eqh1. assumption.
+  }
+
+  assert (b5632m: boundph (phplus (phplus p5 p6) (phplus p3 (phplus p2 pm)))).
+  {
+  rewrite phplus_comm; repeat php_. rewrite eqh1. assumption.
+  }
+
+  assert (bg32m : boundgh (ghplus C3 (ghplus C2 Cm))).
+  {
+  apply boundgh_mon with (ghplus C5 C6); repeat php_. rewrite eqg1. assumption.
+  }
+
+  assert (bg5632m: boundgh (ghplus (ghplus C5 C6) (ghplus C3 (ghplus C2 Cm)))).
+  {
+  rewrite ghplus_comm; repeat php_. rewrite eqg1. assumption.
+  }
 
   exists (M'of v1 ++ v), v0.
-  exists p1, (phplus p2 pm), phpdefp1p2m, bp1, bp2m, bp1p2m.
-  exists (Some (M'of (evall v1) ++ O)), None, C1, (ghplus C2 Cm).
-  exists ghpdefp1p2m, BC1, bgp2m, bgp1p2m.
+  exists (phplus p5 p6), (phplus p3 (phplus p2 pm)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. assumption.
+  exists. assumption.
+  exists (Some (M'of (evall v1) ++ O)), None.
+  exists (ghplus C5 C6), (ghplus C3 (ghplus C2 Cm)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. assumption.
+  exists. assumption.
+  exists. apply fs_op. apply Permutation_refl.
   exists.
-  apply fs_op.
-  apply Permutation_refl.
+  split. split.
+  apply Z.eqb_eq. assumption. assumption.
+  exists p5, p6.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists None, (Some (map evalol (M'of v1 ++ v))).
+  exists C5, C6.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. assumption.
+  exists. apply sn_op.
+  apply perm_trans with (M'of (evall v1) ++ (map evalol v)).
+  rewrite map_app. apply Permutation_refl.
+  apply Permutation_app_head. apply Permutation_sym. assumption.
+  split. assumption. split. apply fs_op. apply Permutation_refl. split; reflexivity.
   split.
-  split.
-  apply Coq.Bool.Bool.andb_true_iff.
-  split.
-  apply Z.eqb_eq.
-  tauto.
-  tauto.
-  exists p1, (emp knowledge).
-  exists.
-  apply phpdef_emp.
-  exists bp1, boundph_emp.
-  exists.
-  rewrite phplus_emp.
-  assumption.
-  exists None, (Some (M'of (evall v1) ++ O)), C1, (emp (option nat*nat)).
-  exists.
-  apply ghpdef_emp.
-  exists BC1, boundgh_emp.
-  exists.
-  rewrite ghplus_emp.
-  assumption.
-  exists.
-  apply sn_op.
-  apply Permutation_refl.
-  split.
-  tauto.
-  split.
-  apply fs_op.
-  rewrite map_app.
-  apply Permutation_app_head.
-  apply Permutation_sym;
-  tauto.
-  rewrite phplus_emp.
-  rewrite ghplus_emp.
-  tauto.
-  split.
-
   intros.
-  assert (bp2mp': phplusdef p2 p' /\ phplusdef pm p').
+
+  assert (phpd1: phplusdef p3 p' /\ phplusdef (phplus p2 pm) p'). apply phpdef_dist; repeat php_.
+  destruct phpd1 as (phpd3p',phpd2mp').
+  assert (phpd1: phplusdef p2 p' /\ phplusdef pm p'). apply phpdef_dist; repeat php_.
+  destruct phpd1 as (phpd2p',phpdmp').
+
+  assert (phpd1: ghplusdef C3 g' /\ ghplusdef (ghplus C2 Cm) g'). apply ghpdef_dist; repeat php_.
+  destruct phpd1 as (ghpd3p',ghpd2mp').
+  assert (phpd1: ghplusdef C2 g' /\ ghplusdef Cm g'). apply ghpdef_dist; repeat php_.
+  destruct phpd1 as (ghpd2p',ghpdmp').
+
+  assert (EQH1: phplus (phplus p3 (phplus p2 pm)) p' = phplus p2 (phplus p3 (phplus pm p'))).
   {
-  apply phpdef_dist;
-  try tauto.
+  symmetry. rewrite phplus_comm; repeat php_.
+  rewrite <- phplus_assoc; repeat php_.
   }
 
-  assert (phpdefpmp'p2: phplusdef (phplus pm p') p2).
+  assert (EQG1: ghplus (ghplus C3 (ghplus C2 Cm)) g' = ghplus C2 (ghplus C3 (ghplus Cm g'))).
   {
-  apply phpdef_pair';
-  try tauto.
-  apply phpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
+  symmetry. rewrite ghplus_comm; repeat php_.
+  rewrite <- ghplus_assoc; repeat php_.
   }
 
-  assert (bpmp': boundph (phplus pm p')).
+  rewrite EQH1.
+  rewrite EQG1.
+
+  assert (eqh2: phplus (phplus p2 p3) pm = phplus p3 (phplus p2 pm)).
   {
-  apply boundph_mon with p2;
-  try tauto.
-  rewrite phplus_comm;
-  try tauto.
-  rewrite <- phplus_assoc;
-  try tauto.
+  rewrite phplus_comm; repeat php_.
+  rewrite <- phplus_assoc; repeat php_.
   }
 
-  assert (bp2pm': boundph (phplus p2 (phplus pm p'))).
+  assert (eqh3: phplus (phplus pm p') (phplus p2 p3) = 
+    phplus p2 (phplus p3 (phplus pm p'))).
   {
-  rewrite <- phplus_assoc;
-  try tauto.
+  symmetry.
+  rewrite <- phplus_assoc; repeat php_.
   }
 
-  assert (gp2mp': ghplusdef C2 g' /\ ghplusdef Cm g').
+  assert (eqg2: ghplus (ghplus C2 C3) Cm = ghplus C3 (ghplus C2 Cm)).
   {
-  apply ghpdef_dist;
-  try tauto.
+  rewrite ghplus_comm; repeat php_.
+  rewrite <- ghplus_assoc; repeat php_.
   }
 
-  assert (ghpdefpmp'p2: ghplusdef (ghplus Cm g') C2).
+  assert (eqg3: ghplus (ghplus Cm g') (ghplus C2 C3) = 
+    ghplus C2 (ghplus C3 (ghplus Cm g'))).
   {
-  apply ghpdef_pair';
-  try tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
+  symmetry.
+  rewrite <- ghplus_assoc; repeat php_.
   }
 
-  assert (bgpmp': boundgh (ghplus Cm g')).
+  assert (bp23m': boundph (phplus p2 (phplus p3 (phplus pm p')))).
+  rewrite <- EQH1. assumption.
+
+  assert (bp23m: boundph (phplus p3 (phplus p2 pm))).
+  apply boundph_mon with p'; try assumption.
+
+  assert (bp23: boundph (phplus p2 p3)).
   {
-  apply boundgh_mon with C2;
-  try tauto.
-  rewrite ghplus_comm;
-  try tauto.
-  rewrite <- ghplus_assoc;
-  try tauto.
+  apply boundph_mon with pm; try assumption.
+  rewrite eqh2. assumption.
   }
 
-  assert (bgp2pm': boundgh (ghplus C2 (ghplus Cm g'))).
+  assert (bpm': boundph (phplus pm p')).
   {
-  rewrite <- ghplus_assoc;
-  try tauto.
+  apply boundph_mon with (phplus p2 p3); try assumption.
+  rewrite eqh3. assumption.
   }
 
-  rewrite phplus_assoc;
-  try tauto.
-  rewrite ghplus_assoc;
-  try tauto.
-  apply sat2 with v2 v3 O';
-  try tauto.
-  apply phpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
+  assert (bp3m': boundph (phplus p3 (phplus pm p'))).
+  apply boundph_mon with p2; repeat php_.
+
+  assert (bg23m': boundgh (ghplus C2 (ghplus C3 (ghplus Cm g')))).
+  rewrite <- EQG1. assumption.
+
+  assert (bg23m: boundgh (ghplus C3 (ghplus C2 Cm))).
+  apply boundgh_mon with g'; try assumption.
+
+  assert (bg23: boundgh (ghplus C2 C3)).
+  {
+  apply boundgh_mon with Cm; try assumption.
+  rewrite eqg2. assumption.
+  }
+
+  assert (bgm': boundgh (ghplus Cm g')).
+  {
+  apply boundgh_mon with (ghplus C2 C3); try assumption.
+  rewrite eqg3. assumption.
+  }
+
+  assert (bg3m': boundgh (ghplus C3 (ghplus Cm g'))).
+  {
+  apply boundgh_mon with C2; repeat php_.
+  }
+
+  apply sat2 with v2 v3 O'; repeat php_.
+
+  assert (eqh4: phplus p' (phplus p3 pm) = phplus p3 (phplus pm p')).
+  {
+  rewrite phplus_comm; try assumption.
+  symmetry.
+  rewrite phplus_assoc; try assumption. reflexivity.
+  repeat php_.
+  }
+
+  assert (eqg4: ghplus g' (ghplus C3 Cm) = ghplus C3 (ghplus Cm g')).
+  {
+  rewrite ghplus_comm; try assumption.
+  symmetry.
+  rewrite ghplus_assoc; try assumption. reflexivity.
+  repeat php_.
+  }
 
   destruct SAT as (p7,(p8,(phpdefp7p8,(bp7,(bp8,(bp78,(o7,(o8,(C7,(C8,(ghpdefC7C8,(BC7,(BC8,(BC7C8,(opo7o8,(tmp10,(tmp8,(p7p8,C7C8)))))))))))))))))).
-
-
-  assert (phpdefpm7pm8: phplusdef pm p7 /\ phplusdef pm p8).
-  {
-  apply phpdef_dist';
-  try tauto.
-  rewrite p7p8.
-  tauto.
-  }
-
-  assert (phpdefp7p8m: phplusdef p7 (phplus p8 pm)).
-  {
-  apply phpdef_pair;
-  try tauto.
-  apply phpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  }
-
-  assert (bp7p8m : boundph (phplus p7 (phplus p8 pm))).
-  {
-  rewrite <- phplus_assoc;
-  try tauto.
-  rewrite p7p8.
-  rewrite phplus_comm;
-  try tauto.
-  apply phpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  }
-
-  assert (bp8m: boundph (phplus p8 pm)).
-  {
-  apply boundph_mon with p7;
-  try tauto.
-  rewrite phplus_comm;
-  try tauto.
-  apply phpdef_comm;
-  try tauto.
-  }
-
-  assert (ghpdefpm7pm8: ghplusdef Cm C7 /\ ghplusdef Cm C8).
-  {
-  apply ghpdef_dist';
-  try tauto.
-  rewrite C7C8.
-  tauto.
-  }
-
-  assert (ghpdefp7p8m: ghplusdef C7 (ghplus C8 Cm)).
-  {
-  apply ghpdef_pair;
-  try tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
-  }
-
-  assert (bgp7p8m : boundgh (ghplus C7 (ghplus C8 Cm))).
-  {
-  rewrite <- ghplus_assoc;
-  try tauto.
-  rewrite C7C8.
-  rewrite ghplus_comm;
-  try tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
-  }
-
-  assert (bgp8m: boundgh (ghplus C8 Cm)).
-  {
-  apply boundgh_mon with C7;
-  try tauto.
-  rewrite ghplus_comm;
-  try tauto.
-  apply ghpdef_comm;
-  try tauto.
-  }
-
-
-  exists p7, (phplus p8 pm).
-  exists phpdefp7p8m, bp7, bp8m, bp7p8m.
-  exists o7, o8, C7, (ghplus C8 Cm).
-  exists ghpdefp7p8m, BC7, bgp8m, bgp7p8m, opo7o8.
-  split.
-  assumption.
-  split.
   destruct tmp8 as (p9,(p0,(phpdefp9p0,(bp9,(bp0,(bp90,(o9,(o0,(C9,(C0,(ghpdefC9C0,(BC9,(BC0,(BC9C0,(opo9o0,(tmp110,(tmp18,(p9p0,C9C0)))))))))))))))))).
 
-  assert (phpdefpm9pm0: phplusdef pm p9 /\ phplusdef pm p0).
+  exists (emp knowledge), (phplus p' (phplus p3 pm)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. rewrite eqh4. assumption.
+  exists. repeat php_. rewrite eqh4. assumption.
+  exists (Some (evalol (Oof v0) :: map evalol (M'of v1 ++ v))), None.
+  exists (emp (option nat * nat)), (ghplus g' (ghplus C3 Cm)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. rewrite eqg4. assumption.
+  exists. repeat php_. rewrite eqg4. assumption.
+  exists.
+  inversion tmp10.
+  rewrite <- H1 in opo7o8.
+  inversion opo7o8.
+  apply fs_op.
+  apply Permutation_trans with o'; try assumption.
+  split. apply fs_op. apply Permutation_refl.
+  split.
+  exists p3, (phplus p' pm) .
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. replace (phplus p' pm) with (phplus pm p'). assumption. repeat php_.
+  exists None, None.
+  exists C3, (ghplus g' Cm) .
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. replace (ghplus g' Cm) with (ghplus Cm g'). assumption. repeat php_.
+  exists. apply None_op.
+  split. assumption.
+  split.
+  subst.
+  assert (phpd1: phplusdef p2 (phplus p7 (phplus p9 p0)) /\ phplusdef pm ((phplus p7 (phplus p9 p0)))). apply phpdef_dist; repeat php_.
+  destruct phpd1 as (phpd2790,phpdm790).
+  assert (phpd1: phplusdef p2 p7 /\ phplusdef p2 (phplus p9 p0)). apply phpdef_dist'; repeat php_.
+  destruct phpd1 as (phpd27,phpdm290).
+  assert (phpd1: phplusdef p2 p9 /\ phplusdef p2 p0). apply phpdef_dist'; repeat php_.
+  destruct phpd1 as (phpd29,phpdm20).
+  assert (phpd1: phplusdef pm p7 /\ phplusdef pm (phplus p9 p0)). apply phpdef_dist'; repeat php_.
+  destruct phpd1 as (phpdm7,phpdm90).
+  assert (phpd1: phplusdef pm p9 /\ phplusdef pm p0). apply phpdef_dist'; repeat php_.
+  destruct phpd1 as (phpdm9,phpdm0).
+  assert (phpd1: phplusdef p7 p9 /\ phplusdef p7 p0). apply phpdef_dist'; repeat php_.
+  destruct phpd1 as (phpd79,phpd70).
+
+  assert (phpd1: ghplusdef C2 (ghplus C7 (ghplus C9 C0)) /\ ghplusdef Cm ((ghplus C7 (ghplus C9 C0)))). apply ghpdef_dist; repeat php_.
+  destruct phpd1 as (ghpd2790,ghpdm790).
+  assert (phpd1: ghplusdef C2 C7 /\ ghplusdef C2 (ghplus C9 C0)). apply ghpdef_dist'; repeat php_.
+  destruct phpd1 as (ghpd27,ghpdm290).
+  assert (phpd1: ghplusdef C2 C9 /\ ghplusdef C2 C0). apply ghpdef_dist'; repeat php_.
+  destruct phpd1 as (ghpd29,ghpdm20).
+  assert (phpd1: ghplusdef Cm C7 /\ ghplusdef Cm (ghplus C9 C0)). apply ghpdef_dist'; repeat php_.
+  destruct phpd1 as (ghpdm7,ghpdm90).
+  assert (phpd1: ghplusdef Cm C9 /\ ghplusdef Cm C0). apply ghpdef_dist'; repeat php_.
+  destruct phpd1 as (ghpdm9,ghpdm0).
+  assert (phpd1: ghplusdef C7 C9 /\ ghplusdef C7 C0). apply ghpdef_dist'; repeat php_.
+  destruct phpd1 as (ghpd79,ghpd70).
+
+  assert (bp790: boundph (phplus p7 (phplus p9 p0))).
   {
-  apply phpdef_dist';
-  try tauto.
-  rewrite p9p0.
-  tauto.
+  apply boundph_mon with pm; repeat php_.
   }
 
-  assert (phpdefp90m: phplusdef p9 (phplus p0 pm)).
+  assert (bp79: boundph (phplus p7 p9)).
   {
-  apply phpdef_pair;
-  try tauto.
-  apply phpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
+  apply boundph_mon with p0; repeat php_.
   }
 
-  assert (bpmp8: boundph (phplus pm p8)).
+  assert (bp90m: boundph (phplus (phplus p9 p0) pm)).
   {
-  apply boundph_mon with p7;
-  try tauto.
-  rewrite phplus_assoc;
-  try tauto.
-  replace (phplus p8 p7) with (phplus p7 p8).
-  rewrite p7p8.
-  tauto.
-  apply phplus_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
+  rewrite phplus_comm in bpm'; repeat php_.
+  rewrite phplus_assoc in bpm'; repeat php_.
   }
-
-  assert (bp9p0m : boundph (phplus p9 (phplus p0 pm))).
-  {
-  rewrite <- phplus_assoc;
-  try tauto.
-  rewrite p9p0.
-  rewrite phplus_comm;
-  try tauto.
-  apply phpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  }
-
   assert (bp0m: boundph (phplus p0 pm)).
   {
-  apply boundph_mon with p9;
-  try tauto.
-  rewrite phplus_comm;
-  try tauto.
-  apply phpdef_comm;
-  try tauto.
+  repeat php_. rewrite phplus_comm; repeat php_.
+  rewrite <- phplus_assoc; repeat php_.
   }
 
-  assert (ghpdefpm9pm0: ghplusdef Cm C9 /\ ghplusdef Cm C0).
+  assert (bg790: boundgh (ghplus C7 (ghplus C9 C0))).
   {
-  apply ghpdef_dist';
-  try tauto.
-  rewrite C9C0.
-  tauto.
+  apply boundgh_mon with Cm; repeat php_.
   }
 
-  assert (ghpdefp90m: ghplusdef C9 (ghplus C0 Cm)).
+  assert (bg79: boundgh (ghplus C7 C9)).
   {
-  apply ghpdef_pair;
-  try tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
+  apply boundgh_mon with C0; repeat php_.
   }
 
-  assert (bgpmp8: boundgh (ghplus Cm C8)).
+  assert (bg90m: boundgh (ghplus (ghplus C9 C0) Cm)).
   {
-  apply boundgh_mon with C7;
-  try tauto.
-  rewrite ghplus_assoc;
-  try tauto.
-  replace (ghplus C8 C7) with (ghplus C7 C8).
-  rewrite C7C8.
-  tauto.
-  apply ghplus_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
+  rewrite ghplus_comm in bgm'; repeat php_.
+  rewrite ghplus_assoc in bgm'; repeat php_.
   }
-
-  assert (bgp9p0m : boundgh (ghplus C9 (ghplus C0 Cm))).
+  assert (bg0m: boundgh (ghplus C0 Cm)).
   {
-  rewrite <- ghplus_assoc;
-  try tauto.
-  rewrite C9C0.
-  rewrite ghplus_comm;
-  try tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
+  repeat php_. rewrite ghplus_comm; repeat php_.
+  rewrite <- ghplus_assoc; repeat php_.
   }
 
-  assert (bgp0m: boundgh (ghplus C0 Cm)).
+  assert (eqh5: phplus (phplus p9 p7) (phplus p0 pm) =
+    phplus pm (phplus p7 (phplus p9 p0))).
   {
-  apply boundgh_mon with C9;
-  try tauto.
-  rewrite ghplus_comm;
-  try tauto.
-  apply ghpdef_comm;
-  try tauto.
+  rewrite phplus_comm; try assumption.
+  replace (phplus p0 pm) with (phplus pm p0).
+  repeat php_. rewrite <- phplus_assoc; repeat php_. repeat php_. repeat php_.
   }
 
-  assert (bp0pm: boundph (phplus p0 pm)).
+  assert (eqg5: ghplus (ghplus C9 C7) (ghplus C0 Cm) =
+    ghplus Cm (ghplus C7 (ghplus C9 C0))).
   {
-  rewrite phplus_comm;
-  try tauto.
-  apply boundph_mon with p9;
-  try tauto.
-  rewrite phplus_assoc;
-  try tauto.
-  replace (phplus p0 p9) with (phplus p9 p0).
-  rewrite p9p0.
-  tauto.
-  apply phplus_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
+  rewrite ghplus_comm; try assumption.
+  replace (ghplus C0 Cm) with (ghplus Cm C0).
+  repeat php_. rewrite <- ghplus_assoc; repeat php_. repeat php_. repeat php_.
   }
 
-  assert (bgp0pm: boundgh (ghplus C0 Cm)).
-  {
-  rewrite ghplus_comm;
-  try tauto.
-  apply boundgh_mon with C9;
-  try tauto.
-  rewrite ghplus_assoc;
-  try tauto.
-  replace (ghplus C0 C9) with (ghplus C9 C0).
-  rewrite C9C0.
-  tauto.
-  apply ghplus_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
-  }
-
-
-  exists p9, (phplus p0 pm), phpdefp90m, bp9, bp0m, bp9p0m.
-  exists o9, o0, C9, (ghplus C0 Cm).
-  exists ghpdefp90m, BC9, bgp0m, bgp9p0m, opo9o0.
+  exists (phplus p9 p7), (phplus p0 pm).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. rewrite eqh5. assumption.
+  exists None, None.
+  exists (ghplus C9 C7), (ghplus C0 Cm).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. rewrite eqg5. assumption.
+  exists. apply None_op.
   split.
-  tauto.
+  apply phplus_locked; repeat php_.
   split.
   exists p0, pm.
-  exists.
-  apply phpdef_comm; tauto.
-  exists bp0, BPm, bp0pm.
-  exists o0, None, C0, Cm.
-  exists.
-  apply ghpdef_comm; tauto.
-  exists BC0, BCm, bgp0pm.
-  exists.
-  destruct o0.
-  apply fs_op.
-  apply Permutation_refl.
-  apply None_op.
-  tauto.
-  rewrite <- phplus_assoc;
-  try tauto.
-  rewrite p9p0.
-  rewrite <- ghplus_assoc;
-  try tauto.
-  rewrite C9C0.
-  tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  rewrite <- phplus_assoc;
-  try tauto.
-  rewrite p7p8.
-  rewrite <- ghplus_assoc;
-  try tauto.
-  rewrite C7C8.
-  rewrite phplus_comm;
-  try tauto.
-  rewrite ghplus_comm;
-  try tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply ghpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  apply phpdef_comm;
-  tauto.
-  rewrite <- phplus_assoc;
-  try tauto.
-  rewrite p1p2.
-  rewrite <- ghplus_assoc;
-  try tauto.
-  rewrite C1C2.
-  tauto.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists None, None.
+  exists C0, Cm.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply None_op.
+  split.
+  inversion tmp10.
+  rewrite <- H1 in opo7o8.
+  inversion opo7o8.
+  rewrite <- H3 in opo9o0.
+  inversion opo9o0. rewrite H5. assumption.
+  split. assumption. split; reflexivity.
+  split. rewrite eqh5. repeat php_. rewrite eqg5. repeat php_.
+  split. rewrite phplus_comm; repeat php_.
+  rewrite ghplus_comm; repeat php_.
+  split; repeat php_. 
+  split. rewrite phplus_comm; try assumption. rewrite eqh1. repeat php_. repeat php_.
+  rewrite ghplus_comm; try assumption. rewrite eqg1. repeat php_. repeat php_.
 Qed.
-
 
 Lemma sat_notify:
 forall m p O C v tx invs sp
@@ -5988,7 +5907,7 @@ Lemma sat_WasWaiting4cond:
          (Lofv: Lof lv = ([[l]]))
          (Pl: p ll = Some Lock \/ exists Wt Ot, p ll = Some (Locked Wt Ot))
          (Pv: p lv = Some Cond)
-         (PRCl: prcl (Oof ll) O = true),
+         (PRCl: prcl (Oof ll) O),
     forall p1 C1 wt ot 
           (SPUR: spurious_ok true ll lv invs)
           (bp: boundph p1)
@@ -6008,15 +5927,13 @@ Proof.
   intros.
   destruct SAT as (v0,(v1,(v2,(EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(O1,(O2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opO1O2,(tmp1,tmp2)))))))))))))))))))).
   destruct tmp2 as (tmp2,(p1p2,c1c2)).
+  destruct EQ as (EQ,EQ4).
   apply Coq.Bool.Bool.andb_true_iff in EQ.
-  destruct EQ as (EQ0,EQ).
-  apply Coq.Bool.Bool.andb_true_iff in EQ.
-  destruct EQ as (EQ1,EQ2).
+  destruct EQ as (EQ0,EQ1).
+  apply Coq.Bool.Bool.andb_true_iff in EQ1.
+  destruct EQ1 as (EQ1,EQ2).
   apply Coq.Bool.Bool.andb_true_iff in EQ2.
   destruct EQ2 as (EQ2,EQ3).
-  apply Coq.Bool.Bool.andb_true_iff in EQ3.
-  destruct EQ3 as (EQ3,EQ4).
-  apply Coq.Bool.Bool.andb_true_iff in EQ4.
   destruct EQ4 as (EQ4,EQ5).
   unfold id in *.
 
@@ -6340,22 +6257,41 @@ Proof.
   rewrite ghplus_comm; repeat php_.
   rewrite <- EQC3.
 
-  exists (phplus p3 p6), (phplus (upd (location_eq_dec Z.eq_dec) p5 (evall v1)
-       (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) (phplus p7 p8)).
+  assert (eqh4: phplus p6 (phplus p3 (phplus (upd (location_eq_dec Z.eq_dec) p5 
+   (evall v1) (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) (phplus p7 p8))) =
+   phplus (phplus p3 p6) (phplus (upd (location_eq_dec Z.eq_dec) p5 (evall v1)
+   (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) (phplus p7 p8))).
+  {
+  replace (phplus p3 p6) with (phplus p6 p3).
+  rewrite phplus_assoc; repeat php_. repeat php_.
+  }
+
+  assert (eqg4: ghplus C6 (ghplus C3 (ghplus C5 (ghplus C7 C8))) = ghplus (ghplus C3 C6) (ghplus C5 (ghplus C7 C8))).
+  {
+  replace (ghplus C3 C6) with (ghplus C6 C3).
+  rewrite ghplus_assoc; repeat php_. repeat php_.
+  }
+
+  assert (b3578: boundph (phplus p3 (phplus (upd (location_eq_dec Z.eq_dec) p5 (evall v1)
+   (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) (phplus p7 p8)))).
+  rewrite <- eqh4 in bp36u578. repeat php_.
+
+  assert (bg3578: boundgh (ghplus C3 (ghplus C5 (ghplus C7 C8)))).
+  rewrite <- eqg4 in bgc36c578. repeat php_.
+
+  exists p6, (phplus p3 (phplus (upd (location_eq_dec Z.eq_dec) p5 (evall v1)
+       (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) (phplus p7 p8))).
   exists. repeat php_.
   exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
+  exists. assumption.
+  exists. rewrite eqh4. assumption.
   exists (Some (Oof(evall v1)::O)), None.
-  exists (ghplus C3 C6), (ghplus C5 (ghplus C7 C8)).
+  exists C6, (ghplus C3 (ghplus C5 (ghplus C7 C8))).
   exists. repeat php_.
   exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  exists. repeat php_.
-  apply fs_op.
-  apply Permutation_refl.
-  split.
+  exists. assumption.
+  exists. rewrite eqg4. assumption.
+  exists. apply fs_op. apply Permutation_refl. split.
   {
   destruct SPUR as (SPUR1,SPUR2).
   assert (M'n: M'of v2 = nil).
@@ -6375,9 +6311,24 @@ Proof.
   }
   split.
   {
+  subst.
+  exists p3, (phplus (upd (location_eq_dec Z.eq_dec) p5 (evall v1)
+   (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))) (phplus p7 p8)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists None, None.
+  exists C3, (ghplus C5 (ghplus C7 C8)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply None_op.
+  split. assumption. split.
+
   exists (upd (location_eq_dec Z.eq_dec) p5 (evall v1)
-   (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))).
-  exists (phplus p7 p8).
+   (Some (Locked (upd Z.eq_dec wt ([[v]]) (wt ([[v]]) - 1)%nat) ot))), (phplus p7 p8).
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
@@ -6388,13 +6339,11 @@ Proof.
   exists. repeat php_.
   exists. repeat php_.
   exists. repeat php_.
-  exists. repeat php_.
-  apply None_op.
+  exists. apply None_op.
   split.
   unfold upd at 1.
   destruct (location_eq_dec Z.eq_dec (evall v1) (evall v1)).
-  rewrite EQ1.
-  reflexivity.
+  rewrite EQ1. reflexivity.
   contradiction.
   split.
   {
@@ -6415,8 +6364,15 @@ Proof.
   }
   rewrite EQ1.
   split; reflexivity.
-  }
   split; reflexivity.
+  }
+  split.
+  rewrite <- phplus_assoc; try assumption.
+  replace (phplus p6 p3) with (phplus p3 p6). reflexivity.
+  repeat php_. repeat php_. repeat php_. repeat php_.
+  rewrite <- ghplus_assoc; try assumption.
+  replace (ghplus C6 C3) with (ghplus C3 C6). reflexivity.
+  repeat php_. repeat php_. repeat php_. repeat php_.
 Qed.
 
 

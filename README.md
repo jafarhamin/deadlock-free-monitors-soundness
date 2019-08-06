@@ -10,7 +10,8 @@ An HTML representation of this formalization can be found [here](https://www.ham
 
 For more details about the approach please look at the following papers:
 * [Deadlock-Free Monitors](https://link.springer.com/chapter/10.1007/978-3-319-89884-1_15), published in [27th European Symposium on Programming, ESOP 2018](https://link.springer.com/book/10.1007/978-3-319-89884-1)
-* [Transferring Obligations Through Synchronizations](https://2019.ecoop.org/home), published in [33rd European Conference on Object-Oriented Programming, ECOOP 2019)](https://2019.ecoop.org/home)
+* [Transferring Obligations Through Synchronizations](http://drops.dagstuhl.de/opus/volltexte/2019/10811/), published in [33rd European Conference on Object-Oriented Programming, ECOOP 2019)](https://2019.ecoop.org/home)
+* [Starvation-Free Monitors](http://www.redcad.org/events/ictac2019/index.html), published in [16th International Colloquium on Theoretical Aspects of Computing, ICTAC 2019)](http://www.redcad.org/events/ictac2019/index.html)
 
 This project has received funding from [the European Union’s Horizon 2020 research and innovation programme](https://ec.europa.eu/programmes/horizon2020/en) under grant agreement No 731453 ([VESSEDIA](https://vessedia.eu/)) as well as [Flemish Research Fund project](https://www.fwo.be/en/) under grant agreement No G.0962.17N.
 
@@ -27,6 +28,7 @@ This project has received funding from [the European Union’s Horizon 2020 rese
 * ValidityOfGhostCommands.v : Lemmas proving that ghost commands preseve validity of configurations
 * ProofRules.v : The proposed proof rules
 * Soundness.v : The soundness proof of the proposed proof rules, i.e. any program that is verified by the proposed proof rules is deadlock-free
+* Examples_Channels.v : The proof of a deadlock-free program, which sends and receives on a channel in two threads
 
 # Contact
 

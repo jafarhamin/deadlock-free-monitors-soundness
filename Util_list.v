@@ -1029,6 +1029,41 @@ Proof.
   assumption.
 Qed.
 
+Lemma NoDup_concat A:
+  forall (l1 l2: list A) (NODUP: NoDup (l1 ++ l2)),
+    NoDup l1.
+Proof.
+  induction l1. simpl. intros. apply NoDup_nil.
+  simpl. intros.
+  apply NoDup_cons.
+  inversion NODUP.
+  unfold not. intros. apply H1.
+  apply in_or_app. left. assumption.
+  eapply IHl1. inversion NODUP. apply H2.
+Qed.
+
+Lemma NoDup_concat' A:
+  forall (l1 l2: list A) (NODUP: NoDup (l1 ++ l2)),
+    NoDup l2.
+Proof.
+  induction l1. simpl. intros. assumption.
+  simpl. intros.
+  apply IHl1.
+  inversion NODUP. assumption.
+Qed.
+
+Lemma nodup_neq A:
+  forall (x1: A) (l: list A) (NODUP: NoDup (x1::l)),
+    forall x (IN: In x l), x1 <> x.
+Proof.
+  intros.
+  inversion NODUP.
+  unfold not.
+  intros.
+  rewrite H3 in *.
+  contradiction.
+Qed.
+
 Lemma nodup_filter A f:
   forall (l: list A) (UNQ: NoDup l),
     NoDup (filter f l).

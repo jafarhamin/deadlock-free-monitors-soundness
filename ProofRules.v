@@ -23,6 +23,19 @@ Definition correct a c a' invs sp :=
   forall n, a |= weakest_pre n sp c a' id invs.
 
 
+(** # <font size="5"><b> NOP </b></font> # *)
+
+Theorem rule_nop invs sp P: correct
+  P nop (fun _ => P) invs sp.
+Proof.
+  unfold correct.
+  intros. destruct n. reflexivity.
+  left. left. left. left. left. left. left. left. left. left.
+  simpl in *.
+  intros.
+  assumption.
+Qed.
+
 (** # <font size="5"><b> Value </b></font> # *)
 
 Theorem rule_Val invs sp e: correct
@@ -43,7 +56,7 @@ Qed.
 Theorem rule_Cons invs sp n: correct
   (Abool true)
   (Cons n)
-  (fun l => fold_left Astar (points_tos (seq 0 n)(Enum l, zero, Enum l, None, false, ND, ND ,nil)) (Abool true)) invs sp.
+  (fun l => fold_left Astar (points_tos (seq 0 n)(Enum l, 0%Qc, Enum l, None, false, ND, ND ,nil)) (Abool true)) invs sp.
 Proof.
   unfold correct.
   intros. destruct n0. reflexivity.
@@ -58,7 +71,7 @@ Qed.
 
 (** # <font size="5"><b> Lookup Memory </b></font> # *)
 
-Definition cell_loc (adrs: exp) : location exp := (adrs, zero, adrs, None, false, ND, ND,nil).
+Definition cell_loc (adrs: exp) : location exp := (adrs, 0%Qc, adrs, None, false, ND, ND,nil).
 
 Theorem rule_Lookup invs sp f e e': correct
   (Apointsto f (cell_loc e) e')
@@ -484,7 +497,7 @@ Qed.
 (** # <font size="5"><b> Acquire Lock </b></font> # *)
 
 Theorem rule_Acquire invs sp el l (O: list (olocation exp)): correct
-  (Abool (andb (Z.eqb ([[el]]) ([[Aof l]]))(prcl (evalol (Oof l)) (map evalol O))) &* Alock l ** Aobs O)
+  (Abool (Z.eqb ([[el]]) ([[Aof l]])) &* Aprop (prcl (evalol (Oof l)) (map evalol O)) &* Alock l ** Aobs O)
   (Acquire el) 
   (fun _ => EX wt, (EX ot, (Aobs (Oof l::O) ** Alocked l wt ot ** (subsas (snd (Iof l)) (invs (fst (Iof l)) wt ot))))) invs sp.
 Proof.
@@ -850,13 +863,13 @@ Theorem rule_Wait invs sp l v el ev O wt ot: correct
   ((Abool (andb (Z.eqb ([[ev]]) ([[Aof v]]))
     (andb (Z.eqb ([[el]]) ([[Aof l]]))
     (andb (Z.eqb ([[Lof v]]) ([[Aof l]]))
-    (andb (safe_obs (evall v) (S (wt ([[Aof v]]))) (ot ([[Aof v]])))
-    (andb (prcl (evalol (Oof v)) (map evalol O))
-    (prcl (evalol (Oof l)) (map evalol (M'of v ++ O)))))))) &* 
+    (safe_obs (evall v) (S (wt ([[Aof v]]))) (ot ([[Aof v]])))))) &*
+    (Aprop (prcl (evalol (Oof v)) (map evalol O)) &*
+    Aprop (prcl (evalol (Oof l)) (map evalol (M'of v ++ O)))) &* 
     ((subsas (snd (Iof l)) (invs (fst (Iof l)) (upd Z.eq_dec wt ([[Aof v]]) (S (wt ([[Aof v]])))) ot)) ** 
     Aobs (Oof l::O) ** Acond v ** Alocked l wt ot)))
   (Wait ev el) 
-  (fun _ => EX wt', (EX ot', (Aobs (Oof l :: M'of v ++ O) ** Alocked l wt' ot' **
+  (fun _ => EX wt', (EX ot', (Aobs (Oof l :: M'of v ++ O) ** Acond v ** Alocked l wt' ot' **
     (subsas (snd (Iof l)) (invs (fst (Iof l)) wt' ot')) ** 
     (subsas (snd (Mof v)) (invs (fst (Mof v)) empb empb))))) invs sp.
 Proof.
@@ -864,7 +877,7 @@ Proof.
   intros. destruct n. reflexivity.
   simpl.
   intros.
-  destruct SAT as (EQ,(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,tmp3)))))))))))))))))).
+  destruct SAT as ((EQ1,EQ2),(p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp12,(o1,(o2,(C1,(C2,(ghpdefC1C2,(BC1,(BC2,(BC1C2,(opo1o2,(tmp1,(tmp2,tmp3)))))))))))))))))).
   exists O, l, v.
   exists p, (emp knowledge).
   exists.
@@ -888,7 +901,7 @@ Proof.
   split.
   exists wt, ot.
   split.
-  tauto.
+  split; assumption.
   exists p1, p2, phpdefp1p2, bp1, bp2, bp12, o1, o2, C1, C2, ghpdefC1C2, BC1, BC2, BC1C2, opo1o2.
   split.
   assumption.
@@ -924,7 +937,6 @@ Proof.
   rewrite ghplus_emp.
   tauto.
 Qed.
-
 
 (** # <font size="5"><b> Notify CV </b></font> # *)
 
@@ -1914,7 +1926,6 @@ Proof.
   intros. apply H; try assumption. apply H; try assumption.
 Qed.
 
-
 Theorem rule_exists_dist A (a: A -> assn) a':
   (EX x, a x) ** a' |=  EX x, (a x ** a').
 Proof.
@@ -1954,7 +1965,6 @@ Proof.
   exists v. assumption.
 Qed.
 
-
 Theorem rule_exists_dist' A (a: A -> assn) a':
   EX x, (a x ** a') |= (EX x, a x) ** a'.
 Proof.
@@ -1969,17 +1979,16 @@ Proof.
   assumption.
 Qed.
 
-(*
-Lemma sat_exists_swap A B (a: A -> B -> assn):
-  (forall x x', a x x' = a x' x) -> 
-  (EX x, (EX x', a x x')) |= (EX x', (EX x, a x x')).
+Theorem sat_exists_imps A (a a': A -> assn):
+  forall (IMP1: forall x, a x |= a' x),
+    (EX x, a x) |= (EX x, a' x).
 Proof.
   simpl.
   intros.
-  assumption.
-
-Admitted.
-*)
+  destruct SAT as (v,SAT).
+  exists v.
+  apply IMP1; try assumption.
+Qed.
 
 Theorem rule_star_pure a a':
   a ** a' |= a &* a'.
@@ -2073,6 +2082,125 @@ Proof.
   split; repeat php_.
 Qed.
 
+Theorem rule_prop_star a b:
+  a &* (Aprop b) |= a ** (Aprop b).
+Proof.
+  simpl. intros.
+  destruct SAT as (SAT,btrue).
+  exists p, (emp knowledge).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists o, None.
+  exists g, (emp (option nat * nat)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply fs_oplus.
+  split. assumption.
+  split. assumption.
+  split; repeat php_.
+Qed.
+
+Theorem rule_prop_star' a b:
+  (Aprop b) &* a |= (Aprop b) ** a.
+Proof.
+  simpl. intros.
+  destruct SAT as (SAT,btrue).
+  exists (emp knowledge), p.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists None, o.
+  exists (emp (option nat * nat)), g.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply sn_oplus.
+  split. assumption.
+  split. assumption.
+  split; repeat php_.
+Qed.
+
+Theorem rule_pure_prop_star a b1 b2:
+  Abool b1 &* Aprop b2 &* a |= Abool b1 ** Aprop b2 ** a.
+Proof.
+  simpl. intros.
+  destruct SAT as ((SAT,btrue),b2true).
+  exists (emp knowledge), p.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists None, o.
+  exists (emp (option nat * nat)), g.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply sn_oplus.
+  split. assumption.
+  split.
+  exists (emp knowledge), p.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists None, o.
+  exists (emp (option nat * nat)), g.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. apply sn_oplus.
+  split. assumption.
+  split.
+  assumption.
+  split; repeat php_.
+  split; repeat php_.
+Qed.
+
+Theorem rule_pure_prop_star' a b1 b2:
+  Abool b1 ** Aprop b2 ** a |= Abool b1 &* Aprop b2 &* a.
+Proof.
+  simpl. intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(b1true,(rest1,(p1p2,c1c2)))))))))))))))))).
+  destruct rest1 as (p3,(p4,(phpdefp3p4,(bp3,(bp4,(bp3p4,(o3,(o4,(c3,(c4,(ghpdefc3c4,(bc3,(bc4,(bc34,(opo3o4,(rest4,(rest5,(p3p4,c3c4)))))))))))))))))).
+  split.
+  split; assumption.
+  subst.
+  rewrite phplus_comm; try assumption.
+  rewrite ghplus_comm; try assumption.
+  assert (phpdefp13: phplusdef p1 p3 /\ phplusdef p1 p4). repeat php_.
+  destruct phpdefp13 as (phpdefp13,phpdefp14).
+  assert (ghpdefp13: ghplusdef c1 c3 /\ ghplusdef c1 c4). repeat php_.
+  destruct ghpdefp13 as (ghpdefp13,ghpdefp14).
+  destruct o4.
+  apply sat_mon with (Some l) None; repeat php_.
+  inversion opo3o4.
+  rewrite <- H0 in opo1o2.
+  inversion opo1o2.
+  apply fs_op.
+  apply Coq.Sorting.Permutation.Permutation_trans with o'; try assumption.
+  rewrite phplus_comm; repeat php_.
+  rewrite ghplus_comm; repeat php_.
+  apply sat_mon with (Some l) None; repeat php_.
+  apply fs_op.
+  apply Coq.Sorting.Permutation.Permutation_refl.
+  apply sat_mon with None o; repeat php_.
+  destruct o. apply sn_op.
+  apply Coq.Sorting.Permutation.Permutation_refl.
+  apply None_op.
+  rewrite phplus_comm; repeat php_.
+  rewrite ghplus_comm; repeat php_.
+  apply sat_mon with None None; repeat php_.
+  apply None_op.
+Qed.
+
 Theorem rule_comm_pure a a':
   a &* a' |= a' &* a.
 Proof.
@@ -2112,7 +2240,7 @@ Proof.
   }
 Qed.
 
-Lemma sat_star_imps:
+Theorem sat_star_imps:
   forall a a' b b' p o C
          (SAT: sat p o C (a ** b))
          (IMP1: a |= a')
@@ -2129,15 +2257,15 @@ Proof.
   split; assumption.
 Qed.
 
-Lemma sat_exists_imps A (a a': A -> assn):
-  forall (IMP1: forall x, a x |= a' x),
-    (EX x, a x) |= (EX x, a' x).
+
+Theorem rule_perm_obs:
+  forall O O' (Perm: Permutation.Permutation (map evalol O) (map evalol O')),
+    Aobs O |= Aobs O'.
 Proof.
-  simpl.
-  intros.
-  destruct SAT as (v,SAT).
-  exists v.
-  apply IMP1; try assumption.
+  simpl. intros. inversion SAT.
+  apply fs_op.
+  apply Coq.Sorting.Permutation.perm_trans with (map evalol O).
+  apply Coq.Sorting.Permutation.Permutation_sym. assumption. assumption.
 Qed.
 
 Theorem sat_array:
@@ -2168,7 +2296,7 @@ Proof.
   exists v', lev. assumption.
 Qed.
 
-Lemma cell_loc_eval:
+Theorem cell_loc_eval:
   forall v v' value (EQ: ([[v]]) = ([[v']])),
   (cell_loc v) |-> Enum value |=
   (cell_loc v') |-> Enum value.
@@ -2183,7 +2311,7 @@ Proof.
   assumption.
 Qed.
 
-Lemma cell_loc_eval1:
+Theorem cell_loc_eval1:
   forall v v' value (EQ: ([[v]]) = ([[v']])),
   (next_loc (cell_loc v) |-> Enum value) |=
 (next_loc (cell_loc v') |-> Enum value).
@@ -2212,12 +2340,214 @@ Proof.
   exists v', lev. assumption.
 Qed.
 
-Lemma Qc_Le_le_mon1:
-  forall (q1 q2: Qc)
-         (LE: (q1 + q2 <= 1)%Qc)
-         (LT: (0 <= q2)%Qc),
-    (q1 <= 1)%Qc.
-Admitted.
+Theorem rule_points_to_leak f1 f2 l v (LE: Qcle f2 f1):
+  Apointsto f1 (cell_loc l) v |= Apointsto f2 (cell_loc l) v.
+Proof.
+  simpl. intros.
+  destruct SAT as (f',(lez,pll)).
+  exists (-f2 + f1 + f')%Qc.
+  exists.
+  replace 0%Qc with (0+0)%Qc.
+  apply Qcplus_le_compat.
+  rewrite Qcplus_comm.
+  apply Qcle_minus_iff in LE. assumption. assumption.
+  apply Qcplus_0_r.
+  rewrite Qcplus_assoc.
+  rewrite Qcplus_assoc.
+  rewrite Qcplus_opp_r.
+  rewrite Qcplus_0_l.
+  assumption.
+Qed.
+
+Theorem rule_points_to_fraction f1 f2 l v:
+  Apointsto f1 l v ** Apointsto f2 l v |= Apointsto (f1+f2) l v.
+Proof.
+  simpl. intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,rest))))))))))))))).
+  destruct rest as (f1',(f2',(p1p2,c1c2))).
+  destruct f1' as (f',(le',p1')).
+  destruct f2' as (f'',(le'',p1'')).
+  subst.
+  unfold phplus.
+  rewrite p1', p1''.
+  exists (f'+f'')%Qc.
+  exists.
+  replace 0%Qc with (0+0)%Qc.
+  apply Qcplus_le_compat; assumption. reflexivity.
+  rewrite <- Qcplus_assoc.
+  rewrite <- Qcplus_assoc.
+  replace (f' + (f2 + f''))%Qc with (f2 + (f' + f''))%Qc. reflexivity.
+  rewrite Qcplus_comm.
+  rewrite <- Qcplus_assoc.
+  replace (f'' + f2)%Qc with (f2 + f'')%Qc. reflexivity.
+  apply Qcplus_comm.
+Qed.
+
+Theorem rule_points_to_fraction' f1 f2 l v (F1: Qclt 0 f1) (F2: Qclt 0 f2):
+  Apointsto (f1+f2)%Qc l v |= Apointsto f1 l v ** Apointsto f2 l v.
+Proof.
+  simpl. intros.
+  destruct SAT as (f',(le',pl)).
+
+  assert (bu: boundph (upd (location_eq_dec Z.eq_dec) (emp knowledge) (evall l)
+    (Some (Cell (f2 + f') ([[v]]))))).
+  {
+  apply boundph_upd; try assumption. repeat php_.
+  intros.
+  destruct H as (z',eq).
+  inversion eq.
+  unfold boundph in bp. apply bp in pl.
+  destruct pl as (pl1,pl2).
+  split.
+  apply Qclt_le_trans with f2. assumption.
+  rewrite <- Qcplus_0_r at 1.
+  apply Qcplus_le_compat.
+  apply Qcle_refl. assumption.
+  apply Qcle_trans with (f1 + f2 + f')%Qc.
+  replace (f2 + f')%Qc with (0 + f2 + f')%Qc.
+  rewrite <- Qcplus_assoc.
+  rewrite <- Qcplus_assoc.
+  apply Qcplus_le_compat.
+  apply Qclt_le_weak. assumption.
+  apply Qcle_refl.
+  rewrite <- Qcplus_assoc.
+  apply Qcplus_0_l.
+  assumption.
+  }
+
+  assert (bu1: boundph (upd (location_eq_dec Z.eq_dec) p (evall l) (Some (Cell f1 ([[v]]))))).
+  {
+  apply boundph_upd; try assumption.
+  intros.
+  destruct H as (z',eq).
+  inversion eq.
+  rewrite <- H0.
+  unfold boundph in bp.
+  apply bp in pl.
+  split. assumption.
+  destruct pl as (pl1,pl2).
+  apply Qcle_trans with (f1 + f2 + f')%Qc.
+  apply Qcle_minus_iff.
+  rewrite Qcplus_comm.
+  rewrite Qcplus_assoc.
+  rewrite Qcplus_assoc.
+  replace (- f1 + f1)%Qc with (f1 + (-f1))%Qc.
+  rewrite Qcplus_opp_r.
+  rewrite Qcplus_0_l.
+  replace 0%Qc with (0+0)%Qc.
+  apply Qcplus_le_compat; try assumption.
+  apply Qclt_le_weak. assumption. reflexivity.
+  apply Qcplus_comm. assumption.
+  }
+
+
+  exists (upd (location_eq_dec Z.eq_dec) p (evall l) (Some (Cell f1 ([[v]])))).
+  exists (upd (location_eq_dec Z.eq_dec) (emp knowledge) (evall l) (Some (Cell (f2+f') ([[v]])))).
+  exists.
+  apply phpdef_comm.
+  unfold phplusdef.
+  intros.
+  unfold upd.
+  destruct (location_eq_dec Z.eq_dec x (evall l)). reflexivity.
+  simpl. trivial.
+  exists. assumption.
+  exists. assumption.
+  exists.
+  unfold boundph. unfold phplus. unfold upd. simpl. intros.
+  destruct (location_eq_dec Z.eq_dec x (evall l)).
+  inversion H.
+  unfold boundph in bp.
+  apply bp in pl.
+  rewrite Qcplus_assoc. assumption.
+  destruct (p x) eqn:px. destruct k; simpl in H; try inversion H. rewrite <- H1.
+  unfold boundph in bp.
+  apply bp in px. assumption. inversion H.
+  exists o, None.
+  exists g, (emp (option nat * nat)).
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists. repeat php_.
+  exists.
+  destruct o. apply fs_op. apply Coq.Sorting.Permutation.Permutation_refl. apply None_op.
+  split.
+  exists 0%Qc.
+  exists.
+  apply Qcle_refl.
+  unfold upd.
+  destruct (location_eq_dec Z.eq_dec (evall l) (evall l)).
+  rewrite Qcplus_0_r. reflexivity. contradiction.
+  split.
+  exists f', le'.
+  unfold upd.
+  destruct (location_eq_dec Z.eq_dec (evall l) (evall l)). reflexivity. contradiction.
+  split.
+  unfold phplus, upd.
+  apply functional_extensionality.
+  intros.
+  destruct (location_eq_dec Z.eq_dec x (evall l)).
+  rewrite e.
+  rewrite Qcplus_assoc.
+  symmetry. assumption.
+  simpl.
+  destruct (p x).
+  destruct k; reflexivity. reflexivity.
+  repeat php_.
+Qed.
+
+Theorem rule_points_to_value f1 f2 l v v':
+  Apointsto f1 l v ** Apointsto f2 l v' |= Apointsto f1 l v ** Apointsto f2 l v' &* Aprop (([[v]]) = ([[v']])).
+Proof.
+  simpl. intros.
+  destruct SAT as (p1,(p2,(phpdefp1p2,(bp1,(bp2,(bp1p2,(o1,(o2,(c1,(c2,(ghpdefc1c2,(bc1,(bc2,(bc12,(opo1o2,(rest1,(rest2,rest3))))))))))))))))).
+  split.
+  exists p1, p2, phpdefp1p2, bp1, bp2, bp1p2, o1, o2, c1, c2, ghpdefc1c2, bc1, bc2, bc12, opo1o2.
+  split; try assumption.
+  split; try assumption.
+  destruct rest1 as (f1',(le1,p1l)).
+  destruct rest2 as (f2',(le2,p2l)).
+  unfold phplusdef in phpdefp1p2.
+  specialize phpdefp1p2 with (evall l).
+  rewrite p1l in phpdefp1p2.
+  rewrite p2l in phpdefp1p2.
+  assumption.
+Qed.  
+
+Theorem next_plus2:
+  forall f z v,
+    Apointsto f (cell_loc (Eplus (Enum z) (Enum 2))) v |=
+    Apointsto f (next_loc (next_loc (cell_loc (Enum z)))) v.
+Proof.
+  simpl.
+  intros.
+  unfold next_loc in *.
+  unfold Aof,Aofo,Oof in *. simpl.
+  unfold evall, evalol in *.
+  simpl in *.
+  unfold Aofo, Rofo, Lofo, Xofo, Pofo, Iof, Mof, Aof, Rof, Lof, Xof, Pof, Aofo, Rofo, Lofo, Xofo, Pofo in *.
+  simpl in *.
+  replace (z + 1 + 1)%Z with (z+2)%Z.
+  assumption.
+  omega.
+Qed.
+
+Theorem next_plus2':
+  forall f z v,
+    Apointsto f (next_loc (next_loc (cell_loc (Enum z)))) v |=
+    Apointsto f (cell_loc (Eplus (Enum z) (Enum 2))) v .
+Proof.
+  simpl.
+  intros.
+  unfold next_loc in *.
+  unfold Aof,Aofo,Oof in *. simpl.
+  unfold evall, evalol in *.
+  simpl in *.
+  unfold Aofo, Rofo, Lofo, Xofo, Pofo, Iof, Mof, Aof, Rof, Lof, Xof, Pof, Aofo, Rofo, Lofo, Xofo, Pofo in *.
+  simpl in *.
+  replace (z + 1 + 1)%Z with (z+2)%Z in SAT.
+  assumption.
+  omega.
+Qed.
 
 Theorem rule_disjont:
   forall l l' v v' (EQ: ([[l]]) = ([[l']])),
@@ -2248,4 +2578,18 @@ Proof.
   unfold evall, evalol. simpl.
   unfold Aofo, Rofo, Lofo, Xofo, Pofo, Iof, Mof, Aof, Rof, Lof, Xof, Pof, Aofo, Rofo, Lofo, Xofo, Pofo.
   simpl. rewrite EQ. reflexivity.
+Qed.
+
+Theorem pointsto_loc_eval:
+  forall l l' f v (EQ: (evall l) = (evall l')),
+  Apointsto f l v |= Apointsto f l' v.
+Proof.
+  simpl.
+  unfold evall, evalol.
+  simpl.
+  unfold Aofo, Rofo, Lofo, Xofo, Pofo, Iof, Mof, Aof, Rof, Lof, Xof, Pof, Aofo, Rofo, Lofo, Xofo, Pofo.
+  simpl.
+  intros.
+  rewrite EQ in *.
+  assumption.
 Qed.
