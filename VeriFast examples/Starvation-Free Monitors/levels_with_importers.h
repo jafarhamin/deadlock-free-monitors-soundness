@@ -62,6 +62,11 @@ lemma void object_lt_remove(void* o, void* o', list<void*> O)
 @*/
 
 /*@
+lemma void wait_level_lt_below_obs(real w1, real w2, list<void*> O);
+    requires level_lt_level(w1, w2) && level_lt_objects(w2, O);
+    ensures level_lt_objects(w1, O) == true;
+
+
 fixpoint list<T> minus<T> (list<T> O1, list<T> O2){
     switch (O1){
         case nil: return nil;

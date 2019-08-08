@@ -1,12 +1,9 @@
-/*
-  Monitors
-*/
-
 #ifndef MONITORS_H
 #define MONITORS_H
 
 #include "levels_with_importers.h"
 //@#include "ghost_cells.gh"
+
 
 struct mutex;
 struct condvar;
@@ -16,15 +13,15 @@ typedef struct condvar *condvar;
 
 /*@
 fixpoint mutex mutex_of(void* condvar);
-fixpoint predicate(fixpoint(void*, unsigned int), fixpoint(void*, unsigned int), fixpoint(void*, int, unsigned int)) inv(struct mutex* mutex);
+fixpoint predicate(fixpoint(void*, unsigned int), fixpoint(void*, unsigned int), list< pair<void*, int> > It) inv(struct mutex* mutex);
 @*/
 
 /*@
-predicate umutex(mutex mutex; fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot, fixpoint(void*, int, unsigned int) It);
+predicate umutex(mutex mutex; fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot, list< pair<void*, int> > It);
 
 predicate mutex(mutex mutex;);
 
-predicate mutex_held(mutex mutex; real frac, fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot, fixpoint(void*, int, unsigned int) It);
+predicate mutex_held(mutex mutex; real frac, fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot, list< pair<void*, int> > It);
 
 predicate ucond(condvar condvar;);
 
@@ -32,26 +29,19 @@ predicate cond(condvar condvar; predicate() M, list<void*> M');
 
 predicate create_mutex_ghost_args(real wlevel) = true;
 
-predicate init_mutex_ghost_args(predicate(fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot, fixpoint(void*, int, unsigned int) It) lockinv) = true;
+predicate init_mutex_ghost_args(predicate(fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot, list< pair<void*, int> > It) lockinv) = true;
 
 predicate create_condvar_ghost_args(real wlevel) = true;
 
 predicate init_condvar_ghost_args(mutex mutex, predicate() M, list<void*> M') = true;
 
-predicate mutex_inv(mutex mutex; predicate(fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot, fixpoint(void*, int, unsigned int) It) lockinv) = lockinv == inv(mutex);
+predicate mutex_inv(mutex mutex; predicate(fixpoint(void*, unsigned int) Wt, fixpoint(void*, unsigned int) Ot, list< pair<void*, int> > It) lockinv) = lockinv == inv(mutex);
 
 predicate Id(int id) = true;
 @*/
 
 /*@
 predicate no_transfer() = true;
-
-predicate n_times(int n, predicate() p) =
-  n <= 0 ? true : p() &*& n_times(n-1,p);
-
-lemma void n_times_no_transfer(int n);
-  requires true;
-  ensures n_times(n,no_transfer);  
 @*/
 
 /*@
@@ -61,14 +51,6 @@ fixpoint int inc(fixpoint(void*, int) f, void* x, void* y){
 
 fixpoint fixpoint(void*, unsigned int) finc(fixpoint(void*, unsigned int) f, void* x){
     return (inc)(f)(x);
-}
-
-fixpoint int incIt(fixpoint(void*, int, int) f, void* x, int idx, void* y, int idy){
-    return x==y && idx==idy ? f(x,idx)+1 : f(y,idy);
-}
-
-fixpoint fixpoint(void*, int, unsigned int) fincIt(fixpoint(void*, int, unsigned int) f, void* x, int idx){
-    return (incIt)(f)(x,idx);
 }
 
 fixpoint int inc'(int i, fixpoint(void*, int) f, void* x, void* y){
@@ -91,19 +73,7 @@ fixpoint fixpoint(void*, int) fdec(fixpoint(void*, unsigned int) f, void* x){
     return (dec)(f)(x);
 }
 
-fixpoint int decIt(fixpoint(void*, int, unsigned int) f, void* x, int idx, void* y, int idy){
-    return x==y && idx==idy ? dec1(f(x,idx)) : f(y,idy);
-}
-
-fixpoint fixpoint(void*, int, unsigned int) fdecIt(fixpoint(void*, int, unsigned int) f, void* x, int idx){
-    return (decIt)(f)(x,idx);
-}
-
 fixpoint int empb(void* x){
-    return 0;
-}
-
-fixpoint int empbIt(void* x, int id){
     return 0;
 }
 
@@ -135,62 +105,30 @@ lemma void g_chrgu(condvar condvar);
 
 lemma void g_chrgu'(int n, condvar condvar);
     requires umutex(mutex_of(condvar), ?Wt, ?Ot, ?It) &*& obs(?O) &*& n >= 0;
-    ensures umutex(mutex_of(condvar), Wt, finc'(n,Ot,condvar), It) &*& obs(ntimes_list(nat_of_int(n),condvar,O));// obs(cons(condvar,O));
+    ensures umutex(mutex_of(condvar), Wt, finc'(n,Ot,condvar), It) &*& obs(ntimes_list(nat_of_int(n),condvar,O));
 
 lemma void g_chrgl(condvar condvar);
     requires mutex_held(mutex_of(condvar), ?f, ?Wt, ?Ot, ?It) &*& obs(?O);
     ensures mutex_held(mutex_of(condvar), f, Wt, finc(Ot,condvar), It) &*& obs(cons(condvar,O));
 
 lemma void g_dischu(condvar condvar);
-    requires umutex(mutex_of(condvar), ?Wt, ?Ot, ?It) &*& obs(?O) &*& enfo(condvar,Wt,fdec(Ot,condvar)) == true;// &*& 0 < Ot(condvar);
+    requires umutex(mutex_of(condvar), ?Wt, ?Ot, ?It) &*& obs(?O) &*& enfo(condvar,Wt,fdec(Ot,condvar)) == true;
     ensures umutex(mutex_of(condvar), Wt, fdec(Ot,condvar), It) &*& obs(remove(condvar,O));
 
 lemma void g_dischl(condvar condvar);
-    requires mutex_held(mutex_of(condvar), ?f, ?Wt, ?Ot, ?It) &*& obs(?O) &*& enfo(condvar,Wt,fdec(Ot,condvar)) == true;// &*& 0 < Ot(condvar);
+    requires mutex_held(mutex_of(condvar), ?f, ?Wt, ?Ot, ?It) &*& obs(?O) &*& enfo(condvar,Wt,fdec(Ot,condvar)) == true;
     ensures mutex_held(mutex_of(condvar), f, Wt, fdec(Ot,condvar), It) &*& obs(remove(condvar,O));
     
 lemma void g_Ot_isbag(mutex mutex, condvar condvar);
     requires mutex_held(mutex, ?f, ?Wt, ?Ot, ?It);
     ensures mutex_held(mutex, f, Wt, Ot, It) &*& Ot(condvar) >= 0;
 
-lemma void cond_plus(condvar cv)
-  requires [?f1]cond(cv,?M,?M') &*& [?f2]cond(cv,?M1,?M'1);
-  ensures [f1+f2]cond(cv,M,M');
-{}
-
-lemma void cond_frac(struct condvar *c1);
-  requires cond(c1,?M,?M') &*& [?f]cond (c1,M,M') &*& 0 < f;
-  ensures false;        
-
-lemma void u_cond_frac(struct condvar *c1);
-  requires ucond(c1) &*& [?f]cond(c1,?M,?M');
-  ensures false;        
-
-lemma void ucond_frac(struct condvar *c1);
-  requires ucond(c1) &*& ucond (c1);
-  ensures false;        
-
-lemma void cond_frac'(struct condvar *c1);
-  requires [?f]cond(c1,?M,?M');
-  ensures [f]cond(c1,M,M') &*& 0 < f &*& f <= 1;  
-  
-//fixpoint bool min(fixpoint(void*, int, unsigned int) It, void* condvar, int id){
-//  return true;
-//}
-        
-//predicate min(fixpoint(void*, int, unsigned int) It, void* condvar, bool has, int minid) = true;
-//  0 < It(condvar, eachid) ? minid <= eachid : true;
-
 predicate publishable(predicate() p1, predicate() p2);
-
-
-//predicate publishable(int pg, int u, int p)
-//fixpoint predicate() publishable(predicate() p){ return p;}
 @*/
 
 mutex create_mutex();
     //@ requires create_mutex_ghost_args(?wlevel);
-    //@ ensures result != 0 &*& umutex(result, empb ,empb, empbIt) &*& mutex_of(result)==result &*& level_of(result) == wlevel;
+    //@ ensures result != 0 &*& umutex(result, empb ,empb, nil) &*& mutex_of(result)==result &*& level_of(result) == wlevel;
     
 void mutex_acquire(mutex mutex);
     //@ requires [?f]mutex(mutex) &*& obs(?O) &*& mutex_inv(mutex, ?p) &*& object_lt_objects(mutex,O) == true;
@@ -205,10 +143,10 @@ condvar create_condvar();
     //@ ensures ucond(result) &*& level_of(result) == wlevel;
 
 void condvar_wait(condvar condvar, mutex mutex);
-    /*@ requires [?fc]cond(condvar,?M,?M') &*& mutex_held(mutex, ?f, ?Wt, ?Ot, ?It) &*& mutex_inv(mutex,?inv) &*& Id(?id) &*& inv(finc(Wt,condvar), Ot, fincIt(It,condvar,id)) &*& obs(?O) &*&
+    /*@ requires [?fc]cond(condvar,?M,?M') &*& mutex_held(mutex, ?f, ?Wt, ?Ot, ?It) &*& mutex_inv(mutex,?inv) &*& Id(?id) &*& inv(finc(Wt,condvar), Ot, cons(pair(condvar,id),It)) &*& obs(?O) &*&
                  object_lt_objects(condvar,remove(mutex,O))==true &*& object_lt_objects(mutex,append(M',remove(mutex,O))) == true &*& enfo(condvar,finc(Wt,condvar),Ot)==true;@*/
     /*@ ensures [fc]cond(condvar,M,M') &*& M() &*& inv(?Wt', ?Ot', ?It') &*&
-        0 < It'(condvar,id) ? mutex_held(mutex, f, Wt', Ot', fdecIt(It',condvar,id)) &*& obs(O) : 
+        mem(pair(condvar,id), It') ? mutex_held(mutex, f, Wt', Ot', remove(pair(condvar,id),It')) &*& obs(O) : 
         mutex_held(mutex, f, Wt', Ot', It') &*& obs(append(M',O)); @*/
 
 void condvar_signal(condvar condvar);
@@ -217,6 +155,6 @@ void condvar_signal(condvar condvar);
 
 void condvar_broadcast(condvar condvar);
     //@ requires obs(?O) &*& [?fc]cond(condvar,?M,?M') &*& mutex_held(?mutex, ?f, ?Wt, ?Ot, ?It) &*& Id(?id) &*& publishable(?P,M) &*& P();
-    //@ ensures obs(minus(O, 0 < It(condvar,id) ? M' : nil)) &*& [fc]cond(condvar,M,M') &*& mutex_held(mutex, f, removeAll(Wt,condvar), Ot, fdecIt(It,condvar,id));
+    //@ ensures obs(minus(O, mem(pair(condvar,id), It) ? M' : nil)) &*& [fc]cond(condvar,M,M') &*& mutex_held(mutex, f, removeAll(Wt,condvar), Ot, remove(pair(condvar,id),It));
 
 #endif    

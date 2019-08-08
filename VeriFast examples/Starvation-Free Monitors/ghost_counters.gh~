@@ -32,12 +32,8 @@ lemma void inc_pctr(int id);
   ensures pctr(id,n+1) &*& ptic(id,1,0);
 
 lemma void dec_pctr(int id);
-  requires pctr(id,?n) &*& ptic(id,?n',?p) &*& 0 < n';
-  ensures pctr(id,n-1) &*& ptic(id,n'-1,p) &*& n' <= n;
-
-lemma void min_pctr(int id);
-  requires pctr(id,?n) &*& ptic(id,?n',?p);
-  ensures pctr(id,n) &*& ptic(id,n',p) &*& n' + p <= n;
+  requires pctr(id,?n) &*& ptic(id,1,0);
+  ensures pctr(id,n-1) &*& ptic(id,0,0) &*& n > 0;
 
 lemma void merge_ptic(int id, int u1, int p1, int u2, int p2);
   requires ptic(id,u1,p1) &*& ptic(id,u2,p2);
